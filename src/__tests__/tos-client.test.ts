@@ -1,9 +1,20 @@
-import { describe, expect, it } from "vitest";
-import { deriveTOSAddressFromPrivateKey, normalizeTOSAddress } from "../tos/address.js";
-import { signTOSNativeTransfer } from "../tos/client.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  deriveTOSAddressFromPrivateKey,
+  normalizeTOSAddress,
+} from "../tos/address.js";
+import {
+  recordTOSReputationScore,
+  signTOSNativeTransfer,
+  TOS_SYSTEM_ACTION_ADDRESS,
+} from "../tos/client.js";
 
 const TEST_PRIVATE_KEY =
   "0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8" as const;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("TOS address", () => {
   it("derives 32-byte TOS address from secp256k1 private key", () => {
@@ -42,5 +53,64 @@ describe("TOS signer tx", () => {
     expect(signed.transactionHash).toBe(
       "0x0e558f3142dd1941c13358fc738b9462db391ea5bc27ab4bbdd7f188e0da99c3",
     );
+  });
+
+  it("builds and submits a reputation record system action", async () => {
+    const originalFetch = global.fetch;
+    let sendRawSeen = false;
+    global.fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        id: number;
+        method: string;
+        params: unknown[];
+      };
+      switch (body.method) {
+        case "tos_chainId":
+          return new Response(
+            JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x539" }),
+            { status: 200 },
+          );
+        case "tos_getTransactionCount":
+          return new Response(
+            JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x2a" }),
+            { status: 200 },
+          );
+        case "tos_sendRawTransaction":
+          sendRawSeen = true;
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result:
+                "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            }),
+            { status: 200 },
+          );
+        default:
+          throw new Error(`unexpected rpc method ${body.method}`);
+      }
+    }) as typeof fetch;
+
+    try {
+      const result = await recordTOSReputationScore({
+        rpcUrl: "http://127.0.0.1:8545",
+        privateKey: TEST_PRIVATE_KEY,
+        who: normalizeTOSAddress("0x42"),
+        delta: "1",
+        reason: "agent-discovery:success:sponsor.topup.testnet",
+        refId: "agent-discovery:sponsor.topup.testnet:node-1:nonce-1",
+        waitForReceipt: false,
+      });
+
+      expect(sendRawSeen).toBe(true);
+      expect(result.signed.to).toBe(TOS_SYSTEM_ACTION_ADDRESS);
+      expect(result.signed.value).toBe(0n);
+      expect(result.signed.data.startsWith("0x")).toBe(true);
+      expect(result.txHash).toBe(
+        "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

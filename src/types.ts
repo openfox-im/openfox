@@ -75,6 +75,16 @@ export interface AgentDiscoveryObservationServerConfig {
   allowPrivateTargets: boolean;
 }
 
+export interface AgentDiscoveryReputationUpdateConfig {
+  enabled: boolean;
+  successDelta: string;
+  failureDelta: string;
+  timeoutDelta: string;
+  malformedDelta: string;
+  gas: string;
+  reasonPrefix: string;
+}
+
 export interface AgentDiscoverySelectionPolicy {
   requireRegistered: boolean;
   excludeSuspended: boolean;
@@ -101,6 +111,7 @@ export interface AgentDiscoveryConfig {
   directoryNodeRecords?: string[];
   selectionPolicy?: AgentDiscoverySelectionPolicy;
   policyProfiles?: Partial<AgentDiscoveryPolicyProfiles>;
+  reputationUpdates?: AgentDiscoveryReputationUpdateConfig;
   faucetServer?: AgentDiscoveryFaucetServerConfig;
   observationServer?: AgentDiscoveryObservationServerConfig;
 }
@@ -162,6 +173,17 @@ export const DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES: AgentDiscoveryPolicyProfil
     },
   };
 
+export const DEFAULT_AGENT_DISCOVERY_REPUTATION_UPDATE_CONFIG: AgentDiscoveryReputationUpdateConfig =
+  {
+    enabled: false,
+    successDelta: "1",
+    failureDelta: "-1",
+    timeoutDelta: "-2",
+    malformedDelta: "-2",
+    gas: "120000",
+    reasonPrefix: "agent-discovery",
+  };
+
 export const DEFAULT_AGENT_DISCOVERY_CONFIG: AgentDiscoveryConfig = {
   enabled: false,
   publishCard: false,
@@ -171,6 +193,7 @@ export const DEFAULT_AGENT_DISCOVERY_CONFIG: AgentDiscoveryConfig = {
   directoryNodeRecords: [],
   selectionPolicy: DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
   policyProfiles: DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES,
+  reputationUpdates: DEFAULT_AGENT_DISCOVERY_REPUTATION_UPDATE_CONFIG,
   faucetServer: DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG,
   observationServer: DEFAULT_AGENT_DISCOVERY_OBSERVATION_SERVER_CONFIG,
 };

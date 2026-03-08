@@ -2,7 +2,12 @@ import { createHmac } from "node:crypto";
 import { etc, sign as signSecp256k1 } from "@noble/secp256k1";
 import type { PrivateKeyAccount } from "viem";
 import { keccak256, parseUnits, toHex } from "viem";
-import { deriveTOSAddressFromPrivateKey, normalizeTOSAddress, type TOSAddress, type HexString } from "./address.js";
+import {
+  deriveTOSAddressFromPrivateKey,
+  normalizeTOSAddress,
+  type TOSAddress,
+  type HexString,
+} from "./address.js";
 import {
   bigintToMinimalBytes,
   encodeRlpAddress,
@@ -12,6 +17,8 @@ import {
   encodeRlpUint,
   hexToBytes,
 } from "./rlp.js";
+
+export const TOS_SYSTEM_ACTION_ADDRESS = normalizeTOSAddress("0x1");
 
 if (!etc.hmacSha256Sync) {
   etc.hmacSha256Sync = (key, ...messages) => {
@@ -36,6 +43,11 @@ export interface TOSUnsignedTransaction {
   data?: HexString;
   from: TOSAddress;
   signerType?: "secp256k1";
+}
+
+export interface TOSSystemAction {
+  action: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface TOSSignedTransaction extends TOSUnsignedTransaction {
@@ -66,7 +78,11 @@ export interface TOSX402Requirement {
 }
 
 type JsonRpcSuccess<T> = { jsonrpc: "2.0"; id: number; result: T };
-type JsonRpcFailure = { jsonrpc: "2.0"; id: number; error: { code: number; message: string } };
+type JsonRpcFailure = {
+  jsonrpc: "2.0";
+  id: number;
+  error: { code: number; message: string };
+};
 
 function bytesToHex(bytes: Uint8Array): HexString {
   return toHex(bytes) as HexString;
@@ -96,6 +112,10 @@ function parseChainIdFromNetwork(network: string): bigint {
     return BigInt(normalized.slice("tos:".length));
   }
   throw new Error(`Unsupported TOS network identifier: ${network}`);
+}
+
+function utf8ToHex(value: string): HexString {
+  return bytesToHex(new TextEncoder().encode(value));
 }
 
 function bigIntFromSignatureBytes(bytes: Uint8Array): bigint {
@@ -167,11 +187,15 @@ export class TOSRpcClient {
       }),
     });
     if (!response.ok) {
-      throw new Error(`TOS RPC ${method} failed: ${response.status} ${await response.text()}`);
+      throw new Error(
+        `TOS RPC ${method} failed: ${response.status} ${await response.text()}`,
+      );
     }
-    const body = await response.json() as JsonRpcSuccess<T> | JsonRpcFailure;
+    const body = (await response.json()) as JsonRpcSuccess<T> | JsonRpcFailure;
     if ("error" in body) {
-      throw new Error(`TOS RPC ${method} error ${body.error.code}: ${body.error.message}`);
+      throw new Error(
+        `TOS RPC ${method} error ${body.error.code}: ${body.error.message}`,
+      );
     }
     return body.result;
   }
@@ -180,24 +204,43 @@ export class TOSRpcClient {
     return parseHexQuantity(await this.request<string>("tos_chainId", []));
   }
 
-  async getBalance(address: TOSAddress, blockTag: string = "latest"): Promise<bigint> {
+  async getBalance(
+    address: TOSAddress,
+    blockTag: string = "latest",
+  ): Promise<bigint> {
     return parseHexQuantity(
-      await this.request<string>("tos_getBalance", [normalizeTOSAddress(address), blockTag]),
+      await this.request<string>("tos_getBalance", [
+        normalizeTOSAddress(address),
+        blockTag,
+      ]),
     );
   }
 
-  async getTransactionCount(address: TOSAddress, blockTag: string = "pending"): Promise<bigint> {
+  async getTransactionCount(
+    address: TOSAddress,
+    blockTag: string = "pending",
+  ): Promise<bigint> {
     return parseHexQuantity(
-      await this.request<string>("tos_getTransactionCount", [normalizeTOSAddress(address), blockTag]),
+      await this.request<string>("tos_getTransactionCount", [
+        normalizeTOSAddress(address),
+        blockTag,
+      ]),
     );
   }
 
   async sendRawTransaction(rawTransaction: HexString): Promise<HexString> {
-    return await this.request<HexString>("tos_sendRawTransaction", [rawTransaction]);
+    return await this.request<HexString>("tos_sendRawTransaction", [
+      rawTransaction,
+    ]);
   }
 
-  async getTransactionReceipt(txHash: HexString): Promise<Record<string, unknown> | null> {
-    return await this.request<Record<string, unknown> | null>("tos_getTransactionReceipt", [txHash]);
+  async getTransactionReceipt(
+    txHash: HexString,
+  ): Promise<Record<string, unknown> | null> {
+    return await this.request<Record<string, unknown> | null>(
+      "tos_getTransactionReceipt",
+      [txHash],
+    );
   }
 }
 
@@ -300,6 +343,70 @@ export async function sendTOSNativeTransfer(params: {
   return { signed, txHash, receipt: null };
 }
 
+export async function sendTOSSystemAction(params: {
+  rpcUrl: string;
+  privateKey: HexString;
+  action: string;
+  payload?: Record<string, unknown>;
+  gas?: bigint;
+  waitForReceipt?: boolean;
+  receiptTimeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<{
+  signed: TOSSignedTransaction;
+  txHash: HexString;
+  receipt?: Record<string, unknown> | null;
+}> {
+  const body: TOSSystemAction = {
+    action: params.action,
+    ...(params.payload ? { payload: params.payload } : {}),
+  };
+  return sendTOSNativeTransfer({
+    rpcUrl: params.rpcUrl,
+    privateKey: params.privateKey,
+    to: TOS_SYSTEM_ACTION_ADDRESS,
+    amountWei: 0n,
+    gas: params.gas ?? 120_000n,
+    data: utf8ToHex(JSON.stringify(body)),
+    waitForReceipt: params.waitForReceipt,
+    receiptTimeoutMs: params.receiptTimeoutMs,
+    pollIntervalMs: params.pollIntervalMs,
+  });
+}
+
+export async function recordTOSReputationScore(params: {
+  rpcUrl: string;
+  privateKey: HexString;
+  who: TOSAddress | string;
+  delta: string;
+  reason: string;
+  refId: string;
+  gas?: bigint;
+  waitForReceipt?: boolean;
+  receiptTimeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<{
+  signed: TOSSignedTransaction;
+  txHash: HexString;
+  receipt?: Record<string, unknown> | null;
+}> {
+  return sendTOSSystemAction({
+    rpcUrl: params.rpcUrl,
+    privateKey: params.privateKey,
+    action: "REPUTATION_RECORD_SCORE",
+    payload: {
+      who: normalizeTOSAddress(params.who),
+      delta: params.delta,
+      reason: params.reason,
+      ref_id: params.refId,
+    },
+    gas: params.gas,
+    waitForReceipt: params.waitForReceipt,
+    receiptTimeoutMs: params.receiptTimeoutMs,
+    pollIntervalMs: params.pollIntervalMs,
+  });
+}
+
 export async function buildTOSX402Payment(params: {
   privateKey: HexString;
   requirement: TOSX402Requirement;
@@ -340,10 +447,15 @@ export async function buildTOSX402Payment(params: {
   };
 }
 
-export function encodeTOSX402PaymentHeader(envelope: TOSPaymentEnvelope): string {
+export function encodeTOSX402PaymentHeader(
+  envelope: TOSPaymentEnvelope,
+): string {
   return Buffer.from(JSON.stringify(envelope)).toString("base64");
 }
 
-export function getTOSAddressFromAccount(_account: PrivateKeyAccount, privateKey: HexString): TOSAddress {
+export function getTOSAddressFromAccount(
+  _account: PrivateKeyAccount,
+  privateKey: HexString,
+): TOSAddress {
   return deriveTOSAddressFromPrivateKey(privateKey);
 }

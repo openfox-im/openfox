@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
+import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { checkX402, x402Fetch } from "../runtime/x402.js";
-import { TOSRpcClient } from "../tos/client.js";
+import { recordTOSReputationScore, TOSRpcClient } from "../tos/client.js";
 import type {
   OpenFoxConfig,
   OpenFoxDatabase,
@@ -245,18 +246,22 @@ function loadLocalFeedback(
 
 function recordProviderFeedback(params: {
   db?: OpenFoxDatabase;
+  config: OpenFoxConfig;
   provider: VerifiedAgentProvider;
   capability: string;
   outcome: "success" | "failure" | "timeout" | "malformed";
+  requestNonce?: string;
 }): void {
-  if (!params.db) {
-    return;
+  let current: AgentDiscoveryLocalFeedback = {
+    successCount: 0,
+    failureCount: 0,
+    timeoutCount: 0,
+    malformedCount: 0,
+    localScore: 0,
+  };
+  if (params.db) {
+    current = loadLocalFeedback(params.db, params.provider, params.capability);
   }
-  const current = loadLocalFeedback(
-    params.db,
-    params.provider,
-    params.capability,
-  );
   switch (params.outcome) {
     case "success":
       current.successCount += 1;
@@ -277,10 +282,13 @@ function recordProviderFeedback(params: {
     current.failureCount * 10 -
     current.timeoutCount * 15 -
     current.malformedCount * 12;
-  params.db.setKV(
-    feedbackKey(params.provider.search.nodeId, params.capability),
-    JSON.stringify(current),
-  );
+  if (params.db) {
+    params.db.setKV(
+      feedbackKey(params.provider.search.nodeId, params.capability),
+      JSON.stringify(current),
+    );
+  }
+  submitReputationUpdate(params).catch(() => undefined);
 }
 
 function classifyInvocationError(
@@ -302,6 +310,50 @@ function classifyInvocationError(
     return "malformed";
   }
   return "failure";
+}
+
+async function submitReputationUpdate(params: {
+  config: OpenFoxConfig;
+  provider: VerifiedAgentProvider;
+  capability: string;
+  outcome: "success" | "failure" | "timeout" | "malformed";
+  requestNonce?: string;
+}): Promise<void> {
+  const updates = params.config.agentDiscovery?.reputationUpdates;
+  if (!updates?.enabled) {
+    return;
+  }
+  const privateKey = loadWalletPrivateKey();
+  const rpcUrl = params.config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const who = params.provider.search.primaryIdentity;
+  if (!privateKey || !rpcUrl || !who) {
+    return;
+  }
+
+  const delta =
+    params.outcome === "success"
+      ? updates.successDelta
+      : params.outcome === "timeout"
+        ? updates.timeoutDelta
+        : params.outcome === "malformed"
+          ? updates.malformedDelta
+          : updates.failureDelta;
+
+  await recordTOSReputationScore({
+    rpcUrl,
+    privateKey,
+    who,
+    delta,
+    reason: `${updates.reasonPrefix}:${params.outcome}:${params.capability}`,
+    refId: [
+      "agent-discovery",
+      params.capability,
+      params.provider.search.nodeId,
+      params.requestNonce || "no-nonce",
+    ].join(":"),
+    gas: BigInt(updates.gas),
+    waitForReceipt: false,
+  });
 }
 
 function providerMatchesSelectionPolicy(
@@ -671,9 +723,11 @@ export async function requestTestnetFaucet(params: {
   } catch (error) {
     recordProviderFeedback({
       db: params.db,
+      config: params.config,
       provider,
       capability,
       outcome: classifyInvocationError(error),
+      requestNonce: request.request_nonce,
     });
     throw error;
   }
@@ -710,9 +764,11 @@ export async function requestTestnetFaucet(params: {
   );
   recordProviderFeedback({
     db: params.db,
+    config: params.config,
     provider,
     capability,
     outcome: "success",
+    requestNonce: request.request_nonce,
   });
 
   return { provider, request, response, receipt };
@@ -793,9 +849,11 @@ export async function requestObservationOnce(params: {
   } catch (error) {
     recordProviderFeedback({
       db: params.db,
+      config: params.config,
       provider,
       capability,
       outcome: classifyInvocationError(error),
+      requestNonce: request.request_nonce,
     });
     throw error;
   }
@@ -811,9 +869,11 @@ export async function requestObservationOnce(params: {
   );
   recordProviderFeedback({
     db: params.db,
+    config: params.config,
     provider,
     capability,
     outcome: "success",
+    requestNonce: request.request_nonce,
   });
   return { provider, request, response };
 }
