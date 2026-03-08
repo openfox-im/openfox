@@ -31,11 +31,9 @@ function makeConfig(): OpenFoxConfig {
     dbPath: "~/.openfox/state.db",
     logLevel: "info",
     walletAddress:
-      "0x0000000000000000000000000000000000000001" as `0x${string}`,
-    tosWalletAddress:
       "0x0000000000000000000000000000000000000000000000000000000000000042",
-    tosRpcUrl: "http://127.0.0.1:8545",
-    tosChainId: 1666,
+    rpcUrl: "http://127.0.0.1:8545",
+    chainId: 1666,
     version: "0.2.1",
     skillsDir: "~/.openfox/skills",
     maxChildren: 3,
@@ -116,7 +114,7 @@ describe("agent discovery", () => {
       identity,
       config,
       agentDiscovery: config.agentDiscovery!,
-      tosAddress: config.tosWalletAddress!,
+      address: config.walletAddress!,
       discoveryNodeId: "node-1",
       issuedAt: Math.floor(Date.now() / 1000),
       cardSequence: 7,
@@ -135,7 +133,7 @@ describe("agent discovery", () => {
       identity,
       config,
       agentDiscovery: config.agentDiscovery!,
-      tosAddress: config.tosWalletAddress!,
+      address: config.walletAddress!,
       discoveryNodeId: "node-provider",
       issuedAt: Math.floor(Date.now() / 1000),
       cardSequence: 9,
@@ -158,7 +156,7 @@ describe("agent discovery", () => {
                   {
                     nodeId: "node-provider",
                     nodeRecord: "enr:provider",
-                    primaryIdentity: config.tosWalletAddress,
+                    primaryIdentity: config.walletAddress,
                     connectionModes: 3,
                     cardSequence: 9,
                   },
@@ -217,7 +215,7 @@ describe("agent discovery", () => {
     const result = await requestTestnetFaucet({
       identity,
       config,
-      tosAddress: config.tosWalletAddress!,
+      address: config.walletAddress!,
       requestedAmountWei: 10_000_000_000_000_000n,
       waitForReceipt: false,
     });
@@ -250,7 +248,7 @@ describe("agent discovery", () => {
       identity,
       config,
       agentDiscovery: config.agentDiscovery!,
-      tosAddress: config.tosWalletAddress!,
+      address: config.walletAddress!,
       discoveryNodeId: "node-provider",
       issuedAt: Math.floor(Date.now() / 1000),
       cardSequence: 11,
@@ -282,7 +280,7 @@ describe("agent discovery", () => {
                   {
                     nodeId: "node-provider",
                     nodeRecord: "enr:provider",
-                    primaryIdentity: config.tosWalletAddress,
+                    primaryIdentity: config.walletAddress,
                     connectionModes: 3,
                     cardSequence: 11,
                   },
@@ -430,7 +428,7 @@ describe("agent discovery", () => {
     const result = await requestObservationOnce({
       identity,
       config,
-      tosAddress: config.tosWalletAddress!,
+      address: config.walletAddress!,
       targetUrl: "https://target.example/data",
     });
 
@@ -479,7 +477,7 @@ describe("agent discovery", () => {
             },
           ],
         },
-        tosAddress: config.tosWalletAddress!,
+        address: config.walletAddress!,
         discoveryNodeId: nodeId,
         issuedAt: Math.floor(Date.now() / 1000),
         cardSequence,
@@ -535,7 +533,7 @@ describe("agent discovery", () => {
                 {
                   nodeId: "node-low",
                   nodeRecord: "enr:low",
-                  primaryIdentity: config.tosWalletAddress,
+                  primaryIdentity: config.walletAddress,
                   connectionModes: 3,
                   cardSequence: 3,
                   trust: {
@@ -552,7 +550,7 @@ describe("agent discovery", () => {
                 {
                   nodeId: "node-high",
                   nodeRecord: "enr:high",
-                  primaryIdentity: config.tosWalletAddress,
+                  primaryIdentity: config.walletAddress,
                   connectionModes: 3,
                   cardSequence: 4,
                   trust: {
@@ -569,7 +567,7 @@ describe("agent discovery", () => {
                 {
                   nodeId: "node-suspended",
                   nodeRecord: "enr:suspended",
-                  primaryIdentity: config.tosWalletAddress,
+                  primaryIdentity: config.walletAddress,
                   connectionModes: 3,
                   cardSequence: 5,
                   trust: {

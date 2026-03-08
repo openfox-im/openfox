@@ -32,7 +32,7 @@ export async function verifyGatewayBootnodeList(
   if (list.version !== 1) {
     return false;
   }
-  if (config.tosChainId !== undefined && list.networkId !== config.tosChainId) {
+  if (config.chainId !== undefined && list.networkId !== config.chainId) {
     return false;
   }
   if (!Array.isArray(list.entries) || !list.entries.length) {

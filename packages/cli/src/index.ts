@@ -38,8 +38,8 @@ Usage:
   openfox-cli logs [--tail N]     View OpenFox logs
   openfox-cli fund <amount> [--to 0x...]  Legacy Runtime credits transfer
   openfox-cli send <to-address> <message> Send a social message
-  openfox-cli tos-status          Show TOS wallet status
-  openfox-cli tos-send <to> <amount> [--wait]   Send native TOS transfer
+  openfox-cli tos-status          Show native wallet status
+  openfox-cli tos-send <to> <amount> [--wait]   Send a native transfer
 `);
   }
 }

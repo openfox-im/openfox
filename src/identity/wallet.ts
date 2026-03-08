@@ -1,9 +1,9 @@
 /**
  * OpenFox Wallet Management
  *
- * Creates and manages an EVM wallet for the openfox's identity and payments.
- * The private key is the openfox's sovereign identity.
- * Adapted from runtime-mcp/src/wallet.ts
+ * Creates and manages the secp256k1 signer key used by OpenFox.
+ * The user-facing wallet address is the derived 32-byte native address,
+ * not the legacy 20-byte signer address.
  */
 
 import type { PrivateKeyAccount } from "viem";
@@ -11,6 +11,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import fs from "fs";
 import path from "path";
 import type { WalletData } from "../types.js";
+import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "../tos/address.js";
 
 const OPENFOX_DIR = path.join(
   process.env.HOME || "/root",
@@ -73,8 +74,7 @@ export function getWalletAddress(): string | null {
   const walletData: WalletData = JSON.parse(
     fs.readFileSync(WALLET_FILE, "utf-8"),
   );
-  const account = privateKeyToAccount(walletData.privateKey);
-  return account.address;
+  return deriveAddressFromPrivateKey(walletData.privateKey);
 }
 
 /**

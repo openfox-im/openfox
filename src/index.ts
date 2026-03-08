@@ -44,8 +44,11 @@ import {
   buildGatewayProviderRoutes,
   buildPublishedAgentDiscoveryConfig,
 } from "./agent-gateway/publish.js";
-import { deriveTOSAddressFromPrivateKey } from "./tos/address.js";
-import { grantTOSCapability, registerTOSCapabilityName } from "./tos/client.js";
+import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "./tos/address.js";
+import {
+  grantTOSCapability as grantCapability,
+  registerTOSCapabilityName as registerCapabilityName,
+} from "./tos/client.js";
 import { randomUUID } from "crypto";
 import { keccak256, toHex } from "viem";
 
@@ -83,16 +86,17 @@ Environment:
   OLLAMA_BASE_URL          Ollama base URL (overrides config, e.g. http://localhost:11434)
   OPENFOX_API_URL           Legacy Runtime API URL (optional)
   OPENFOX_API_KEY           Legacy Runtime API key (optional)
-  TOS_RPC_URL              TOS RPC URL (overrides config for TOS wallet operations)
+  TOS_RPC_URL              Chain RPC URL (overrides config for native wallet operations)
 `);
     process.exit(0);
   }
 
   if (args.includes("--init")) {
-    const { account, isNew } = await getWallet();
+    const { privateKey, isNew } = await getWallet();
+    const address = deriveAddressFromPrivateKey(privateKey);
     logger.info(
       JSON.stringify({
-        address: account.address,
+        address,
         isNew,
         configDir: getOpenFoxDir(),
       }),
@@ -173,8 +177,7 @@ async function showStatus(): Promise<void> {
   logger.info(`
 === OPENFOX STATUS ===
 Name:       ${config.name}
-Address:    ${config.walletAddress}
-TOS:        ${config.tosWalletAddress || "not configured"}
+Wallet:     ${config.walletAddress}
 Discovery:  ${discovery?.enabled ? "enabled" : "disabled"}
 Gateway:    ${gatewaySummary}
 Creator:    ${config.creatorAddress}
@@ -228,9 +231,11 @@ async function run(): Promise<void> {
   }
 
   // Build identity
+  const address = config.walletAddress || deriveAddressFromPrivateKey(privateKey);
+
   const identity: OpenFoxIdentity = {
     name: config.name,
-    address: account.address,
+    address,
     account,
     creatorAddress: config.creatorAddress,
     sandboxId: config.sandboxId,
@@ -238,14 +243,11 @@ async function run(): Promise<void> {
     createdAt,
   };
 
-  const tosAddress = config.tosWalletAddress || deriveTOSAddressFromPrivateKey(privateKey);
-
   // Store identity in DB
   db.setIdentity("name", config.name);
-  db.setIdentity("address", account.address);
+  db.setIdentity("address", address);
   db.setIdentity("creator", config.creatorAddress);
   db.setIdentity("sandbox", config.sandboxId);
-  db.setIdentity("tosAddress", tosAddress);
   const storedOpenFoxId = db.getIdentity("openfoxId");
   const openfoxId = storedOpenFoxId || config.sandboxId || randomUUID();
   if (!storedOpenFoxId) {
@@ -280,7 +282,7 @@ async function run(): Promise<void> {
       faucetServer = await startAgentDiscoveryFaucetServer({
         identity,
         config,
-        tosAddress,
+        address,
         privateKey,
         db,
         faucetConfig: config.agentDiscovery.faucetServer,
@@ -298,7 +300,7 @@ async function run(): Promise<void> {
       observationServer = await startAgentDiscoveryObservationServer({
         identity,
         config,
-        tosAddress,
+        address,
         db,
         observationConfig: config.agentDiscovery.observationServer,
       });
@@ -314,11 +316,11 @@ async function run(): Promise<void> {
     try {
       if (
         config.agentDiscovery.gatewayServer.registerCapabilityOnStartup &&
-        config.tosRpcUrl
+        config.rpcUrl
       ) {
         try {
-          await registerTOSCapabilityName({
-            rpcUrl: config.tosRpcUrl,
+          await registerCapabilityName({
+            rpcUrl: config.rpcUrl,
             privateKey,
             name: config.agentDiscovery.gatewayServer.capability,
             waitForReceipt: false,
@@ -331,13 +333,13 @@ async function run(): Promise<void> {
       }
       if (
         config.agentDiscovery.gatewayServer.grantCapabilityBit !== undefined &&
-        config.tosRpcUrl
+        config.rpcUrl
       ) {
         try {
-          await grantTOSCapability({
-            rpcUrl: config.tosRpcUrl,
+          await grantCapability({
+            rpcUrl: config.rpcUrl,
             privateKey,
-            target: tosAddress,
+            target: address,
             bit: config.agentDiscovery.gatewayServer.grantCapabilityBit,
             waitForReceipt: false,
           });
@@ -424,7 +426,7 @@ async function run(): Promise<void> {
     const published = await publishLocalAgentDiscoveryCard({
       identity,
       config,
-      tosAddress,
+      address,
       db,
       agentDiscoveryOverride: publishedAgentDiscoveryConfig,
       overrideIsNormalized: true,
@@ -451,7 +453,7 @@ async function run(): Promise<void> {
         gatewayProviderSessions = await startAgentGatewayProviderSessions({
           identity,
           config,
-          tosAddress,
+          address,
           routes,
           db,
           privateKey,
@@ -505,11 +507,11 @@ async function run(): Promise<void> {
       const genesisPromptHash = config.genesisPrompt
         ? keccak256(toHex(config.genesisPrompt))
         : undefined;
-      await runtime.registerOpenFox({
-        openfoxId,
-        openfoxAddress: account.address,
-        creatorAddress: config.creatorAddress,
-        name: config.name,
+        await runtime.registerOpenFox({
+          openfoxId,
+          openfoxAddress: address,
+          creatorAddress: config.creatorAddress,
+          name: config.name,
         bio: config.creatorMessage || "",
         genesisPromptHash,
         account,

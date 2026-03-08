@@ -25,10 +25,9 @@ function makeConfig(): OpenFoxConfig {
     heartbeatConfigPath: "~/.openfox/heartbeat.yml",
     dbPath: "~/.openfox/state.db",
     logLevel: "info",
-    walletAddress: "0x0000000000000000000000000000000000000001" as `0x${string}`,
-    tosWalletAddress: "0x0000000000000000000000000000000000000000000000000000000000000042",
-    tosRpcUrl: "http://127.0.0.1:8545",
-    tosChainId: 1666,
+    walletAddress: "0x0000000000000000000000000000000000000000000000000000000000000042",
+    rpcUrl: "http://127.0.0.1:8545",
+    chainId: 1666,
     version: "0.2.1",
     skillsDir: "~/.openfox/skills",
     maxChildren: 3,
@@ -123,7 +122,7 @@ describe("agent discovery observation server", () => {
     const server = await startAgentDiscoveryObservationServer({
       identity: makeIdentity(),
       config,
-      tosAddress: config.tosWalletAddress!,
+      address: config.walletAddress!,
       db: makeDb(),
       observationConfig: config.agentDiscovery!.observationServer!,
     });
@@ -133,7 +132,7 @@ describe("agent discovery observation server", () => {
 
     global.fetch = vi.fn(async (input, init) => {
       const url = String(input);
-      if (url === config.tosRpcUrl) {
+      if (url === config.rpcUrl) {
         const body = JSON.parse(String(init?.body ?? "{}")) as {
           id: number;
           method: string;
@@ -173,7 +172,7 @@ describe("agent discovery observation server", () => {
           agent_id: requester.address.toLowerCase(),
           identity: {
             kind: "tos",
-            value: config.tosWalletAddress!,
+            value: config.walletAddress!,
           },
         },
         request_nonce: "nonce-observe-1",

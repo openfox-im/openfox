@@ -6,13 +6,15 @@
 
 import type { PrivateKeyAccount, Address } from "viem";
 
+export type HexAddress = `0x${string}`;
+
 // ─── Identity ────────────────────────────────────────────────────
 
 export interface OpenFoxIdentity {
   name: string;
   address: Address;
   account: PrivateKeyAccount;
-  creatorAddress: Address;
+  creatorAddress: HexAddress;
   sandboxId: string;
   apiKey: string;
   createdAt: string;
@@ -63,7 +65,7 @@ export interface AgentDiscoveryFaucetServerConfig {
   payoutAmountWei: string;
   maxAmountWei: string;
   cooldownSeconds: number;
-  requireTOSIdentity: boolean;
+  requireNativeIdentity: boolean;
 }
 
 export interface AgentDiscoveryObservationServerConfig {
@@ -217,7 +219,7 @@ export const DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG: AgentDiscoveryFaucetS
     payoutAmountWei: "10000000000000000",
     maxAmountWei: "10000000000000000",
     cooldownSeconds: 86400,
-    requireTOSIdentity: true,
+    requireNativeIdentity: true,
   };
 
 export const DEFAULT_AGENT_DISCOVERY_OBSERVATION_SERVER_CONFIG: AgentDiscoveryObservationServerConfig =
@@ -357,7 +359,7 @@ export interface OpenFoxConfig {
   name: string;
   genesisPrompt: string;
   creatorMessage?: string;
-  creatorAddress: Address;
+  creatorAddress: HexAddress;
   registeredRemotely: boolean;
   sandboxId: string;
   runtimeApiUrl?: string;
@@ -371,10 +373,10 @@ export interface OpenFoxConfig {
   heartbeatConfigPath: string;
   dbPath: string;
   logLevel: "debug" | "info" | "warn" | "error";
-  walletAddress: Address;
-  tosWalletAddress?: `0x${string}`;
-  tosRpcUrl?: string;
-  tosChainId?: number;
+  walletAddress: HexAddress;
+  rpcUrl?: string;
+  chainId?: number;
+  baseRpcUrl?: string;
   version: string;
   skillsDir: string;
   agentId?: string;
@@ -388,8 +390,6 @@ export interface OpenFoxConfig {
   // Phase 2 config additions
   soulConfig?: SoulConfig;
   modelStrategy?: ModelStrategyConfig;
-  /** Custom RPC endpoint for Base chain interactions (overrides default public RPC) */
-  rpcUrl?: string;
   agentDiscovery?: AgentDiscoveryConfig;
 }
 
@@ -404,7 +404,8 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   maxChildren: 3,
   maxTurnsPerCycle: 25,
   childSandboxMemoryMb: 1024,
-  tosRpcUrl: process.env.TOS_RPC_URL,
+  rpcUrl: process.env.TOS_RPC_URL,
+  baseRpcUrl: process.env.OPENFOX_RPC_URL,
   agentDiscovery: DEFAULT_AGENT_DISCOVERY_CONFIG,
 };
 
@@ -697,7 +698,7 @@ export interface RuntimeClient {
   registerOpenFox(params: {
     openfoxId: string;
     openfoxAddress: Address;
-    creatorAddress: Address;
+    creatorAddress: HexAddress;
     name: string;
     bio?: string;
     genesisPromptHash?: `0x${string}`;
@@ -1177,8 +1178,8 @@ export interface GenesisConfig {
   name: string;
   genesisPrompt: string;
   creatorMessage?: string;
-  creatorAddress: Address;
-  parentAddress: Address;
+  creatorAddress: HexAddress;
+  parentAddress: HexAddress;
 }
 
 export const MAX_CHILDREN = 3;

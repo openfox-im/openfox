@@ -1436,7 +1436,7 @@ Model: ${ctx.inference.getDefaultModel()}
             args.agent_uri as string,
             ((args.network as string) || "mainnet") as any,
             ctx.db,
-            ctx.config.rpcUrl,
+            ctx.config.baseRpcUrl,
           );
           return `Registered on-chain! Agent ID: ${entry.agentId}, TX: ${entry.txHash}`;
         } catch (err: any) {
@@ -1488,7 +1488,7 @@ Model: ${ctx.inference.getDefaultModel()}
         const limit = (args.limit as number) || 10;
 
         // Phase 3.2: Pass db.raw for agent card caching
-        const rpcUrl = ctx.config.rpcUrl;
+        const rpcUrl = ctx.config.baseRpcUrl;
         const agents = keyword
           ? await searchAgents(
               keyword,
@@ -1589,7 +1589,7 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
     {
       name: "request_testnet_faucet",
       description:
-        "Find a sponsor.topup.testnet provider via Agent Discovery v1 and request a constrained TOS testnet top-up.",
+        "Find a sponsor.topup.testnet provider via Agent Discovery v1 and request a constrained native testnet top-up.",
       category: "financial",
       riskLevel: "caution",
       parameters: {
@@ -1597,7 +1597,7 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
         properties: {
           amount: {
             type: "string",
-            description: "Requested TOS amount as a decimal string, e.g. 0.01",
+            description: "Requested native amount as a decimal string, e.g. 0.01",
           },
           capability: {
             type: "string",
@@ -1613,25 +1613,25 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestTestnetFaucet } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey } =
+        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
           await import("../tos/address.js");
-        const { parseTOSAmount } = await import("../tos/client.js");
+        const { parseTOSAmount: parseAmount } = await import("../tos/client.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
         if (!privateKey) {
           return "No local OpenFox wallet found.";
         }
-        const tosAddress =
-          ctx.config.tosWalletAddress ||
-          deriveTOSAddressFromPrivateKey(privateKey);
+        const address =
+          ctx.config.walletAddress ||
+          deriveAddressFromPrivateKey(privateKey);
         const amount = typeof args.amount === "string" ? args.amount : "0.01";
-        const requestedAmountWei = parseTOSAmount(amount);
+        const requestedAmountWei = parseAmount(amount);
 
         const result = await requestTestnetFaucet({
           identity: ctx.identity,
           config: ctx.config,
-          tosAddress,
+          address,
           requestedAmountWei,
           capability:
             typeof args.capability === "string" && args.capability.trim()
@@ -1687,7 +1687,7 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestObservationOnce } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey } =
+        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
           await import("../tos/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
@@ -1695,14 +1695,14 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
         if (!privateKey) {
           return "No local OpenFox wallet found.";
         }
-        const tosAddress =
-          ctx.config.tosWalletAddress ||
-          deriveTOSAddressFromPrivateKey(privateKey);
+        const address =
+          ctx.config.walletAddress ||
+          deriveAddressFromPrivateKey(privateKey);
 
         const result = await requestObservationOnce({
           identity: ctx.identity,
           config: ctx.config,
-          tosAddress,
+          address,
           targetUrl: String(args.targetUrl || ""),
           capability:
             typeof args.capability === "string" && args.capability.trim()
@@ -1772,7 +1772,7 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
           comment,
           network,
           ctx.db,
-          ctx.config.rpcUrl,
+          ctx.config.baseRpcUrl,
         );
         return `Feedback submitted. TX: ${hash}`;
       },

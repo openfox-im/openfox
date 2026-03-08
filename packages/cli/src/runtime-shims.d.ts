@@ -2,9 +2,9 @@ declare module "@openfox/openfox/config.js" {
   export interface OpenFoxCliConfig {
     name: string;
     walletAddress: string;
-    tosWalletAddress?: string;
-    tosRpcUrl?: string;
-    tosChainId?: number;
+    rpcUrl?: string;
+    chainId?: number;
+    baseRpcUrl?: string;
     creatorAddress: string;
     sandboxId: string;
     dbPath: string;

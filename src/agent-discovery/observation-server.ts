@@ -4,7 +4,10 @@ import net from "net";
 import { URL } from "url";
 import { createLogger } from "../observability/logger.js";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
-import { TOSRpcClient, formatTOSNetwork } from "../tos/client.js";
+import {
+  TOSRpcClient as RpcClient,
+  formatTOSNetwork as formatNetwork,
+} from "../tos/client.js";
 import {
   readTOSPaymentEnvelope,
   submitTOSPayment,
@@ -12,7 +15,7 @@ import {
   writeTOSPaymentRequired,
   type TOSPaymentRequirement,
 } from "../tos/x402.js";
-import { normalizeTOSAddress } from "../tos/address.js";
+import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
 import {
   buildObservationServerUrl,
   type AgentDiscoveryObservationServerConfig,
@@ -36,7 +39,7 @@ export interface AgentDiscoveryObservationServer {
 export interface StartAgentDiscoveryObservationServerParams {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   db: OpenFoxDatabase;
   observationConfig: AgentDiscoveryObservationServerConfig;
 }
@@ -109,20 +112,20 @@ async function requirePayment(params: {
   req: IncomingMessage;
   res: ServerResponse;
   config: OpenFoxConfig;
-  providerTOSAddress: string;
+  providerAddress: string;
   amountWei: string;
 }): Promise<boolean> {
-  const rpcUrl = params.config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
-    throw new Error("TOS RPC is required to run the observation server");
+    throw new Error("Chain RPC is required to run the observation server");
   }
-  const client = new TOSRpcClient({ rpcUrl });
-  const chainId = params.config.tosChainId ? BigInt(params.config.tosChainId) : await client.getChainId();
+  const client = new RpcClient({ rpcUrl });
+  const chainId = params.config.chainId ? BigInt(params.config.chainId) : await client.getChainId();
   const requirement: TOSPaymentRequirement = {
     scheme: "exact",
-    network: formatTOSNetwork(chainId),
+    network: formatNetwork(chainId),
     maxAmountRequired: params.amountWei,
-    payToAddress: normalizeTOSAddress(params.providerTOSAddress),
+    payToAddress: normalizeAddress(params.providerAddress),
     asset: "native",
     requiredDeadlineSeconds: 300,
     description: "OpenFox observation.once payment",
@@ -177,7 +180,7 @@ async function fetchObservation(
 export async function startAgentDiscoveryObservationServer(
   params: StartAgentDiscoveryObservationServerParams,
 ): Promise<AgentDiscoveryObservationServer> {
-  const { observationConfig, config, db, tosAddress } = params;
+  const { observationConfig, config, db, address } = params;
   const path = observationConfig.path.startsWith("/") ? observationConfig.path : `/${observationConfig.path}`;
   const healthzPath = `${path}/healthz`;
 
@@ -189,7 +192,7 @@ export async function startAgentDiscoveryObservationServer(
           ok: true,
           capability: observationConfig.capability,
           priceWei: observationConfig.priceWei,
-          tosAddress,
+          address,
         });
         return;
       }
@@ -198,7 +201,7 @@ export async function startAgentDiscoveryObservationServer(
           req,
           res,
           config,
-          providerTOSAddress: tosAddress,
+          providerAddress: address,
           amountWei: observationConfig.priceWei,
         });
         if (paid) {
@@ -227,7 +230,7 @@ export async function startAgentDiscoveryObservationServer(
         req,
         res,
         config,
-        providerTOSAddress: tosAddress,
+        providerAddress: address,
         amountWei: observationConfig.priceWei,
       });
       if (!paid) {

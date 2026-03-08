@@ -1,14 +1,17 @@
 /**
  * openfox-cli tos-send <to-address> <amount> [--wait]
  *
- * Send a native TOS transfer using the openfox's wallet.
+ * Send a native transfer using the openfox wallet.
  * Amount is interpreted as whole TOS with up to 18 decimals.
  */
 
 import { loadConfig } from "@openfox/openfox/config.js";
 import { loadWalletPrivateKey } from "@openfox/openfox/identity/wallet.js";
-import { normalizeTOSAddress } from "@openfox/openfox/tos/address.js";
-import { parseTOSAmount, sendTOSNativeTransfer } from "@openfox/openfox/tos/client.js";
+import { normalizeTOSAddress as normalizeAddress } from "@openfox/openfox/tos/address.js";
+import {
+  parseTOSAmount as parseAmount,
+  sendTOSNativeTransfer as sendNativeTransfer,
+} from "@openfox/openfox/tos/client.js";
 
 const args = process.argv.slice(3);
 const toAddress = args[0];
@@ -36,16 +39,16 @@ if (!privateKey) {
   process.exit(1);
 }
 
-const rpcUrl = rpcFromFlag || config.tosRpcUrl || process.env.TOS_RPC_URL;
+const rpcUrl = rpcFromFlag || config.rpcUrl || process.env.TOS_RPC_URL;
 if (!rpcUrl) {
-  console.log("No TOS RPC URL configured. Set TOS_RPC_URL or add tosRpcUrl to openfox config.");
+  console.log("No chain RPC URL configured. Set TOS_RPC_URL or add rpcUrl to openfox config.");
   process.exit(1);
 }
 
 try {
-  const normalizedTo = normalizeTOSAddress(toAddress);
-  const amountWei = parseTOSAmount(amount);
-  const { signed, txHash, receipt } = await sendTOSNativeTransfer({
+  const normalizedTo = normalizeAddress(toAddress);
+  const amountWei = parseAmount(amount);
+  const { signed, txHash, receipt } = await sendNativeTransfer({
     rpcUrl,
     privateKey,
     to: normalizedTo,
@@ -54,7 +57,7 @@ try {
   });
 
   console.log(`
-TOS transfer submitted.
+Transfer submitted.
 To:         ${normalizedTo}
 Amount:     ${amount} TOS
 Nonce:      ${signed.nonce.toString()}
@@ -64,6 +67,6 @@ Raw tx:     ${signed.rawTransaction}
 ${receipt ? `Receipt:    ${JSON.stringify(receipt, null, 2)}` : ""}
 `);
 } catch (error) {
-  console.log(`TOS transfer failed: ${error instanceof Error ? error.message : String(error)}`);
+  console.log(`Transfer failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }

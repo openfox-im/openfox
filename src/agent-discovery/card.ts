@@ -32,7 +32,7 @@ export function buildAgentDiscoveryCardPayload(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
   agentDiscovery: AgentDiscoveryConfig;
-  tosAddress: string;
+  address: string;
   discoveryNodeId: string;
   issuedAt?: number;
   cardSequence?: number;
@@ -46,7 +46,7 @@ export function buildAgentDiscoveryCardPayload(params: {
     agent_id: params.config.agentId || params.identity.address.toLowerCase(),
     primary_identity: {
       kind: "tos",
-      value: params.tosAddress.toLowerCase(),
+      value: params.address.toLowerCase(),
     },
     discovery_node_id: params.discoveryNodeId,
     card_seq: params.cardSequence ?? issuedAt,
@@ -87,7 +87,7 @@ export async function buildSignedAgentDiscoveryCard(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
   agentDiscovery: AgentDiscoveryConfig;
-  tosAddress: string;
+  address: string;
   discoveryNodeId: string;
   issuedAt?: number;
   cardSequence?: number;

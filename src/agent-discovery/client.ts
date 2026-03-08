@@ -1,7 +1,10 @@
 import { randomBytes } from "crypto";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { checkX402, x402Fetch } from "../runtime/x402.js";
-import { recordTOSReputationScore, TOSRpcClient } from "../tos/client.js";
+import {
+  recordTOSReputationScore as recordReputationScore,
+  TOSRpcClient as RpcClient,
+} from "../tos/client.js";
 import {
   AGENT_GATEWAY_E2E_HEADER,
   AGENT_GATEWAY_E2E_SCHEME,
@@ -54,7 +57,7 @@ class AgentDiscoveryRpcClient {
     });
     if (!response.ok) {
       throw new Error(
-        `TOS RPC ${method} failed: ${response.status} ${await response.text()}`,
+        `Chain RPC ${method} failed: ${response.status} ${await response.text()}`,
       );
     }
     const body = (await response.json()) as {
@@ -63,7 +66,7 @@ class AgentDiscoveryRpcClient {
     };
     if (body.error) {
       throw new Error(
-        `TOS RPC ${method} error ${body.error.code}: ${body.error.message}`,
+        `Chain RPC ${method} error ${body.error.code}: ${body.error.message}`,
       );
     }
     return body.result as T;
@@ -112,9 +115,9 @@ class AgentDiscoveryRpcClient {
 }
 
 function requireDiscoveryRpc(config: OpenFoxConfig): AgentDiscoveryRpcClient {
-  const rpcUrl = config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
-    throw new Error("TOS RPC is required for Agent Discovery");
+    throw new Error("Chain RPC is required for Agent Discovery");
   }
   return new AgentDiscoveryRpcClient(rpcUrl);
 }
@@ -358,7 +361,7 @@ async function submitReputationUpdate(params: {
     return;
   }
   const privateKey = loadWalletPrivateKey();
-  const rpcUrl = params.config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   const who = params.provider.search.primaryIdentity;
   if (!privateKey || !rpcUrl || !who) {
     return;
@@ -373,7 +376,7 @@ async function submitReputationUpdate(params: {
           ? updates.malformedDelta
           : updates.failureDelta;
 
-  await recordTOSReputationScore({
+  await recordReputationScore({
     rpcUrl,
     privateKey,
     who,
@@ -620,7 +623,7 @@ async function invokeProviderCapability(params: {
 export async function publishLocalAgentDiscoveryCard(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   db?: OpenFoxDatabase;
   agentDiscoveryOverride?: AgentDiscoveryConfig;
   overrideIsNormalized?: boolean;
@@ -649,12 +652,12 @@ export async function publishLocalAgentDiscoveryCard(params: {
     identity: params.identity,
     config: params.config,
     agentDiscovery,
-    tosAddress: params.tosAddress,
+    address: params.address,
     discoveryNodeId: info.nodeId,
   });
 
   const published = await rpc.publish({
-    primaryIdentity: params.tosAddress,
+    primaryIdentity: params.address,
     capabilities: card.capabilities.map((capability) => capability.name),
     connectionModes: deriveConnectionModes(agentDiscovery),
     cardJson: JSON.stringify(card),
@@ -745,7 +748,7 @@ export async function discoverCapabilityProviders(params: {
 export async function requestTestnetFaucet(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   requestedAmountWei: bigint;
   capability?: string;
   reason?: string;
@@ -785,7 +788,7 @@ export async function requestTestnetFaucet(params: {
       agent_id: params.config.agentId || params.identity.address.toLowerCase(),
       identity: {
         kind: "tos",
-        value: params.tosAddress.toLowerCase(),
+        value: params.address.toLowerCase(),
       },
     },
     request_nonce: randomBytes(16).toString("hex"),
@@ -828,14 +831,14 @@ export async function requestTestnetFaucet(params: {
   }
 
   let receipt: Record<string, unknown> | null | undefined;
-  const receiptRpcUrl = params.config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const receiptRpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (
     params.waitForReceipt &&
     response.status === "approved" &&
     response.tx_hash &&
     receiptRpcUrl
   ) {
-    const client = new TOSRpcClient({ rpcUrl: receiptRpcUrl });
+    const client = new RpcClient({ rpcUrl: receiptRpcUrl });
     const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       receipt = await client.getTransactionReceipt(
@@ -872,7 +875,7 @@ export async function requestTestnetFaucet(params: {
 export async function requestObservationOnce(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   targetUrl: string;
   capability?: string;
   reason?: string;
@@ -911,7 +914,7 @@ export async function requestObservationOnce(params: {
       agent_id: params.config.agentId || params.identity.address.toLowerCase(),
       identity: {
         kind: "tos",
-        value: params.tosAddress.toLowerCase(),
+        value: params.address.toLowerCase(),
       },
     },
     request_nonce: randomBytes(16).toString("hex"),

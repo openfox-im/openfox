@@ -26,6 +26,7 @@ import { ResilientHttpClient } from "./http-client.js";
 import { ulid } from "ulid";
 import { keccak256, toHex } from "viem";
 import type { Address, PrivateKeyAccount } from "viem";
+import type { HexAddress } from "../types.js";
 import { randomUUID } from "crypto";
 
 interface RuntimeClientOptions {
@@ -385,7 +386,7 @@ export function createRuntimeClient(options: RuntimeClientOptions): RuntimeClien
   const registerOpenFox = async (params: {
     openfoxId: string;
     openfoxAddress: Address;
-    creatorAddress: Address;
+    creatorAddress: HexAddress;
     name: string;
     bio?: string;
     genesisPromptHash?: `0x${string}`;

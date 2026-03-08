@@ -8,8 +8,8 @@ import {
 import type { VerifiedAgentProvider } from "../agent-discovery/types.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import {
-  buildTOSX402Payment,
-  recordTOSReputationScore,
+  buildTOSX402Payment as buildPayment,
+  recordTOSReputationScore as recordReputationScore,
   type TOSPaymentEnvelope,
 } from "../tos/client.js";
 import { resolveVerifiedGatewayBootnodes } from "./bootnodes.js";
@@ -218,7 +218,7 @@ function recordGatewayFeedback(params: {
     return;
   }
   const feedback = params.config.agentDiscovery?.gatewayClient?.feedback;
-  const rpcUrl = params.config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   const who = params.target.provider.search.primaryIdentity;
   const privateKey = params.privateKey || loadWalletPrivateKey();
   if (!feedback || !rpcUrl || !who || !privateKey) {
@@ -232,7 +232,7 @@ function recordGatewayFeedback(params: {
         : params.outcome === "malformed"
           ? feedback.malformedDelta
           : feedback.failureDelta;
-  recordTOSReputationScore({
+  recordReputationScore({
     rpcUrl,
     privateKey,
     who,
@@ -265,21 +265,19 @@ async function buildSessionPayment(params: {
     return undefined;
   }
   const privateKey = params.privateKey || loadWalletPrivateKey();
-  const rpcUrl = params.config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (!privateKey || !rpcUrl) {
-    throw new Error("gateway session payment requires a local TOS wallet and RPC");
+    throw new Error("gateway session payment requires a local wallet and chain RPC");
   }
   const payToAddress = params.target.paymentAddress;
   if (!payToAddress) {
-    throw new Error(
-      "gateway session payment requires the gateway TOS payment address",
-    );
+    throw new Error("gateway session payment requires the gateway payment address");
   }
   const chainId =
-    params.config.tosChainId !== undefined
-      ? BigInt(params.config.tosChainId)
+    params.config.chainId !== undefined
+      ? BigInt(params.config.chainId)
       : undefined;
-  return buildTOSX402Payment({
+  return buildPayment({
     privateKey,
     rpcUrl,
     requirement: {
@@ -461,7 +459,7 @@ async function handleRelayRequest(params: {
 async function establishGatewaySession(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   routes: AgentGatewayProviderRoute[];
   target: GatewayTarget;
   db?: OpenFoxDatabase;
@@ -478,7 +476,7 @@ async function establishGatewaySession(params: {
     agentId: (params.config.agentId || params.identity.address).toLowerCase(),
     primaryIdentity: {
       kind: "tos",
-      value: params.tosAddress.toLowerCase(),
+      value: params.address.toLowerCase(),
     },
     gatewayAgentId: params.target.gatewayAgentId,
     ttlSeconds: clientConfig.sessionTtlSeconds,
@@ -820,7 +818,7 @@ async function establishGatewaySession(params: {
 async function openSingleGatewaySession(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   routes: AgentGatewayProviderRoute[];
   target: GatewayTarget;
   db?: OpenFoxDatabase;
@@ -862,7 +860,7 @@ async function openSingleGatewaySession(params: {
 export async function startAgentGatewayProviderSession(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   routes: AgentGatewayProviderRoute[];
   db?: OpenFoxDatabase;
   privateKey?: `0x${string}`;
@@ -877,7 +875,7 @@ export async function startAgentGatewayProviderSession(params: {
 export async function startAgentGatewayProviderSessions(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   routes: AgentGatewayProviderRoute[];
   db?: OpenFoxDatabase;
   privateKey?: `0x${string}`;
@@ -904,7 +902,7 @@ export async function startAgentGatewayProviderSessions(params: {
       const session = await openSingleGatewaySession({
         identity: params.identity,
         config: params.config,
-        tosAddress: params.tosAddress,
+        address: params.address,
         routes: params.routes,
         target,
         db: params.db,

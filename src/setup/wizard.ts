@@ -1,13 +1,12 @@
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
-import type { OpenFoxConfig, TreasuryPolicy } from "../types.js";
+import type { OpenFoxConfig, TreasuryPolicy, HexAddress } from "../types.js";
 import { DEFAULT_TREASURY_POLICY } from "../types.js";
-import type { Address } from "viem";
 import { getWallet, getOpenFoxDir } from "../identity/wallet.js";
 import { createConfig, saveConfig } from "../config.js";
 import { writeDefaultHeartbeatConfig } from "../heartbeat/config.js";
-import { deriveTOSAddressFromPrivateKey } from "../tos/address.js";
+import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "../tos/address.js";
 import { showBanner } from "./banner.js";
 import {
   promptRequired,
@@ -28,13 +27,12 @@ export async function runSetupWizard(): Promise<OpenFoxConfig> {
   // ─── 1. Generate wallet ───────────────────────────────────────
   console.log(chalk.cyan("  [1/5] Generating identity (wallet)..."));
   const { account, privateKey, isNew } = await getWallet();
-  const tosAddress = deriveTOSAddressFromPrivateKey(privateKey);
+  const address = deriveAddressFromPrivateKey(privateKey);
   if (isNew) {
-    console.log(chalk.green(`  Wallet created: ${account.address}`));
+    console.log(chalk.green(`  Wallet created: ${address}`));
   } else {
-    console.log(chalk.green(`  Wallet loaded: ${account.address}`));
+    console.log(chalk.green(`  Wallet loaded: ${address}`));
   }
-  console.log(chalk.green(`  TOS address derived: ${tosAddress}`));
   console.log(chalk.dim(`  Private key stored at: ${getOpenFoxDir()}/wallet.json\n`));
 
   // ─── 2. Interactive questions ─────────────────────────────────
@@ -46,9 +44,9 @@ export async function runSetupWizard(): Promise<OpenFoxConfig> {
   const genesisPrompt = await promptMultiline("Enter the genesis prompt (system prompt) for your openfox.");
   console.log(chalk.green(`  Genesis prompt set (${genesisPrompt.length} chars)\n`));
 
-  console.log(chalk.dim(`  Your openfox's address is ${account.address}`));
+  console.log(chalk.dim(`  Your openfox wallet address is ${address}`));
   console.log(chalk.dim("  Now enter YOUR wallet address (the human creator/owner).\n"));
-  const creatorAddress = await promptAddress("Creator wallet address (0x...)");
+  const creatorAddress = await promptAddress("Creator wallet address (0x... 64 hex)");
   console.log(chalk.green(`  Creator: ${creatorAddress}\n`));
 
   console.log(chalk.white("  Configure local/provider inference."));
@@ -94,12 +92,12 @@ export async function runSetupWizard(): Promise<OpenFoxConfig> {
     console.log(chalk.yellow("  No inference provider configured yet. The runtime will not start until you add OpenAI, Anthropic, or Ollama.\n"));
   }
 
-  const tosRpcUrlInput = await promptOptional("TOS RPC URL (optional, e.g. http://127.0.0.1:8545)");
-  const tosRpcUrl = tosRpcUrlInput || undefined;
-  if (tosRpcUrl) {
-    console.log(chalk.green(`  TOS RPC saved: ${tosRpcUrl}`));
+  const rpcUrlInput = await promptOptional("RPC URL (optional, e.g. http://127.0.0.1:8545)");
+  const rpcUrl = rpcUrlInput || undefined;
+  if (rpcUrl) {
+    console.log(chalk.green(`  RPC saved: ${rpcUrl}`));
   } else {
-    console.log(chalk.dim("  No TOS RPC configured. TOS wallet support will be offline until you set TOS_RPC_URL or update config.\n"));
+    console.log(chalk.dim("  No chain RPC configured. Native wallet support will be offline until you set TOS_RPC_URL or update config.\n"));
   }
 
   // ─── Financial Safety Policy ─────────────────────────────────
@@ -143,11 +141,10 @@ export async function runSetupWizard(): Promise<OpenFoxConfig> {
   const config = createConfig({
     name,
     genesisPrompt,
-    creatorAddress: creatorAddress as Address,
+    creatorAddress: creatorAddress as HexAddress,
     sandboxId: env.sandboxId,
-    walletAddress: account.address,
-    tosWalletAddress: tosAddress,
-    tosRpcUrl,
+    walletAddress: address,
+    rpcUrl,
     openaiApiKey: openaiApiKey || undefined,
     anthropicApiKey: anthropicApiKey || undefined,
     ollamaBaseUrl,
@@ -173,7 +170,7 @@ export async function runSetupWizard(): Promise<OpenFoxConfig> {
 
   // SOUL.md
   const soulPath = path.join(openfoxDir, "SOUL.md");
-  fs.writeFileSync(soulPath, generateSoulMd(name, account.address, creatorAddress, genesisPrompt), { mode: 0o600 });
+  fs.writeFileSync(soulPath, generateSoulMd(name, address, creatorAddress, genesisPrompt), { mode: 0o600 });
   console.log(chalk.green("  SOUL.md written"));
 
   // Default skills
@@ -183,30 +180,29 @@ export async function runSetupWizard(): Promise<OpenFoxConfig> {
 
   // ─── 5. Funding guidance ──────────────────────────────────────
   console.log(chalk.cyan("  [5/5] Funding & providers\n"));
-  showFundingPanel(account.address, tosAddress);
+  showFundingPanel(address);
 
   closePrompts();
 
   return config;
 }
 
-function showFundingPanel(address: string, tosAddress: string): void {
-  const short = `${address.slice(0, 6)}...${address.slice(-5)}`;
+function showFundingPanel(walletAddress: string): void {
+  const short = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-5)}`;
   const w = 58;
   const pad = (s: string, len: number) => s + " ".repeat(Math.max(0, len - s.length));
 
   console.log(chalk.cyan(`  ${"╭" + "─".repeat(w) + "╮"}`));
   console.log(chalk.cyan(`  │${pad("  Fund your openfox", w)}│`));
   console.log(chalk.cyan(`  │${" ".repeat(w)}│`));
-  console.log(chalk.cyan(`  │${pad(`  Address: ${short}`, w)}│`));
-  console.log(chalk.cyan(`  │${pad(`  TOS:     ${tosAddress.slice(0, 6)}...${tosAddress.slice(-5)}`, w)}│`));
+  console.log(chalk.cyan(`  │${pad(`  Wallet: ${short}`, w)}│`));
   console.log(chalk.cyan(`  │${" ".repeat(w)}│`));
   console.log(chalk.cyan(`  │${pad("  1. Configure one inference provider:", w)}│`));
   console.log(chalk.cyan(`  │${pad("     - OPENAI_API_KEY", w)}│`));
   console.log(chalk.cyan(`  │${pad("     - ANTHROPIC_API_KEY", w)}│`));
   console.log(chalk.cyan(`  │${pad("     - OLLAMA_BASE_URL", w)}│`));
   console.log(chalk.cyan(`  │${" ".repeat(w)}│`));
-  console.log(chalk.cyan(`  │${pad("  2. Optional: fund the TOS wallet for x402/TOS flows", w)}│`));
+  console.log(chalk.cyan(`  │${pad("  2. Optional: fund the wallet for native payment flows", w)}│`));
   console.log(chalk.cyan(`  │${pad("  3. Local-first mode means no hosted control-plane account is needed", w)}│`));
   console.log(chalk.cyan(`  │${pad("  4. Restart after changing provider configuration", w)}│`));
   console.log(chalk.cyan(`  ${"╰" + "─".repeat(w) + "╯"}`));

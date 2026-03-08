@@ -11,8 +11,11 @@ import {
   readTOSPaymentEnvelope,
   type TOSPaymentEnvelope,
 } from "../tos/x402.js";
-import { formatTOSNetwork, TOSRpcClient } from "../tos/client.js";
-import { normalizeTOSAddress } from "../tos/address.js";
+import {
+  formatTOSNetwork as formatNetwork,
+  TOSRpcClient as RpcClient,
+} from "../tos/client.js";
+import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
 import { verifyGatewaySessionAuth } from "./auth.js";
 import {
   buildGatewayPublicUrl,
@@ -293,19 +296,19 @@ async function enforceRelayPayment(params: {
   if (relayPriceWei === 0n) {
     return true;
   }
-  const rpcUrl = params.config?.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = params.config?.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
-    throw new Error("TOS RPC is required for relay payment enforcement");
+    throw new Error("Chain RPC is required for relay payment enforcement");
   }
-  const client = new TOSRpcClient({ rpcUrl });
-  const chainId = params.config?.tosChainId
-    ? BigInt(params.config.tosChainId)
+  const client = new RpcClient({ rpcUrl });
+  const chainId = params.config?.chainId
+    ? BigInt(params.config.chainId)
     : await client.getChainId();
   const requirement = {
     scheme: "exact" as const,
-    network: formatTOSNetwork(chainId),
+    network: formatNetwork(chainId),
     maxAmountRequired: relayPriceWei.toString(),
-    payToAddress: normalizeTOSAddress(params.gatewayAddress),
+    payToAddress: normalizeAddress(params.gatewayAddress),
     asset: "native",
     requiredDeadlineSeconds:
       params.gatewayConfig.relayPaymentRequiredDeadlineSeconds ?? 300,
@@ -336,19 +339,19 @@ async function enforceSessionPayment(params: {
   if (!params.payment) {
     throw new Error("provider session payment required");
   }
-  const rpcUrl = params.config?.tosRpcUrl || process.env.TOS_RPC_URL;
+  const rpcUrl = params.config?.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
-    throw new Error("TOS RPC is required for provider session payment");
+    throw new Error("Chain RPC is required for provider session payment");
   }
-  const client = new TOSRpcClient({ rpcUrl });
-  const chainId = params.config?.tosChainId
-    ? BigInt(params.config.tosChainId)
+  const client = new RpcClient({ rpcUrl });
+  const chainId = params.config?.chainId
+    ? BigInt(params.config.chainId)
     : await client.getChainId();
   const requirement = {
     scheme: "exact" as const,
-    network: formatTOSNetwork(chainId),
+    network: formatNetwork(chainId),
     maxAmountRequired: sessionFeeWei.toString(),
-    payToAddress: normalizeTOSAddress(params.gatewayAddress),
+    payToAddress: normalizeAddress(params.gatewayAddress),
     asset: "native",
     requiredDeadlineSeconds:
       params.gatewayConfig.relayPaymentRequiredDeadlineSeconds ?? 300,
@@ -401,8 +404,8 @@ export async function startAgentGatewayServer(params: {
 }): Promise<StartedAgentGatewayServer> {
   const { identity, config, db, gatewayConfig } = params;
   const gatewayAgentId = gatewayAgentIdFromIdentity(identity);
-  const gatewayAddress = config?.tosWalletAddress
-    ? normalizeTOSAddress(config.tosWalletAddress)
+  const gatewayAddress = config?.walletAddress
+    ? normalizeAddress(config.walletAddress)
     : undefined;
   const sessionsByID = new Map<string, LiveSession>();
   const sessionsByPathToken = new Map<string, LiveSession>();
@@ -483,7 +486,7 @@ export async function startAgentGatewayServer(params: {
       }
       if (relayPaymentAmount(gatewayConfig) > 0n) {
         if (!gatewayAddress) {
-          throw new Error("gateway TOS address is required for relay operation");
+          throw new Error("gateway wallet address is required for relay operation");
         }
         const paid = await enforceRelayPayment({
           req,
@@ -597,7 +600,7 @@ export async function startAgentGatewayServer(params: {
           }
           if (sessionPaymentAmount(gatewayConfig) > 0n) {
             if (!gatewayAddress) {
-              throw new Error("gateway TOS address is required for gateway sessions");
+              throw new Error("gateway wallet address is required for gateway sessions");
             }
             await enforceSessionPayment({
               config,

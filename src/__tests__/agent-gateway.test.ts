@@ -102,11 +102,9 @@ function makeProviderConfig(): OpenFoxConfig {
     dbPath: "~/.openfox/state.db",
     logLevel: "info",
     walletAddress:
-      "0x0000000000000000000000000000000000000001" as `0x${string}`,
-    tosWalletAddress:
       "0x00000000000000000000000000000000000000000000000000000000000000aa",
-    tosRpcUrl: "http://127.0.0.1:8545",
-    tosChainId: 1666,
+    rpcUrl: "http://127.0.0.1:8545",
+    chainId: 1666,
     version: "0.2.1",
     skillsDir: "~/.openfox/skills",
     maxChildren: 3,
@@ -146,7 +144,7 @@ function makeProviderConfig(): OpenFoxConfig {
         payoutAmountWei: "10000000000000000",
         maxAmountWei: "10000000000000000",
         cooldownSeconds: 60,
-        requireTOSIdentity: true,
+        requireNativeIdentity: true,
       },
     },
   };
@@ -345,6 +343,44 @@ describe("agent gateway", () => {
     global.fetch = originalFetch;
   });
 
+  function mockChainRpc(rpcUrl: string) {
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url === rpcUrl) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as {
+          id: number;
+          method: string;
+        };
+        switch (body.method) {
+          case "tos_chainId":
+            return new Response(
+              JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x682" }),
+              { status: 200 },
+            );
+          case "tos_getTransactionCount":
+            return new Response(
+              JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x1" }),
+              { status: 200 },
+            );
+          case "tos_sendRawTransaction":
+            sendRawTransactionMock(String(init?.body ?? ""));
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                result:
+                  "0xfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed",
+              }),
+              { status: 200 },
+            );
+          default:
+            throw new Error(`unexpected RPC method ${body.method}`);
+        }
+      }
+      return originalFetch(input as RequestInfo | URL, init);
+    }) as typeof fetch;
+  }
+
   it("relays a faucet capability through a gateway-backed public endpoint", async () => {
     const providerConfig = makeProviderConfig();
     const providerIdentity = makeIdentity(PROVIDER_PRIVATE_KEY, "ProviderFox");
@@ -354,7 +390,7 @@ describe("agent gateway", () => {
     const faucetServer = await startAgentDiscoveryFaucetServer({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db: providerDb,
       faucetConfig: providerConfig.agentDiscovery!.faucetServer!,
@@ -382,7 +418,7 @@ describe("agent gateway", () => {
     const providerSession = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes,
     });
@@ -397,7 +433,7 @@ describe("agent gateway", () => {
       identity: providerIdentity,
       config: providerConfig,
       agentDiscovery: publishedConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       discoveryNodeId: "node-provider",
     });
     const endpoint = card.endpoints.find(
@@ -448,7 +484,7 @@ describe("agent gateway", () => {
 
   it("discovers a gateway.relay provider before falling back to bootnodes", async () => {
     const providerConfig = makeProviderConfig();
-    providerConfig.tosRpcUrl = "http://agent-discovery.test/rpc";
+    providerConfig.rpcUrl = "http://agent-discovery.test/rpc";
     providerConfig.agentDiscovery!.gatewayClient = {
       ...providerConfig.agentDiscovery!.gatewayClient!,
       enabled: true,
@@ -507,7 +543,7 @@ describe("agent gateway", () => {
           },
         ],
       },
-      tosAddress:
+      address:
         "0x00000000000000000000000000000000000000000000000000000000000000bb",
       discoveryNodeId: "node-gateway",
     });
@@ -567,7 +603,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       db: makeDb(),
       privateKey: PROVIDER_PRIVATE_KEY,
       routes: [
@@ -637,7 +673,7 @@ describe("agent gateway", () => {
     const faucetServer = await startAgentDiscoveryFaucetServer({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db: providerDb,
       faucetConfig: providerConfig.agentDiscovery!.faucetServer!,
@@ -650,7 +686,7 @@ describe("agent gateway", () => {
     const sessions = await startAgentGatewayProviderSessions({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes,
     });
@@ -717,6 +753,7 @@ describe("agent gateway", () => {
 
   it("enforces TOS x402 relay payment before forwarding the request", async () => {
     const providerConfig = makeProviderConfig();
+    mockChainRpc(providerConfig.rpcUrl!);
     const providerIdentity = makeIdentity(PROVIDER_PRIVATE_KEY, "ProviderFox");
     const gatewayIdentity = makeIdentity(GATEWAY_PRIVATE_KEY, "GatewayFox");
     const requesterAccount = privateKeyToAccount(REQUESTER_PRIVATE_KEY);
@@ -725,7 +762,7 @@ describe("agent gateway", () => {
     const faucetServer = await startAgentDiscoveryFaucetServer({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db: providerDb,
       faucetConfig: providerConfig.agentDiscovery!.faucetServer!,
@@ -755,7 +792,7 @@ describe("agent gateway", () => {
     const providerSession = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes,
     });
@@ -788,7 +825,7 @@ describe("agent gateway", () => {
 
       const payment = await buildTOSX402Payment({
         privateKey: REQUESTER_PRIVATE_KEY,
-        rpcUrl: providerConfig.tosRpcUrl!,
+        rpcUrl: providerConfig.rpcUrl!,
         requirement,
       });
       const paymentHeader = Buffer.from(JSON.stringify(payment)).toString("base64");
@@ -837,7 +874,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes: [
         {
@@ -898,7 +935,7 @@ describe("agent gateway", () => {
           {
             agentId: gatewayServer.gatewayAgentId,
             url: gatewayServer.sessionUrl,
-            payToAddress: providerConfig.tosWalletAddress!,
+            payToAddress: providerConfig.walletAddress!,
           },
         ],
       });
@@ -906,7 +943,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db: makeDb(),
       routes: [
@@ -948,7 +985,7 @@ describe("agent gateway", () => {
         {
           agentId: gatewayServer.gatewayAgentId,
           url: gatewayServer.sessionUrl,
-          payToAddress: providerConfig.tosWalletAddress!,
+          payToAddress: providerConfig.walletAddress!,
         },
       ],
     };
@@ -965,7 +1002,7 @@ describe("agent gateway", () => {
     const first = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db,
       routes,
@@ -979,7 +1016,7 @@ describe("agent gateway", () => {
     const second = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db,
       routes,
@@ -1016,7 +1053,7 @@ describe("agent gateway", () => {
         {
           agentId: gatewayServer.gatewayAgentId,
           url: gatewayServer.sessionUrl,
-          payToAddress: providerConfig.tosWalletAddress!,
+          payToAddress: providerConfig.walletAddress!,
         },
       ],
     };
@@ -1024,7 +1061,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes: [
         {
@@ -1067,6 +1104,7 @@ describe("agent gateway", () => {
 
   it("charges provider session fees in provider-pays mode", async () => {
     const providerConfig = makeProviderConfig();
+    mockChainRpc(providerConfig.rpcUrl!);
     providerConfig.agentDiscovery!.enabled = false;
     const providerIdentity = makeIdentity(PROVIDER_PRIVATE_KEY, "ProviderFox");
     const gatewayIdentity = makeIdentity(GATEWAY_PRIVATE_KEY, "GatewayFox");
@@ -1075,7 +1113,7 @@ describe("agent gateway", () => {
     const faucetServer = await startAgentDiscoveryFaucetServer({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db: providerDb,
       faucetConfig: providerConfig.agentDiscovery!.faucetServer!,
@@ -1098,7 +1136,7 @@ describe("agent gateway", () => {
         {
           agentId: gatewayServer.gatewayAgentId,
           url: gatewayServer.sessionUrl,
-          payToAddress: providerConfig.tosWalletAddress!,
+          payToAddress: providerConfig.walletAddress!,
           paymentDirection: "provider_pays",
           sessionFeeWei: "777",
           perRequestFeeWei: "0",
@@ -1115,7 +1153,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes,
     });
@@ -1151,6 +1189,7 @@ describe("agent gateway", () => {
 
   it("charges both provider session fees and requester relay fees in split mode", async () => {
     const providerConfig = makeProviderConfig();
+    mockChainRpc(providerConfig.rpcUrl!);
     providerConfig.agentDiscovery!.enabled = false;
     const providerIdentity = makeIdentity(PROVIDER_PRIVATE_KEY, "ProviderFox");
     const gatewayIdentity = makeIdentity(GATEWAY_PRIVATE_KEY, "GatewayFox");
@@ -1160,7 +1199,7 @@ describe("agent gateway", () => {
     const faucetServer = await startAgentDiscoveryFaucetServer({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       db: providerDb,
       faucetConfig: providerConfig.agentDiscovery!.faucetServer!,
@@ -1183,7 +1222,7 @@ describe("agent gateway", () => {
         {
           agentId: gatewayServer.gatewayAgentId,
           url: gatewayServer.sessionUrl,
-          payToAddress: providerConfig.tosWalletAddress!,
+          payToAddress: providerConfig.walletAddress!,
           paymentDirection: "split",
           sessionFeeWei: "777",
           perRequestFeeWei: "12345",
@@ -1200,7 +1239,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes,
     });
@@ -1234,7 +1273,7 @@ describe("agent gateway", () => {
 
       const payment = await buildTOSX402Payment({
         privateKey: REQUESTER_PRIVATE_KEY,
-        rpcUrl: providerConfig.tosRpcUrl!,
+        rpcUrl: providerConfig.rpcUrl!,
         requirement,
       });
       const paymentHeader = Buffer.from(JSON.stringify(payment)).toString("base64");
@@ -1286,7 +1325,7 @@ describe("agent gateway", () => {
     const session = await startAgentGatewayProviderSession({
       identity: providerIdentity,
       config: providerConfig,
-      tosAddress: providerConfig.tosWalletAddress!,
+      address: providerConfig.walletAddress!,
       privateKey: PROVIDER_PRIVATE_KEY,
       routes: [
         {

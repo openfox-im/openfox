@@ -1,8 +1,14 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { URL } from "url";
 import { createLogger } from "../observability/logger.js";
-import { normalizeTOSAddress, isTOSAddress } from "../tos/address.js";
-import { sendTOSNativeTransfer, TOSRpcClient } from "../tos/client.js";
+import {
+  normalizeTOSAddress as normalizeAddress,
+  isTOSAddress as isAddress,
+} from "../tos/address.js";
+import {
+  sendTOSNativeTransfer as sendNativeTransfer,
+  TOSRpcClient as RpcClient,
+} from "../tos/client.js";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 import {
   buildFaucetServerUrl,
@@ -26,7 +32,7 @@ export interface AgentDiscoveryFaucetServer {
 export interface StartAgentDiscoveryFaucetServerParams {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
-  tosAddress: string;
+  address: string;
   privateKey: `0x${string}`;
   db: OpenFoxDatabase;
   faucetConfig: AgentDiscoveryFaucetServerConfig;
@@ -109,18 +115,18 @@ function parseRequestedAmount(value: string): bigint {
 function validateRequest(
   request: FaucetInvocationRequest,
   faucet: AgentDiscoveryFaucetServerConfig,
-): { requesterTOSAddress: string; requestedAmountWei: bigint; requestNonce: string } {
+): { requesterAddress: string; requestedAmountWei: bigint; requestNonce: string } {
   if (request.capability !== faucet.capability) {
     throw new Error(`unsupported capability ${request.capability}`);
   }
   if (!request.requester?.identity?.value) {
     throw new Error("missing requester identity");
   }
-  if (faucet.requireTOSIdentity && request.requester.identity.kind !== "tos") {
+  if (faucet.requireNativeIdentity && request.requester.identity.kind !== "tos") {
     throw new Error("requester identity must be kind=tos");
   }
-  if (!isTOSAddress(request.requester.identity.value)) {
-    throw new Error("requester identity is not a valid TOS address");
+  if (!isAddress(request.requester.identity.value)) {
+    throw new Error("requester identity is not a valid native address");
   }
   const requestedAmountWei = parseRequestedAmount(request.requested_amount);
   if (requestedAmountWei <= 0n) {
@@ -129,7 +135,7 @@ function validateRequest(
   const requestNonce = normalizeNonce(request.request_nonce);
   validateRequestExpiry(request.request_expires_at);
   return {
-    requesterTOSAddress: normalizeTOSAddress(request.requester.identity.value),
+    requesterAddress: normalizeAddress(request.requester.identity.value),
     requestedAmountWei,
     requestNonce,
   };
@@ -138,10 +144,10 @@ function validateRequest(
 export async function startAgentDiscoveryFaucetServer(
   params: StartAgentDiscoveryFaucetServerParams,
 ): Promise<AgentDiscoveryFaucetServer> {
-  const { faucetConfig, config, privateKey, db, tosAddress } = params;
-  const rpcUrl = config.tosRpcUrl || process.env.TOS_RPC_URL;
+  const { faucetConfig, config, privateKey, db, address } = params;
+  const rpcUrl = config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
-    throw new Error("TOS RPC is required to run the faucet server");
+    throw new Error("Chain RPC is required to run the faucet server");
   }
   const payoutAmountWei = parseRequestedAmount(faucetConfig.payoutAmountWei);
   const maxAmountWei = parseRequestedAmount(faucetConfig.maxAmountWei);
@@ -157,7 +163,7 @@ export async function startAgentDiscoveryFaucetServer(
           capability: faucetConfig.capability,
           payoutAmountWei: payoutAmountWei.toString(),
           maxAmountWei: maxAmountWei.toString(),
-          tosAddress,
+          address,
         });
         return;
       }
@@ -167,15 +173,15 @@ export async function startAgentDiscoveryFaucetServer(
       }
 
       const body = (await readJsonBody(req)) as FaucetInvocationRequest;
-      const { requesterTOSAddress, requestedAmountWei, requestNonce } = validateRequest(body, faucetConfig);
+      const { requesterAddress, requestedAmountWei, requestNonce } = validateRequest(body, faucetConfig);
       ensureRequestNotReplayed({
         db,
         scope: "faucet",
-        requesterIdentity: requesterTOSAddress,
+        requesterIdentity: requesterAddress,
         capability: body.capability,
         nonce: requestNonce,
       });
-      const last = readRequesterCooldown(db, requesterTOSAddress);
+      const last = readRequesterCooldown(db, requesterAddress);
       const now = Math.floor(Date.now() / 1000);
       const cooldownUntil = (last.at || 0) + faucetConfig.cooldownSeconds;
       if (cooldownUntil > now) {
@@ -197,8 +203,8 @@ export async function startAgentDiscoveryFaucetServer(
 
       const amountWei =
         requestedAmountWei < payoutAmountWei ? requestedAmountWei : payoutAmountWei;
-      const client = new TOSRpcClient({ rpcUrl });
-      const providerBalance = await client.getBalance(normalizeTOSAddress(tosAddress));
+      const client = new RpcClient({ rpcUrl });
+      const providerBalance = await client.getBalance(normalizeAddress(address));
       if (providerBalance < amountWei) {
         const response: FaucetResponse = {
           status: "rejected",
@@ -208,27 +214,27 @@ export async function startAgentDiscoveryFaucetServer(
         return;
       }
 
-      const transfer = await sendTOSNativeTransfer({
+      const transfer = await sendNativeTransfer({
         rpcUrl,
         privateKey,
-        to: requesterTOSAddress,
+        to: requesterAddress,
         amountWei,
         waitForReceipt: false,
       });
       recordRequestNonce({
         db,
         scope: "faucet",
-        requesterIdentity: requesterTOSAddress,
+        requesterIdentity: requesterAddress,
         capability: body.capability,
         nonce: requestNonce,
         expiresAt: body.request_expires_at,
       });
-      writeRequesterCooldown(db, requesterTOSAddress, now, transfer.txHash);
+      writeRequesterCooldown(db, requesterAddress, now, transfer.txHash);
       db.setKV(
         "agent_discovery:faucet:last_served",
         JSON.stringify({
           at: new Date().toISOString(),
-          requester: requesterTOSAddress,
+          requester: requesterAddress,
           amountWei: amountWei.toString(),
           txHash: transfer.txHash,
         }),
@@ -236,7 +242,7 @@ export async function startAgentDiscoveryFaucetServer(
 
       const response: FaucetResponse = {
         status: "approved",
-        transfer_network: `tos:${config.tosChainId || 0}`,
+        transfer_network: `tos:${config.chainId || 0}`,
         tx_hash: transfer.txHash,
         amount: amountWei.toString(),
         cooldown_until: now + faucetConfig.cooldownSeconds,

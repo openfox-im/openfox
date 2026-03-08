@@ -12,6 +12,7 @@ import { SiweMessage } from "siwe";
 import { getWallet, getOpenFoxDir } from "./wallet.js";
 import type { ProvisionResult } from "../types.js";
 import { ResilientHttpClient } from "../runtime/http-client.js";
+import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "../tos/address.js";
 
 const httpClient = new ResilientHttpClient();
 
@@ -65,7 +66,8 @@ export async function provision(
   const url = apiUrl || process.env.OPENFOX_API_URL || DEFAULT_API_URL;
 
   // 1. Load wallet
-  const { account } = await getWallet();
+  const { account, privateKey } = await getWallet();
+  const walletAddress = deriveAddressFromPrivateKey(privateKey);
   const address = account.address;
 
   // 2. Get nonce
@@ -134,9 +136,9 @@ export async function provision(
   };
 
   // 6. Save to config
-  saveConfig(key, address);
+  saveConfig(key, walletAddress);
 
-  return { apiKey: key, walletAddress: address, keyPrefix: key_prefix };
+  return { apiKey: key, walletAddress, keyPrefix: key_prefix };
 }
 
 /**

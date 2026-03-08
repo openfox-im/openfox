@@ -14,8 +14,8 @@ import type {
   ModelStrategyConfig,
   SoulConfig,
   AgentDiscoveryConfig,
+  HexAddress,
 } from "./types.js";
-import type { Address } from "viem";
 import {
   DEFAULT_CONFIG,
   DEFAULT_TREASURY_POLICY,
@@ -323,6 +323,20 @@ export function loadConfig(): OpenFoxConfig | null {
       ...(((raw?.agentDiscovery as JsonRecord | undefined)?.faucetServer as
         | JsonRecord
         | undefined) ?? {}),
+      requireNativeIdentity:
+        typeof (((raw?.agentDiscovery as JsonRecord | undefined)?.faucetServer as
+          | JsonRecord
+          | undefined)?.requireNativeIdentity) === "boolean"
+          ? ((((raw?.agentDiscovery as JsonRecord | undefined)?.faucetServer as
+              | JsonRecord
+              | undefined)?.requireNativeIdentity as boolean) ?? true)
+          : typeof (((raw?.agentDiscovery as JsonRecord | undefined)?.faucetServer as
+                | JsonRecord
+                | undefined)?.requireTOSIdentity) === "boolean"
+            ? ((((raw?.agentDiscovery as JsonRecord | undefined)?.faucetServer as
+                | JsonRecord
+                | undefined)?.requireTOSIdentity as boolean) ?? true)
+            : DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG.requireNativeIdentity,
     },
     observationServer: {
       ...DEFAULT_AGENT_DISCOVERY_OBSERVATION_SERVER_CONFIG,
@@ -526,21 +540,40 @@ export function loadConfig(): OpenFoxConfig | null {
       undefined,
     inferenceModel,
     inferenceModelRef: modelRef,
-    tosWalletAddress:
-      typeof raw?.tosWalletAddress === "string"
-        ? raw.tosWalletAddress.trim()
-        : DEFAULT_CONFIG.tosWalletAddress,
-    tosRpcUrl:
+    walletAddress:
+      typeof raw?.walletAddress === "string" && raw.walletAddress.trim()
+        ? (raw.walletAddress.trim() as HexAddress)
+        : typeof raw?.walletAddress === "string" &&
+            raw.walletAddress.trim()
+          ? (raw.walletAddress.trim() as HexAddress)
+          : DEFAULT_CONFIG.walletAddress!,
+    rpcUrl:
       typeof process.env.TOS_RPC_URL === "string" &&
       process.env.TOS_RPC_URL.trim()
         ? process.env.TOS_RPC_URL.trim()
-        : typeof raw?.tosRpcUrl === "string"
-          ? raw.tosRpcUrl.trim()
-          : DEFAULT_CONFIG.tosRpcUrl,
-    tosChainId:
-      typeof raw?.tosChainId === "number"
-        ? raw.tosChainId
-        : DEFAULT_CONFIG.tosChainId,
+        : typeof raw?.rpcUrl === "string" && raw.rpcUrl.trim()
+          ? raw.rpcUrl.trim()
+          : typeof raw?.rpcUrl === "string" && raw.rpcUrl.trim()
+            ? raw.rpcUrl.trim()
+            : DEFAULT_CONFIG.rpcUrl,
+    chainId:
+      typeof raw?.chainId === "number"
+        ? raw.chainId
+        : typeof raw?.chainId === "number"
+          ? raw.chainId
+          : DEFAULT_CONFIG.chainId,
+    baseRpcUrl:
+      typeof process.env.OPENFOX_RPC_URL === "string" &&
+      process.env.OPENFOX_RPC_URL.trim()
+        ? process.env.OPENFOX_RPC_URL.trim()
+        : typeof raw?.baseRpcUrl === "string" && raw.baseRpcUrl.trim()
+          ? raw.baseRpcUrl.trim()
+          : typeof raw?.rpcUrl === "string" &&
+              raw.rpcUrl.trim() &&
+              typeof raw?.rpcUrl === "string" &&
+              raw.rpcUrl.trim()
+            ? raw.rpcUrl.trim()
+            : DEFAULT_CONFIG.baseRpcUrl,
     socialRelayUrl:
       typeof raw?.socialRelayUrl === "string" && raw.socialRelayUrl.trim()
         ? raw.socialRelayUrl.trim()
@@ -591,20 +624,20 @@ export function createConfig(params: {
   name: string;
   genesisPrompt: string;
   creatorMessage?: string;
-  creatorAddress: Address;
+  creatorAddress: HexAddress;
   registeredRemotely?: boolean;
   sandboxId: string;
-  walletAddress: Address;
-  tosWalletAddress?: `0x${string}`;
-  tosRpcUrl?: string;
-  tosChainId?: number;
+  walletAddress: HexAddress;
+  rpcUrl?: string;
+  chainId?: number;
+  baseRpcUrl?: string;
   apiKey?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
   ollamaBaseUrl?: string;
   inferenceModel?: string;
   inferenceModelRef?: string;
-  parentAddress?: Address;
+  parentAddress?: HexAddress;
   treasuryPolicy?: TreasuryPolicy;
 }): OpenFoxConfig {
   const normalizedSandboxId = (params.sandboxId || "").trim();
@@ -636,9 +669,9 @@ export function createConfig(params: {
     dbPath: DEFAULT_CONFIG.dbPath || "~/.openfox/state.db",
     logLevel: (DEFAULT_CONFIG.logLevel as OpenFoxConfig["logLevel"]) || "info",
     walletAddress: params.walletAddress,
-    tosWalletAddress: params.tosWalletAddress,
-    tosRpcUrl: params.tosRpcUrl,
-    tosChainId: params.tosChainId,
+    rpcUrl: params.rpcUrl,
+    chainId: params.chainId,
+    baseRpcUrl: params.baseRpcUrl,
     version: DEFAULT_CONFIG.version || "0.2.1",
     skillsDir: DEFAULT_CONFIG.skillsDir || "~/.openfox/skills",
     maxChildren: DEFAULT_CONFIG.maxChildren || 3,

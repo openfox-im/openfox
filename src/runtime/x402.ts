@@ -14,8 +14,8 @@ import {
 } from "viem";
 import { base, baseSepolia } from "viem/chains";
 import { loadConfig } from "../config.js";
-import { buildTOSX402Payment } from "../tos/client.js";
-import { normalizeTOSAddress } from "../tos/address.js";
+import { buildTOSX402Payment as buildNativePayment } from "../tos/client.js";
+import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { ResilientHttpClient } from "./http-client.js";
 
@@ -121,13 +121,13 @@ function isTOSNetwork(network: PaymentNetworkId): network is `tos:${string}` {
   return network.startsWith("tos:");
 }
 
-function getTOSRpcUrl(): string | undefined {
+function getChainRpcUrl(): string | undefined {
   const config = loadConfig();
-  return process.env.TOS_RPC_URL || config?.tosRpcUrl;
+  return process.env.TOS_RPC_URL || config?.rpcUrl;
 }
 
-function hasTOSPaymentSupport(): boolean {
-  return !!(loadWalletPrivateKey() && getTOSRpcUrl());
+function hasNativePaymentSupport(): boolean {
+  return !!(loadWalletPrivateKey() && getChainRpcUrl());
 }
 
 function normalizePaymentRequirement(raw: unknown): PaymentRequirement | null {
@@ -208,12 +208,12 @@ function parseMaxAmountRequired(maxAmountRequired: string, x402Version: number):
 }
 
 function selectRequirement(parsed: PaymentRequiredResponse): PaymentRequirement {
-  const tosSupported = hasTOSPaymentSupport();
-  if (tosSupported) {
-    const exactTOS = parsed.accepts.find(
+  const nativeSupported = hasNativePaymentSupport();
+  if (nativeSupported) {
+    const exactNative = parsed.accepts.find(
       (r) => r.scheme === "exact" && isTOSNetwork(r.network),
     );
-    if (exactTOS) return exactTOS;
+    if (exactNative) return exactNative;
   }
   const exactUSDC = parsed.accepts.find(
     (r) => r.scheme === "exact" && isUSDCNetwork(r.network),
@@ -444,20 +444,20 @@ async function signPayment(
   if (isTOSNetwork(requirement.network)) {
     const privateKey = loadWalletPrivateKey();
     if (!privateKey) {
-      throw new Error("TOS payment requested but no local wallet private key was found");
+      throw new Error("native payment requested but no local wallet private key was found");
     }
-    const rpcUrl = getTOSRpcUrl();
+    const rpcUrl = getChainRpcUrl();
     if (!rpcUrl) {
-      throw new Error("TOS payment requested but TOS_RPC_URL is not configured");
+      throw new Error("native payment requested but TOS_RPC_URL is not configured");
     }
-    return await buildTOSX402Payment({
+    return await buildNativePayment({
       privateKey,
       rpcUrl,
       requirement: {
         scheme: "exact",
         network: requirement.network,
         maxAmountRequired: requirement.maxAmountRequired,
-        payToAddress: normalizeTOSAddress(requirement.payToAddress),
+        payToAddress: normalizeAddress(requirement.payToAddress),
         asset: requirement.asset,
         requiredDeadlineSeconds: requirement.requiredDeadlineSeconds,
       },
