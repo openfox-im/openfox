@@ -2,8 +2,6 @@
 
 OpenFox is a local-first, TOS-native agent runtime. It keeps a persistent agent process running, holds a native TOS wallet, discovers and exposes agent capabilities, executes tasks, accepts payments through TOS `x402`, and publishes settlement artifacts back onto TOS.
 
-This document reflects the current codebase, not the older upstream architecture that was centered on Ethereum/Base, USDC topups, and a mandatory remote runtime.
-
 ## Table of Contents
 
 - [System Overview](#system-overview)
@@ -22,7 +20,7 @@ This document reflects the current codebase, not the older upstream architecture
 - [Persistence and Schema](#persistence-and-schema)
 - [Configuration Model](#configuration-model)
 - [Security Model](#security-model)
-- [Secondary and Legacy-Compatible Modules](#secondary-and-legacy-compatible-modules)
+- [Supporting Modules](#supporting-modules)
 - [Testing and Build](#testing-and-build)
 - [Module Dependency Graph](#module-dependency-graph)
 
@@ -93,18 +91,14 @@ The core architectural point is:
 
 ## Current Product Model
 
-OpenFox is no longer best described as "a sovereign AI runtime that buys remote compute with USDC."
-
 The current codebase is organized around these product assumptions:
 
 - OpenFox runs locally by default.
-- OpenFox can use `OpenAI`, `Anthropic`, `Ollama`, or a legacy Runtime-compatible inference endpoint.
+- OpenFox can use `OpenAI`, `Anthropic`, and `Ollama`.
 - OpenFox owns a native `TOS` wallet and can query balances, sign native transfers, and submit TOS payments.
 - OpenFox can expose paid or sponsored capabilities through Agent Discovery and Agent Gateway.
 - OpenFox can host tasks, solve tasks, discover opportunities, and publish settlement receipts.
 - OpenFox can run continuously as a CLI process or as a managed Linux user service.
-
-Remote Runtime integration still exists, but it is now a compatibility layer, not the required center of the product.
 
 ---
 
@@ -193,7 +187,7 @@ This means the architecture is not just "a library plus a loop." It includes exp
 
 ## Directory Structure
 
-The current source tree is organized around runtime capabilities rather than the older upstream layout.
+The current source tree is organized around the active OpenFox runtime and service surfaces.
 
 ```text
 src/
@@ -273,14 +267,14 @@ src/
   orchestration/            Multi-agent/task-planning runtime helpers
   replication/              Child-agent spawning and lifecycle
 
-  runtime/                  Optional remote Runtime and OpenAI-compatible client paths
+  runtime/                  Shared execution, transport, and inference client utilities
     client.ts
     inference.ts
     http-client.ts
     credits.ts
     x402.ts
 
-  self-mod/                 Safe code edits, upstream sync, tool installs
+  self-mod/                 Safe code edits, repo sync, tool installs
   service/                  Managed service lifecycle and service health UX
   settlement/               Receipt publishing and callback dispatch
   setup/                    Interactive setup/configure/model-pick flows
@@ -349,12 +343,11 @@ OpenFox is local-first in startup, but provider-flexible in execution.
 
 ### Primary providers
 
-The current code supports:
+The current code supports these primary providers:
 
 - `OpenAI`
 - `Anthropic`
 - `Ollama`
-- legacy `Runtime` OpenAI-compatible inference
 
 Provider readiness is surfaced through [`src/models/status.ts`](/home/tomi/openfox/src/models/status.ts).
 
@@ -364,7 +357,7 @@ There are two inference layers in the codebase:
 
 1. `src/runtime/inference.ts`
    - the main OpenAI-compatible inference client used by the runtime
-   - can route requests to OpenAI, Anthropic, Ollama, or legacy Runtime
+   - routes requests to configured providers used by the main loop
 
 2. `src/inference/*`
    - model registry
@@ -382,8 +375,8 @@ This split exists because OpenFox has both:
 The important architectural boundary is:
 
 - OpenFox does not require a remote control plane to start.
-- If `runtimeApiUrl` and `runtimeApiKey` are present, runtime features remain available.
-- If they are not present, OpenFox still runs locally, and `RuntimeClient` falls back to local exec/file behavior where appropriate.
+- OpenFox starts from local config, local wallet state, and a configured inference provider.
+- The `src/runtime/*` layer provides shared transport, execution, credit, and inference utilities used by the rest of the runtime.
 
 ---
 
@@ -470,7 +463,7 @@ At runtime, `src/index.ts` coordinates these systems so that:
 - gateway provider sessions attach to those local routes
 - the current relay URL set is republished into the Agent Discovery card
 
-That integration is one of the major architectural differences between current OpenFox and the upstream base.
+That integration is what makes private provider nodes externally reachable without changing the core service logic.
 
 ---
 
@@ -730,7 +723,7 @@ Important config areas:
 - `treasuryPolicy`
 - heartbeat and database paths
 
-Compatibility behavior still exists in the loader for older provider/model shapes, but the live product model is the OpenFox-native config shape defined in [`src/types.ts`](/home/tomi/openfox/src/types.ts).
+The live product model is the OpenFox-native config shape defined in [`src/types.ts`](/home/tomi/openfox/src/types.ts).
 
 ---
 
@@ -763,9 +756,9 @@ The security posture is layered rather than concentrated in one module.
 
 ---
 
-## Secondary and Legacy-Compatible Modules
+## Supporting Modules
 
-Several modules still exist and matter, but they are not the main architectural spine of the current product.
+Several modules support the runtime but are not the main architectural spine of the current product.
 
 ### Secondary but active
 
@@ -780,12 +773,12 @@ Several modules still exist and matter, but they are not the main architectural 
 - `replication/*`: child-agent spawning and lifecycle
 - `social/*`: social relay client and signed messaging
 - `soul/*`: SOUL.md parsing and reflection
-- `self-mod/*`: code modification and upstream sync helpers
+- `self-mod/*`: code modification and repo sync helpers
 
-### Compatibility layers
+### Infrastructure and support layers
 
-- `runtime/*`: still supports legacy Runtime APIs and optional sandbox operations
-- config compatibility parsing in `config.ts`
+- `runtime/*`: shared transport, execution, credit, and inference helpers
+- `config.ts`: config normalization and default merging
 
 The right mental model is:
 
