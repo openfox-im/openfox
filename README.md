@@ -190,7 +190,7 @@ The near-term product direction includes:
 ## Quick Start
 
 ```bash
-git clone https://github.com/tos-network/openfox
+git clone https://github.com/openfox-im/openfox
 cd openfox
 corepack enable
 corepack prepare pnpm@10.28.1 --activate

@@ -44,9 +44,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tos-network/openfox.git"
+    "url": "https://github.com/openfox-im/openfox.git"
   },
-  "homepage": "https://github.com/tos-network/openfox",
+  "homepage": "https://github.com/openfox-im/openfox",
   "keywords": [
     "openfox",
     "autonomous-agent",

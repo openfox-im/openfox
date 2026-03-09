@@ -120,7 +120,7 @@ export async function spawnChild(
     // Install runtime (on the CHILD sandbox)
     await childRuntime.exec("apt-get update -qq && apt-get install -y -qq nodejs npm git curl", 120_000);
     await childRuntime.exec(
-      "git clone https://github.com/tos-network/openfox.git /root/openfox && cd /root/openfox && npm install && npm run build",
+      "git clone https://github.com/openfox-im/openfox.git /root/openfox && cd /root/openfox && npm install && npm run build",
       180_000,
     );
 
@@ -253,7 +253,7 @@ async function spawnChildLegacy(
       120_000,
     );
     await childRuntime.exec(
-      "git clone https://github.com/tos-network/openfox.git /root/openfox && cd /root/openfox && npm install && npm run build",
+      "git clone https://github.com/openfox-im/openfox.git /root/openfox && cd /root/openfox && npm install && npm run build",
       180_000,
     );
     await childRuntime.exec("mkdir -p /root/.openfox", 10_000);

@@ -3,7 +3,7 @@
 # curl -fsSL https://openfox.ai/openfox.sh | sh
 set -e
 
-REPO="https://github.com/tos-network/openfox.git"
+REPO="https://github.com/openfox-im/openfox.git"
 
 # Determine install directory
 if [ -n "$OPENFOX_DIR" ]; then
