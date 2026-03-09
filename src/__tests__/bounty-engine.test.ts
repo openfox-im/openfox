@@ -76,7 +76,7 @@ describe("bounty engine", () => {
     expect(payouts).toEqual([{ to: SOLVER_ADDRESS, amountWei: 1000n }]);
   });
 
-  it("records rejected submissions without paying", async () => {
+  it("keeps the bounty open after a rejected submission", async () => {
     const inference = new MockInferenceClient([
       noToolResponse(
         '{"decision":"rejected","confidence":0.31,"reason":"Wrong answer."}',
@@ -114,6 +114,64 @@ describe("bounty engine", () => {
 
     expect(result.result.decision).toBe("rejected");
     expect(result.result.payoutTxHash).toBeNull();
-    expect(result.bounty.status).toBe("rejected");
+    expect(result.bounty.status).toBe("open");
+  });
+
+  it("supports non-question task kinds and enforces proof rules", async () => {
+    const inference = new MockInferenceClient([
+      noToolResponse(
+        '{"decision":"accepted","confidence":0.93,"reason":"Translation matches the reference."}',
+      ),
+    ]);
+    const engine = createBountyEngine({
+      identity: createIdentity(),
+      db,
+      inference,
+      bountyConfig: {
+        ...DEFAULT_BOUNTY_CONFIG,
+        enabled: true,
+        role: "host",
+      },
+      payoutSender: {
+        async send() {
+          return { txHash: "0xtranslation" };
+        },
+      },
+      now: () => new Date("2026-03-09T00:00:00.000Z"),
+    });
+
+    const translation = engine.openBounty({
+      kind: "translation",
+      title: "Translate hello",
+      taskPrompt: "Translate 'hello' into Chinese.",
+      referenceOutput: "你好",
+      rewardWei: "1000",
+      submissionDeadline: "2026-03-09T01:00:00.000Z",
+    });
+
+    const translated = await engine.submitSubmission({
+      bountyId: translation.bountyId,
+      solverAddress: SOLVER_ADDRESS,
+      submissionText: "你好",
+    });
+    expect(translated.bounty.kind).toBe("translation");
+    expect(translated.result.payoutTxHash).toBe("0xtranslation");
+
+    const social = engine.openBounty({
+      kind: "social_proof",
+      title: "Reply with the phrase",
+      taskPrompt: "Reply to the post with the exact phrase 'openfox test' and submit the proof URL.",
+      referenceOutput: "openfox test",
+      rewardWei: "1000",
+      submissionDeadline: "2026-03-09T01:00:00.000Z",
+    });
+
+    await expect(
+      engine.submitSubmission({
+        bountyId: social.bountyId,
+        solverAddress: SOLVER_ADDRESS,
+        submissionText: "openfox test",
+      }),
+    ).rejects.toThrow("requires a proofUrl");
   });
 });

@@ -11,12 +11,16 @@ import type {
 import type { BountyEngine } from "./engine.js";
 import {
   fetchRemoteBounties,
-  solveRemoteQuestionBounty,
+  solveRemoteBounty,
 } from "./client.js";
 import {
   buildQuestionBountyDraftPrompt,
   parseQuestionBountyDraft,
 } from "./skills/question-host.js";
+import {
+  buildTaskBountyDraftPrompt,
+  parseTaskBountyDraft,
+} from "./skills/task-host.js";
 
 export interface BountyAutomationHandle {
   tick(): Promise<void>;
@@ -32,12 +36,28 @@ function completionKey(bountyId: string): string {
 }
 
 function resolveBountySkillName(config: BountyConfig): string {
+  const defaultHostSkill =
+    config.defaultKind === "translation"
+      ? "translation-bounty-host"
+      : config.defaultKind === "social_proof"
+        ? "social-bounty-host"
+        : config.defaultKind === "problem_solving"
+          ? "problem-bounty-host"
+          : "question-bounty-host";
+  const defaultSolverSkill =
+    config.defaultKind === "translation"
+      ? "translation-bounty-solver"
+      : config.defaultKind === "social_proof"
+        ? "social-bounty-solver"
+        : config.defaultKind === "problem_solving"
+          ? "problem-bounty-solver"
+          : "question-bounty-solver";
   if (config.role === "solver") {
     return config.skill === "question-bounty-host"
-      ? "question-bounty-solver"
-      : config.skill || "question-bounty-solver";
+      ? defaultSolverSkill
+      : config.skill || defaultSolverSkill;
   }
-  return config.skill || "question-bounty-host";
+  return config.skill || defaultHostSkill;
 }
 
 function resolveSkillInstructions(
@@ -81,35 +101,55 @@ export async function ensureAutoQuestionBountyOpen(params: {
     return null;
   }
 
-  const response = await params.inference.chat(
-    [
-      {
-        role: "system",
-        content: buildQuestionBountyDraftPrompt({
+  const skillInstructions = resolveSkillInstructions(
+    params.db,
+    resolveBountySkillName(params.bountyConfig),
+  );
+  const prompt =
+    params.bountyConfig.defaultKind === "question"
+      ? buildQuestionBountyDraftPrompt({
           openingPrompt: params.bountyConfig.openingPrompt,
           defaultSubmissionTtlSeconds:
             params.bountyConfig.defaultSubmissionTtlSeconds,
-          skillInstructions: resolveSkillInstructions(
-            params.db,
-            resolveBountySkillName(params.bountyConfig),
-          ),
-        }),
-      },
-    ],
+          skillInstructions,
+        })
+      : buildTaskBountyDraftPrompt({
+          kind: params.bountyConfig.defaultKind,
+          openingPrompt: params.bountyConfig.openingPrompt,
+          defaultSubmissionTtlSeconds:
+            params.bountyConfig.defaultSubmissionTtlSeconds,
+          skillInstructions,
+        });
+  const response = await params.inference.chat(
+    [{ role: "system", content: prompt }],
     {
       temperature: 0.3,
       maxTokens: 512,
     },
   );
-  const draft = parseQuestionBountyDraft(response.message.content || "");
+  const draft =
+    params.bountyConfig.defaultKind === "question"
+      ? (() => {
+          const parsed = parseQuestionBountyDraft(response.message.content || "");
+          return {
+            title: parsed.question,
+            taskPrompt: parsed.question,
+            referenceOutput: parsed.referenceAnswer,
+            submissionTtlSeconds: parsed.submissionTtlSeconds,
+          };
+        })()
+      : parseTaskBountyDraft(response.message.content || "");
   const ttlSeconds =
     draft.submissionTtlSeconds ??
     params.bountyConfig.defaultSubmissionTtlSeconds;
-  return params.engine.openQuestionBounty({
-    question: draft.question,
-    referenceAnswer: draft.referenceAnswer,
+  return params.engine.openBounty({
+    kind: params.bountyConfig.defaultKind,
+    title: draft.title,
+    taskPrompt: draft.taskPrompt,
+    referenceOutput: draft.referenceOutput,
     rewardWei: params.bountyConfig.rewardWei,
     submissionDeadline: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+    skillName: resolveBountySkillName(params.bountyConfig),
   });
 }
 
@@ -140,7 +180,7 @@ async function listCandidateBounties(params: {
 
   if (params.config.agentDiscovery?.enabled) {
     const capability =
-      params.config.bounty?.discoveryCapability || "bounty.submit";
+      params.config.bounty?.discoveryCapability || "task.submit";
     const providers = await discoverCapabilityProviders({
       config: params.config,
       capability,
@@ -187,7 +227,7 @@ export async function runSolverBountyPass(params: {
   );
 
   try {
-    const solved = await solveRemoteQuestionBounty({
+    const solved = await solveRemoteBounty({
       baseUrl: target.baseUrl,
       bountyId: target.bounty.bountyId,
       solverAddress: params.identity.address,
@@ -268,7 +308,7 @@ export function startBountyAutomation(params: {
         });
         if (opened) {
           params.onEvent?.(
-            `Auto-opened bounty ${opened.bountyId}: ${opened.question}`,
+            `Auto-opened bounty ${opened.bountyId}: ${opened.title}`,
           );
         }
       }

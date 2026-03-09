@@ -391,10 +391,15 @@ export interface OpenFoxConfig {
   modelStrategy?: ModelStrategyConfig;
   agentDiscovery?: AgentDiscoveryConfig;
   bounty?: BountyConfig;
+  opportunityScout?: OpportunityScoutConfig;
 }
 
 export type BountyRole = "host" | "solver";
-export type BountyKind = "question";
+export type BountyKind =
+  | "question"
+  | "translation"
+  | "social_proof"
+  | "problem_solving";
 export type BountyStatus =
   | "open"
   | "submitted"
@@ -407,10 +412,18 @@ export type BountySubmissionStatus = "submitted" | "accepted" | "rejected";
 export type BountyJudgeMode = "local_model";
 export type BountyDecision = "accepted" | "rejected";
 
+export interface BountyPolicy {
+  maxSubmissionsPerSolver: number;
+  solverCooldownSeconds: number;
+  maxAutoPayPerSolverPerDayWei: string;
+  trustedProofUrlPrefixes: string[];
+}
+
 export interface BountyConfig {
   enabled: boolean;
   role: BountyRole;
   skill: string;
+  defaultKind: BountyKind;
   bindHost: string;
   port: number;
   pathPrefix: string;
@@ -427,6 +440,7 @@ export interface BountyConfig {
   autoSolveOnStartup: boolean;
   autoSolveEnabled: boolean;
   openingPrompt?: string;
+  policy: BountyPolicy;
 }
 
 export interface BountyRecord {
@@ -434,8 +448,12 @@ export interface BountyRecord {
   hostAgentId: string;
   hostAddress: Address;
   kind: BountyKind;
-  question: string;
-  referenceAnswer: string;
+  title: string;
+  taskPrompt: string;
+  referenceOutput: string;
+  skillName?: string | null;
+  metadata?: Record<string, unknown>;
+  policy?: BountyPolicy;
   rewardWei: string;
   submissionDeadline: string;
   judgeMode: BountyJudgeMode;
@@ -449,7 +467,9 @@ export interface BountySubmissionRecord {
   bountyId: string;
   solverAgentId?: string | null;
   solverAddress: Address;
-  answer: string;
+  submissionText: string;
+  proofUrl?: string | null;
+  metadata?: Record<string, unknown>;
   status: BountySubmissionStatus;
   submittedAt: string;
   updatedAt: string;
@@ -473,28 +493,56 @@ export interface BountyJudgeResult {
 }
 
 export interface BountyCreateInput {
-  question: string;
-  referenceAnswer: string;
+  kind: BountyKind;
+  title: string;
+  taskPrompt: string;
+  referenceOutput: string;
   rewardWei: string;
   submissionDeadline: string;
+  skillName?: string | null;
+  metadata?: Record<string, unknown>;
+  policy?: Partial<BountyPolicy>;
 }
 
 export interface BountySubmissionInput {
   bountyId: string;
   solverAgentId?: string | null;
   solverAddress: Address;
-  answer: string;
+  submissionText: string;
+  proofUrl?: string | null;
+  metadata?: Record<string, unknown>;
 }
+
+export interface OpportunityScoutConfig {
+  enabled: boolean;
+  discoveryCapabilities: string[];
+  remoteBaseUrls: string[];
+  maxItems: number;
+  minRewardWei: string;
+}
+
+export const DEFAULT_BOUNTY_POLICY: BountyPolicy = {
+  maxSubmissionsPerSolver: 1,
+  solverCooldownSeconds: 3600,
+  maxAutoPayPerSolverPerDayWei: "1000000000000000000",
+  trustedProofUrlPrefixes: [
+    "https://x.com/",
+    "https://twitter.com/",
+    "https://www.x.com/",
+    "https://www.twitter.com/",
+  ],
+};
 
 export const DEFAULT_BOUNTY_CONFIG: BountyConfig = {
   enabled: false,
   role: "host",
   skill: "question-bounty-host",
+  defaultKind: "question",
   bindHost: "127.0.0.1",
   port: 4891,
   pathPrefix: "/bounty",
   remoteBaseUrl: undefined,
-  discoveryCapability: "bounty.submit",
+  discoveryCapability: "task.submit",
   rewardWei: "10000000000000000",
   autoPayConfidenceThreshold: 0.9,
   defaultSubmissionTtlSeconds: 3600,
@@ -505,6 +553,20 @@ export const DEFAULT_BOUNTY_CONFIG: BountyConfig = {
   autoOpenWhenIdle: false,
   autoSolveOnStartup: false,
   autoSolveEnabled: false,
+  policy: DEFAULT_BOUNTY_POLICY,
+};
+
+export const DEFAULT_OPPORTUNITY_SCOUT_CONFIG: OpportunityScoutConfig = {
+  enabled: false,
+  discoveryCapabilities: [
+    "task.submit",
+    "task.solve",
+    "sponsor.topup.testnet",
+    "observation.once",
+  ],
+  remoteBaseUrls: [],
+  maxItems: 25,
+  minRewardWei: "0",
 };
 
 export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
@@ -521,6 +583,7 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   rpcUrl: process.env.TOS_RPC_URL,
   agentDiscovery: DEFAULT_AGENT_DISCOVERY_CONFIG,
   bounty: DEFAULT_BOUNTY_CONFIG,
+  opportunityScout: DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
 };
 
 // ─── Agent State ─────────────────────────────────────────────────

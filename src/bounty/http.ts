@@ -72,14 +72,39 @@ export async function startBountyHttpServer(params: {
             ? body.submission_ttl_seconds
             : params.bountyConfig.defaultSubmissionTtlSeconds;
         const deadline = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-        const bounty = params.engine.openQuestionBounty({
-          question: String(body.question || "").trim(),
-          referenceAnswer: String(body.reference_answer || "").trim(),
+        const kind =
+          typeof body.kind === "string" && body.kind.trim()
+            ? body.kind.trim()
+            : params.bountyConfig.defaultKind;
+        const taskPrompt =
+          typeof body.task_prompt === "string" && body.task_prompt.trim()
+            ? body.task_prompt.trim()
+            : String(body.question || "").trim();
+        const referenceOutput =
+          typeof body.reference_output === "string" && body.reference_output.trim()
+            ? body.reference_output.trim()
+            : String(body.reference_answer || "").trim();
+        const bounty = params.engine.openBounty({
+          kind: kind as any,
+          title:
+            typeof body.title === "string" && body.title.trim()
+              ? body.title.trim()
+              : taskPrompt.slice(0, 160),
+          taskPrompt,
+          referenceOutput,
           rewardWei:
             typeof body.reward_wei === "string" && body.reward_wei.trim()
               ? body.reward_wei.trim()
               : params.bountyConfig.rewardWei,
           submissionDeadline: deadline,
+          skillName:
+            typeof body.skill_name === "string" && body.skill_name.trim()
+              ? body.skill_name.trim()
+              : null,
+          metadata:
+            typeof body.metadata === "object" && body.metadata !== null
+              ? (body.metadata as Record<string, unknown>)
+              : {},
         });
         json(res, 201, bounty);
         return;
@@ -109,7 +134,18 @@ export async function startBountyHttpServer(params: {
               ? body.solver_agent_id
               : null,
           solverAddress: String(body.solver_address || "") as Address,
-          answer: String(body.answer || ""),
+          answer:
+            typeof body.submission_text === "string"
+              ? body.submission_text
+              : String(body.answer || ""),
+          proofUrl:
+            typeof body.proof_url === "string" && body.proof_url.trim()
+              ? body.proof_url.trim()
+              : null,
+          metadata:
+            typeof body.metadata === "object" && body.metadata !== null
+              ? (body.metadata as Record<string, unknown>)
+              : {},
         });
         json(res, 200, result);
         return;

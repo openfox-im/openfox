@@ -235,9 +235,9 @@ describe("Database Transaction Safety", () => {
       expect(tableNames).toContain("modifications");
       expect(tableNames).toContain("skills");
       expect(tableNames).toContain("children");
-      expect(tableNames).toContain("registry");
       expect(tableNames).toContain("reputation");
       expect(tableNames).toContain("inbox_messages");
+      expect(tableNames).toContain("bounties");
       rawDb.close();
     });
   });

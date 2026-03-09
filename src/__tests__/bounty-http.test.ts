@@ -36,6 +36,9 @@ describe("bounty http server", () => {
       noToolResponse(
         '{"decision":"accepted","confidence":0.96,"reason":"Correct."}',
       ),
+      noToolResponse(
+        '{"decision":"accepted","confidence":0.94,"reason":"Translation matches."}',
+      ),
     ]);
 
     const engine = createBountyEngine({
@@ -102,6 +105,35 @@ describe("bounty http server", () => {
       };
       expect(resultPayload.result.decision).toBe("accepted");
       expect(resultPayload.result.payoutTxHash).toBe("0xreward");
+
+      const createTranslation = await fetch(`${server.url}/bounties`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "translation",
+          title: "Translate hello",
+          task_prompt: "Translate 'hello' into Chinese.",
+          reference_output: "你好",
+          reward_wei: "2000",
+          submission_ttl_seconds: 3600,
+        }),
+      });
+      expect(createTranslation.status).toBe(201);
+      const translation = (await createTranslation.json()) as { bountyId: string };
+
+      const submitTranslation = await fetch(
+        `${server.url}/bounties/${translation.bountyId}/submit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            solver_address:
+              "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            submission_text: "你好",
+          }),
+        },
+      );
+      expect(submitTranslation.status).toBe(200);
     } finally {
       await server.close();
     }

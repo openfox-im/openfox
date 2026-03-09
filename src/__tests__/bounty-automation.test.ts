@@ -87,7 +87,7 @@ describe("bounty automation", () => {
       bountyConfig,
       engine,
     });
-    expect(opened?.question).toBe("Capital of Japan?");
+    expect(opened?.taskPrompt).toBe("Capital of Japan?");
     expect(hostDb.listBounties().length).toBe(1);
 
     const duplicate = await ensureAutoQuestionBountyOpen({

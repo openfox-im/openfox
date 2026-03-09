@@ -31,6 +31,7 @@ import type {
   BountySubmissionRecord,
   BountySubmissionStatus,
 } from "../types.js";
+import { DEFAULT_BOUNTY_POLICY } from "../types.js";
 import {
   SCHEMA_VERSION,
   CREATE_TABLES,
@@ -51,6 +52,7 @@ import {
   MIGRATION_V10,
   MIGRATION_V11,
   MIGRATION_V12,
+  MIGRATION_V13,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -488,16 +490,21 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
   const insertBounty = (bounty: BountyRecord): void => {
     db.prepare(
       `INSERT INTO bounties (
-        bounty_id, host_agent_id, host_address, kind, question, reference_answer,
-        reward_wei, submission_deadline, judge_mode, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        bounty_id, host_agent_id, host_address, kind, title, task_prompt,
+        reference_output, skill_name, metadata_json, policy_json, reward_wei,
+        submission_deadline, judge_mode, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bounty.bountyId,
       bounty.hostAgentId,
       bounty.hostAddress,
       bounty.kind,
-      bounty.question,
-      bounty.referenceAnswer,
+      bounty.title,
+      bounty.taskPrompt,
+      bounty.referenceOutput,
+      bounty.skillName ?? null,
+      JSON.stringify(bounty.metadata ?? {}),
+      JSON.stringify(bounty.policy ?? {}),
       bounty.rewardWei,
       bounty.submissionDeadline,
       bounty.judgeMode,
@@ -534,14 +541,17 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
   const insertBountySubmission = (submission: BountySubmissionRecord): void => {
     db.prepare(
       `INSERT INTO bounty_submissions (
-        submission_id, bounty_id, solver_agent_id, solver_address, answer, status, submitted_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        submission_id, bounty_id, solver_agent_id, solver_address, submission_text,
+        proof_url, metadata_json, status, submitted_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       submission.submissionId,
       submission.bountyId,
       submission.solverAgentId ?? null,
       submission.solverAddress,
-      submission.answer,
+      submission.submissionText,
+      submission.proofUrl ?? null,
+      JSON.stringify(submission.metadata ?? {}),
       submission.status,
       submission.submittedAt,
       submission.updatedAt,
@@ -748,9 +758,16 @@ function applyMigrations(db: DatabaseType): void {
       version: 12,
       apply: () => db.exec(MIGRATION_V12),
     },
+    {
+      version: 13,
+      apply: () => db.exec(MIGRATION_V13),
+    },
   ];
 
   for (const m of migrations) {
+    if (currentVersion === 0 && m.version === 13) {
+      continue;
+    }
     if (currentVersion < m.version) {
       const migrate = db.transaction(() => {
         m.apply();
@@ -1794,8 +1811,19 @@ function deserializeBounty(row: any): BountyRecord {
     hostAgentId: row.host_agent_id,
     hostAddress: row.host_address,
     kind: row.kind,
-    question: row.question,
-    referenceAnswer: row.reference_answer,
+    title: row.title,
+    taskPrompt: row.task_prompt,
+    referenceOutput: row.reference_output,
+    skillName: row.skill_name ?? null,
+    metadata: safeJsonParse(row.metadata_json ?? "{}", {}, "deserializeBounty.metadata_json"),
+    policy: {
+      ...DEFAULT_BOUNTY_POLICY,
+      ...safeJsonParse(
+        row.policy_json ?? "{}",
+        {},
+        "deserializeBounty.policy_json",
+      ),
+    },
     rewardWei: row.reward_wei,
     submissionDeadline: row.submission_deadline,
     judgeMode: row.judge_mode,
@@ -1811,7 +1839,13 @@ function deserializeBountySubmission(row: any): BountySubmissionRecord {
     bountyId: row.bounty_id,
     solverAgentId: row.solver_agent_id ?? null,
     solverAddress: row.solver_address,
-    answer: row.answer,
+    submissionText: row.submission_text,
+    proofUrl: row.proof_url ?? null,
+    metadata: safeJsonParse(
+      row.metadata_json ?? "{}",
+      {},
+      "deserializeBountySubmission.metadata_json",
+    ),
     status: row.status,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,

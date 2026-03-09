@@ -510,13 +510,17 @@ OpenFox is especially well suited to long-running background tasks such as:
 
 ## Bounty MVP Surface
 
-OpenFox now includes the first bounty runtime slice for the `question-bounty`
-MVP.
+OpenFox now includes the first bounded-task marketplace slice for:
+
+- `question`
+- `translation`
+- `social_proof`
+- `problem_solving`
 
 Host-side:
 
 ```bash
-openfox bounty open --question "Capital of France?" --answer "Paris"
+openfox bounty open --kind question --task "Capital of France?" --reference "Paris"
 openfox bounty list
 openfox bounty status <bounty-id>
 ```
@@ -536,11 +540,20 @@ The current runtime also supports:
 - host-side automatic bounty opening via `autoOpenOnStartup` / `autoOpenWhenIdle`
 - solver-side automatic polling and solving via `autoSolveOnStartup` / `autoSolveEnabled`
 - direct solver-to-host mode with `remoteBaseUrl`
-- discovery-based solver mode through `bounty.submit`
+- discovery-based solver mode through `task.submit`
+- proof-aware social tasks with trusted proof URL prefixes
+- payout cooldowns and daily per-solver auto-pay limits
+
+OpenFox also includes an MVP opportunity scout surface:
+
+```bash
+openfox scout list
+```
 
 For a concrete host/solver walkthrough, see:
 
 - [OpenFox-Bounty-Host-Solver-Guide.md](./docs/OpenFox-Bounty-Host-Solver-Guide.md)
+- [OpenFox-Local-Task-Marketplace-Guide.md](./docs/OpenFox-Local-Task-Marketplace-Guide.md)
 
 The longer-term fit is even stronger for:
 

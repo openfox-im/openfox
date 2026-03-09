@@ -113,23 +113,41 @@ import { startBountyAutomation } from "./bounty/automation.js";
 import {
   fetchRemoteBounties,
   fetchRemoteBounty,
-  solveRemoteQuestionBounty,
-  submitRemoteBountyAnswer,
+  solveRemoteBounty,
+  submitRemoteBountySubmission,
 } from "./bounty/client.js";
+import { buildOpportunityReport, collectOpportunityItems } from "./opportunity/scout.js";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";
 
 function resolveBountySkillName(config: {
   role: "host" | "solver";
+  defaultKind: "question" | "translation" | "social_proof" | "problem_solving";
   skill: string;
 }): string {
+  const defaultHostSkill =
+    config.defaultKind === "translation"
+      ? "translation-bounty-host"
+      : config.defaultKind === "social_proof"
+        ? "social-bounty-host"
+        : config.defaultKind === "problem_solving"
+          ? "problem-bounty-host"
+          : "question-bounty-host";
+  const defaultSolverSkill =
+    config.defaultKind === "translation"
+      ? "translation-bounty-solver"
+      : config.defaultKind === "social_proof"
+        ? "social-bounty-solver"
+        : config.defaultKind === "problem_solving"
+          ? "problem-bounty-solver"
+          : "question-bounty-solver";
   if (config.role === "solver") {
     return config.skill === "question-bounty-host"
-      ? "question-bounty-solver"
-      : config.skill || "question-bounty-solver";
+      ? defaultSolverSkill
+      : config.skill || defaultSolverSkill;
   }
-  return config.skill || "question-bounty-host";
+  return config.skill || defaultHostSkill;
 }
 
 async function main(): Promise<void> {
@@ -197,6 +215,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "scout") {
+    await handleScoutCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "status") {
     await showStatus({ asJson: args.includes("--json") });
     process.exit(0);
@@ -224,7 +247,8 @@ Usage:
   openfox models ...     Inspect model/provider readiness
   openfox onboard        Run setup and optionally install the managed service
   openfox logs           Show recent OpenFox service logs
-  openfox bounty ...     Open, inspect, and solve question bounties
+  openfox bounty ...     Open, inspect, and solve task bounties
+  openfox scout ...      Discover earning opportunities and task surfaces
   openfox status         Show the current runtime status
   openfox --version      Show version
   openfox --help         Show this help
@@ -970,7 +994,9 @@ OpenFox bounty
 Usage:
   openfox bounty list [--url <base-url>]
   openfox bounty status <bounty-id> [--url <base-url>]
+  openfox bounty open --kind <question|translation|social_proof|problem_solving> --title "<text>" --task "<prompt>" --reference "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>] [--skill <name>]
   openfox bounty open --question "<text>" --answer "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>]
+  openfox bounty submit <bounty-id> --submission "<text>" [--proof-url <url>] [--url <base-url>]
   openfox bounty submit <bounty-id> --answer "<text>" [--url <base-url>]
   openfox bounty solve <bounty-id> --url <base-url>
 `);
@@ -1066,11 +1092,14 @@ Usage:
     });
 
     if (command === "open") {
-      const question = readOption(args, "--question");
-      const answer = readOption(args, "--answer");
-      if (!question || !answer) {
+      const kind = (readOption(args, "--kind") ||
+        config.bounty.defaultKind) as typeof config.bounty.defaultKind;
+      const taskPrompt = readOption(args, "--task") || readOption(args, "--question");
+      const referenceOutput =
+        readOption(args, "--reference") || readOption(args, "--answer");
+      if (!taskPrompt || !referenceOutput) {
         throw new Error(
-          'Usage: openfox bounty open --question "<text>" --answer "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>]',
+          'Usage: openfox bounty open --kind <question|translation|social_proof|problem_solving> --title "<text>" --task "<prompt>" --reference "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>]',
         );
       }
       const ttlSeconds = readNumberOption(
@@ -1078,11 +1107,14 @@ Usage:
         "--ttl-seconds",
         config.bounty.defaultSubmissionTtlSeconds,
       );
-      const bounty = engine.openQuestionBounty({
-        question,
-        referenceAnswer: answer,
+      const bounty = engine.openBounty({
+        kind,
+        title: readOption(args, "--title") || taskPrompt.slice(0, 160),
+        taskPrompt,
+        referenceOutput,
         rewardWei: readOption(args, "--reward-wei") || config.bounty.rewardWei,
         submissionDeadline: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+        skillName: readOption(args, "--skill") || resolveBountySkillName(config.bounty),
       });
       logger.info(JSON.stringify(bounty, null, 2));
       return;
@@ -1090,21 +1122,23 @@ Usage:
 
     if (command === "submit") {
       const bountyId = args[1];
-      const answer = readOption(args, "--answer");
-      if (!bountyId || !answer) {
+      const submissionText =
+        readOption(args, "--submission") || readOption(args, "--answer");
+      if (!bountyId || !submissionText) {
         throw new Error(
-          'Usage: openfox bounty submit <bounty-id> --answer "<text>" [--url <base-url>]',
+          'Usage: openfox bounty submit <bounty-id> --submission "<text>" [--proof-url <url>] [--url <base-url>]',
         );
       }
       if (remoteBaseUrl) {
         logger.info(
           JSON.stringify(
-            await submitRemoteBountyAnswer({
+            await submitRemoteBountySubmission({
               baseUrl: remoteBaseUrl,
               bountyId,
               solverAddress: config.walletAddress,
-              answer,
+              submissionText,
               solverAgentId: config.agentId || null,
+              proofUrl: readOption(args, "--proof-url") || null,
             }),
             null,
             2,
@@ -1114,11 +1148,12 @@ Usage:
       }
       logger.info(
         JSON.stringify(
-          await engine.submitAnswer({
+          await engine.submitSubmission({
             bountyId,
-            answer,
+            submissionText,
             solverAddress: config.walletAddress,
             solverAgentId: config.agentId || null,
+            proofUrl: readOption(args, "--proof-url") || null,
           }),
           null,
           2,
@@ -1134,7 +1169,7 @@ Usage:
       }
         logger.info(
           JSON.stringify(
-            await solveRemoteQuestionBounty({
+            await solveRemoteBounty({
               baseUrl: remoteBaseUrl,
               bountyId,
               solverAddress: config.walletAddress,
@@ -1153,6 +1188,40 @@ Usage:
     }
 
     throw new Error(`Unknown bounty command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleScoutCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox scout
+
+Usage:
+  openfox scout list [--json]
+`);
+    return;
+  }
+
+  if (command !== "list") {
+    throw new Error(`Unknown scout command: ${command}`);
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    const items = await collectOpportunityItems({ config, db });
+    if (asJson) {
+      logger.info(JSON.stringify({ items }, null, 2));
+      return;
+    }
+    logger.info(buildOpportunityReport(items));
   } finally {
     db.close();
   }
@@ -1208,6 +1277,7 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
       ? {
           enabled: config.bounty.enabled,
           role: config.bounty.role,
+          defaultKind: config.bounty.defaultKind,
           skill: config.bounty.skill,
           bind: `${config.bounty.bindHost}:${config.bounty.port}`,
           pathPrefix: config.bounty.pathPrefix,
@@ -1218,6 +1288,15 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
           autoOpenWhenIdle: config.bounty.autoOpenWhenIdle,
           autoSolveOnStartup: config.bounty.autoSolveOnStartup,
           autoSolveEnabled: config.bounty.autoSolveEnabled,
+          policy: config.bounty.policy,
+        }
+      : null,
+    opportunityScout: config.opportunityScout
+      ? {
+          enabled: config.opportunityScout.enabled,
+          maxItems: config.opportunityScout.maxItems,
+          discoveryCapabilities: config.opportunityScout.discoveryCapabilities,
+          remoteBaseUrls: config.opportunityScout.remoteBaseUrls,
         }
       : null,
     state,
@@ -1248,8 +1327,9 @@ Wallet:     ${config.walletAddress}
 Service:    ${managedService.installed ? managedService.active || "installed" : "not installed"}
 Discovery:  ${discovery?.enabled ? "enabled" : "disabled"}
 Gateway:    ${gatewaySummary}
-Bounty:     ${config.bounty?.enabled ? `${config.bounty.role} @ ${config.bounty.bindHost}:${config.bounty.port}${config.bounty.pathPrefix}` : "disabled"}
+Bounty:     ${config.bounty?.enabled ? `${config.bounty.role}/${config.bounty.defaultKind} @ ${config.bounty.bindHost}:${config.bounty.port}${config.bounty.pathPrefix}` : "disabled"}
 Bounty auto: ${config.bounty?.enabled ? `open=${config.bounty.autoOpenOnStartup || config.bounty.autoOpenWhenIdle ? "on" : "off"} solve=${config.bounty.autoSolveOnStartup || config.bounty.autoSolveEnabled ? "on" : "off"}` : "disabled"}
+Scout:      ${config.opportunityScout?.enabled ? "enabled" : "disabled"}
 Creator:    ${config.creatorAddress}
 Sandbox:    ${config.sandboxId}
 State:      ${state}
@@ -1500,22 +1580,57 @@ async function run(): Promise<void> {
           {
             name: "bounty.list",
             mode: "sponsored",
-            description: "List currently open question bounties",
+            description: "List currently open task bounties",
           },
           {
             name: "bounty.get",
             mode: "sponsored",
-            description: "Fetch a bounty and its current status",
+            description: "Fetch a task bounty and its current status",
           },
           {
             name: "bounty.submit",
             mode: "sponsored",
-            description: "Submit an answer to an open bounty",
+            description: "Submit a solution to an open bounty",
           },
           {
             name: "bounty.result",
             mode: "sponsored",
             description: "Read the latest bounty result",
+          },
+          {
+            name: "task.list",
+            mode: "sponsored",
+            description: "List currently open task marketplace items",
+          },
+          {
+            name: "task.get",
+            mode: "sponsored",
+            description: "Fetch a task and its current status",
+          },
+          {
+            name: "task.submit",
+            mode: "sponsored",
+            description: "Submit a solution to an open task",
+          },
+          {
+            name: "task.result",
+            mode: "sponsored",
+            description: "Read the latest task result",
+          },
+          {
+            name: "translation.submit",
+            mode: "sponsored",
+            description: "Submit an answer to an open translation task",
+          },
+          {
+            name: "social.submit",
+            mode: "sponsored",
+            description: "Submit a proof to an open social task",
+          },
+          {
+            name: "task.solve",
+            mode: "sponsored",
+            description: "Submit a solution to an open third-party problem-solving task",
           },
         ],
       };

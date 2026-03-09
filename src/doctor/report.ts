@@ -39,6 +39,7 @@ export interface HealthSnapshot {
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
   bountyRemoteConfigured: boolean;
+  opportunityScoutEnabled: boolean;
   managedService: ManagedServiceStatus;
   heartbeatPaused: boolean;
   pendingWakes: number;
@@ -86,6 +87,7 @@ async function buildConfigSnapshot(
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
   bountyRemoteConfigured: boolean;
+  opportunityScoutEnabled: boolean;
   skillCount: number;
   ineligibleEnabledSkills: string[];
   heartbeatPaused: boolean;
@@ -118,6 +120,7 @@ async function buildConfigSnapshot(
           config.bounty.autoSolveEnabled),
     ),
     bountyRemoteConfigured: Boolean(config.bounty?.remoteBaseUrl),
+    opportunityScoutEnabled: config.opportunityScout?.enabled === true,
     skillCount: enabledSkills.length,
     ineligibleEnabledSkills,
     heartbeatPaused: isHeartbeatPaused(db.raw),
@@ -270,6 +273,15 @@ function collectFindings(
     });
   }
 
+  if (snapshot.opportunityScoutEnabled && !snapshot.rpcConfigured && !snapshot.discoveryEnabled) {
+    findings.push({
+      id: "scout-no-sources",
+      severity: "warn",
+      summary: "Opportunity scout is enabled without RPC or discovery inputs.",
+      recommendation: "Configure rpcUrl, discovery, or remote task URLs so scout has sources to inspect.",
+    });
+  }
+
   if (snapshot.gatewayEnabled && healthReport.includes("ERROR gateway")) {
     findings.push({
       id: "gateway-unhealthy",
@@ -346,6 +358,7 @@ export async function buildHealthSnapshot(
       bountyRole: undefined,
       bountyAutoEnabled: false,
       bountyRemoteConfigured: false,
+      opportunityScoutEnabled: false,
       managedService,
       heartbeatPaused: false,
       pendingWakes: 0,
@@ -384,6 +397,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,
+    `Opportunity scout: ${yesNo(snapshot.opportunityScoutEnabled)}`,
     `Heartbeat paused: ${yesNo(snapshot.heartbeatPaused)}`,
     `Pending wakes: ${snapshot.pendingWakes}`,
     `Enabled skills: ${snapshot.skillCount}`,

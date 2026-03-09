@@ -137,8 +137,8 @@ describe("UnifiedInferenceClient", () => {
       messages: BASE_MESSAGES,
     });
 
-    expect(result.metadata.providerId).toBe("groq");
-    expect(result.metadata.modelId).toBe("llama-3.3-70b-versatile");
+    expect(result.metadata.providerId).toBe("anthropic");
+    expect(result.metadata.modelId).toBe("claude-sonnet-4-5");
     expect(result.metadata.tier).toBe("reasoning");
   });
 
@@ -177,12 +177,12 @@ describe("UnifiedInferenceClient", () => {
     async (status) => {
       const client = createClient();
 
-      // openai gets 4 failures (3 retries + final failure), then groq succeeds
+      // openai gets 4 failures (3 retries + final failure), then anthropic succeeds
       queueError(status);
       queueError(status);
       queueError(status);
       queueError(status);
-      queueCompletion({ content: `from-groq-${status}` });
+      queueCompletion({ content: `from-anthropic-${status}` });
 
       vi.useFakeTimers();
       const pending = client.chat({ tier: "reasoning", messages: BASE_MESSAGES });
@@ -190,8 +190,8 @@ describe("UnifiedInferenceClient", () => {
       const result = await pending;
       vi.useRealTimers();
 
-      expect(result.content).toBe(`from-groq-${status}`);
-      expect(result.metadata.providerId).toBe("groq");
+      expect(result.content).toBe(`from-anthropic-${status}`);
+      expect(result.metadata.providerId).toBe("anthropic");
       expect(result.metadata.failedProviders).toEqual(["openai"]);
       expect(result.metadata.retries).toBe(3);
     },
@@ -214,6 +214,11 @@ describe("UnifiedInferenceClient", () => {
     queueError(429, "openai-2");
     queueError(429, "openai-3");
     queueError(429, "openai-4");
+    // anthropic exhausted
+    queueError(429, "anthropic-1");
+    queueError(429, "anthropic-2");
+    queueError(429, "anthropic-3");
+    queueError(429, "anthropic-4");
     // groq exhausted
     queueError(429, "groq-1");
     queueError(429, "groq-2");
@@ -308,7 +313,7 @@ describe("UnifiedInferenceClient", () => {
     queueCompletion({ content: "from-fallback" });
 
     const result = await client.chat({ tier: "reasoning", messages: BASE_MESSAGES });
-    expect(result.metadata.providerId).toBe("groq");
+    expect(result.metadata.providerId).toBe("anthropic");
     expect(result.metadata.failedProviders).toEqual([]);
   });
 

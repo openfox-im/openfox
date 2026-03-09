@@ -1,6 +1,6 @@
 # OpenFox Bounty Host/Solver Guide
 
-This guide shows the first question-bounty loop for OpenFox:
+This guide shows the first bounded-task marketplace loop for OpenFox:
 
 - one host OpenFox
 - one solver OpenFox
@@ -13,7 +13,7 @@ This guide shows the first question-bounty loop for OpenFox:
 
 The MVP flow is:
 
-1. the host opens a bounded question bounty
+1. the host opens a bounded task bounty
 2. the solver discovers or reads the bounty
 3. the solver submits one answer
 4. the host judges with the local model
@@ -31,10 +31,11 @@ Add a `bounty` section to `~/.openfox/openfox.json`:
     "enabled": true,
     "role": "host",
     "skill": "question-bounty-host",
+    "defaultKind": "question",
     "bindHost": "127.0.0.1",
     "port": 4891,
     "pathPrefix": "/bounty",
-    "discoveryCapability": "bounty.submit",
+    "discoveryCapability": "task.submit",
     "rewardWei": "10000000000000000",
     "autoPayConfidenceThreshold": 0.9,
     "defaultSubmissionTtlSeconds": 3600,
@@ -55,6 +56,10 @@ the host automatically publishes these capabilities:
 - `bounty.get`
 - `bounty.submit`
 - `bounty.result`
+- `task.list`
+- `task.get`
+- `task.submit`
+- `task.result`
 
 ## 3. Solver Configuration
 
@@ -68,11 +73,12 @@ The solver uses a smaller bounty config:
     "enabled": true,
     "role": "solver",
     "skill": "question-bounty-solver",
+    "defaultKind": "question",
     "bindHost": "127.0.0.1",
     "port": 4891,
     "pathPrefix": "/bounty",
     "remoteBaseUrl": "http://127.0.0.1:4891/bounty",
-    "discoveryCapability": "bounty.submit",
+    "discoveryCapability": "task.submit",
     "rewardWei": "10000000000000000",
     "autoPayConfidenceThreshold": 0.9,
     "defaultSubmissionTtlSeconds": 3600,
@@ -136,14 +142,14 @@ Or let the solver run continuously:
 - set `autoSolveOnStartup: true`
 - set `autoSolveEnabled: true`
 - set `remoteBaseUrl` for a direct host
-- or enable Agent Discovery and let OpenFox find `bounty.submit` providers
+- or enable Agent Discovery and let OpenFox find `task.submit` providers
 
-Submit a manual answer:
+Submit a manual submission:
 
 ```bash
 openfox bounty submit <bounty-id> \
   --url http://127.0.0.1:4891/bounty \
-  --answer "Paris"
+  --submission "Paris"
 ```
 
 ## 6. Host API
@@ -159,13 +165,12 @@ The host exposes:
 
 ## 7. Current MVP Limits
 
-The current slice is intentionally narrow:
+The current slice is intentionally bounded:
 
-- question bounties only
-- one submission per bounty
-- one local-model judge pass
-- zero or one payout
-- no manual review mode
+- `question`, `translation`, `social_proof`, and `problem_solving` bounties
+- one winning submission per bounty
+- one local-model judge pass per submission
+- zero or one payout per accepted winner
 - no dispute mode
 
 This is enough to prove the host/solver/reward loop without turning OpenFox

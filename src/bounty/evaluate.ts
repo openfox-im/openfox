@@ -4,24 +4,44 @@ import type {
   BountySubmissionRecord,
   InferenceClient,
 } from "../types.js";
-import { buildQuestionBountyJudgePrompt, parseQuestionBountyJudgeResult } from "./skills/question-host.js";
+import {
+  buildQuestionBountyJudgePrompt,
+  parseQuestionBountyJudgeResult,
+} from "./skills/question-host.js";
+import {
+  buildTaskBountyJudgePrompt,
+  parseTaskBountyJudgeResult,
+} from "./skills/task-host.js";
 
-export async function evaluateQuestionBountySubmission(params: {
+export async function evaluateBountySubmission(params: {
   inference: InferenceClient;
   bounty: BountyRecord;
   submission: BountySubmissionRecord;
   skillInstructions?: string;
 }): Promise<BountyJudgeResult> {
+  const prompt =
+    params.bounty.kind === "question"
+      ? buildQuestionBountyJudgePrompt({
+          question: params.bounty.taskPrompt,
+          referenceAnswer: params.bounty.referenceOutput,
+          candidateAnswer: params.submission.submissionText,
+          skillInstructions: params.skillInstructions,
+        })
+      : buildTaskBountyJudgePrompt({
+          kind: params.bounty.kind,
+          title: params.bounty.title,
+          taskPrompt: params.bounty.taskPrompt,
+          referenceOutput: params.bounty.referenceOutput,
+          candidateSubmission: params.submission.submissionText,
+          proofUrl: params.submission.proofUrl,
+          skillInstructions: params.skillInstructions,
+        });
+
   const response = await params.inference.chat(
     [
       {
         role: "system",
-        content: buildQuestionBountyJudgePrompt({
-          question: params.bounty.question,
-          referenceAnswer: params.bounty.referenceAnswer,
-          candidateAnswer: params.submission.answer,
-          skillInstructions: params.skillInstructions,
-        }),
+        content: prompt,
       },
     ],
     {
@@ -30,5 +50,7 @@ export async function evaluateQuestionBountySubmission(params: {
     },
   );
 
-  return parseQuestionBountyJudgeResult(response.message.content || "");
+  return params.bounty.kind === "question"
+    ? parseQuestionBountyJudgeResult(response.message.content || "")
+    : parseTaskBountyJudgeResult(response.message.content || "");
 }

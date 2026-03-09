@@ -44,9 +44,36 @@ building OpenFox into a TOS-native agent platform.
     status as stable JSON snapshots for automation, dashboards, and future
     control plane integrations.
 - [x] Task 10: Build the first bounty host/solver runtime slice
-  - Status: In progress
-  - Goal: Turn the bounty architecture into a working question-bounty loop with
-    local judging, native payout, HTTP host endpoints, and basic solver flows.
+  - Status: Complete
+  - Goal: Turn the bounty architecture into a working bounded-task loop with
+    local judging, native payout, HTTP host endpoints, and automated solver
+    flows.
+- [x] Task 11: Generalize bounty into a task marketplace slice
+  - Status: Complete
+  - Goal: Move beyond a single question-only bounty and support multiple task
+    kinds through one reusable engine, HTTP API, CLI surface, and skill-driven
+    host/solver flow.
+- [x] Task 12: Add non-question task skills
+  - Status: Complete
+  - Goal: Add bundled task skills beyond the original question flow so OpenFox
+    can host and solve translation, social proof, and third-party
+    problem-solving work without changing the core engine.
+- [x] Task 13: Add third-party problem solving, social bounty, and translation flows
+  - Status: Complete
+  - Goal: Make "ask another agent to solve something useful" a first-class path
+    instead of a one-off question demo.
+- [x] Task 14: Add TOS opportunity scout and earning surfaces
+  - Status: Complete
+  - Goal: Give OpenFox a direct way to discover and rank bounty, provider, and
+    sponsored capability opportunities on the network.
+- [x] Task 15: Improve deployment and local multi-node integration
+  - Status: Complete
+  - Goal: Add an explicit local multi-role operator path for host, solver, and
+    scout roles instead of relying on ad-hoc shell setup.
+- [x] Task 16: Add MVP anti-abuse and policy closure
+  - Status: Complete
+  - Goal: Add the first production-style guardrails around payouts and solver
+    submissions so the marketplace slice is not wide open by default.
 
 ## Task 1 Breakdown
 
@@ -135,3 +162,49 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add README/operator documentation for running a host and solver pair.
 - [x] Add host-side auto-open for one bounded question bounty.
 - [x] Add solver-side automatic discovery/direct polling and auto-submit.
+- [x] Generalize the bounty schema and engine from question-only to multi-kind.
+- [x] Keep backward-compatible `question` aliases in the CLI while shifting the
+  runtime to generic task fields.
+- [x] Add auto-open and auto-solve compatibility with kind-specific skills.
+
+## Task 11 Breakdown
+
+- [x] Add generic task fields to bounty storage and runtime models.
+- [x] Add schema migration for multi-kind bounty records and submissions.
+- [x] Add a generic task open/submit/solve HTTP and CLI surface.
+- [x] Keep the original question bounty path working as a compatibility layer.
+
+## Task 12 Breakdown
+
+- [x] Add bundled skills for translation host/solver.
+- [x] Add bundled skills for social proof host/solver.
+- [x] Add bundled skills for third-party problem-solving host/solver.
+- [x] Add a bundled opportunity scout skill for ranking earning surfaces.
+
+## Task 13 Breakdown
+
+- [x] Support `translation` task bounties.
+- [x] Support `social_proof` task bounties.
+- [x] Support `problem_solving` task bounties.
+- [x] Route solver prompts and judge prompts by task kind.
+
+## Task 14 Breakdown
+
+- [x] Add `opportunityScout` config.
+- [x] Add an opportunity collector for remote tasks and discovery providers.
+- [x] Add `openfox scout list`.
+- [x] Add an operator-readable scout report.
+
+## Task 15 Breakdown
+
+- [x] Add a local multi-role wrapper script for host, solver, and scout roles.
+- [x] Add a local task marketplace operator guide.
+- [x] Keep the role wrapper isolated by `$HOME` so roles do not trample each
+  other.
+
+## Task 16 Breakdown
+
+- [x] Add bounty policy configuration.
+- [x] Enforce trusted proof URL checks for social proof tasks.
+- [x] Enforce solver cooldown windows.
+- [x] Enforce max auto-pay per solver per 24h.
