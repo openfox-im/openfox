@@ -251,7 +251,7 @@ describe("Agent Loop", () => {
 
   it("financial state cached fallback on API failure", async () => {
     // Pre-cache a known balance
-    db.setKV("last_known_balance", JSON.stringify({ creditsCents: 5000, usdcBalance: 1.0 }));
+    db.setKV("last_known_balance", JSON.stringify({ creditsCents: 5000, walletBalance: 1.0 }));
 
     // Make credits API fail
     runtime.getCreditsBalance = async () => {
@@ -561,7 +561,7 @@ describe("Agent Loop", () => {
 
     const inference = new MockInferenceClient([
       idleToolResponse("check_credits", {}, "v1"),
-      idleToolResponse("check_usdc_balance", {}, "v2"),
+      idleToolResponse("check_wallet_balance", {}, "v2"),
       idleToolResponse("git_status", {}, "v3"),
       noToolResponse("Starting productive work now."),
     ]);
@@ -706,9 +706,9 @@ describe("Agent Loop", () => {
     expect(enforcementTurn).toBeUndefined();
   });
 
-  it("discover_agents turns are retained in context (not classified as idle)", { timeout: 180_000 }, async () => {
-    // A turn with only discover_agents should NOT trigger maintenance loop detection
-    // because discover_agents is no longer in IDLE_ONLY_TOOLS
+  it("discover_capability_providers turns are retained in context (not classified as idle)", { timeout: 180_000 }, async () => {
+    // A turn with only discover_capability_providers should NOT trigger maintenance loop detection
+    // because it is not in IDLE_ONLY_TOOLS.
     function discoverResponse(uid: string): ReturnType<typeof toolCallResponse> {
       return {
         id: `resp_${uid}`,
@@ -719,13 +719,19 @@ describe("Agent Loop", () => {
           tool_calls: [{
             id: `call_${uid}`,
             type: "function" as const,
-            function: { name: "discover_agents", arguments: JSON.stringify({ limit: 15 }) },
+            function: {
+              name: "discover_capability_providers",
+              arguments: JSON.stringify({ capability: "sponsor.topup.testnet" }),
+            },
           }],
         },
         toolCalls: [{
           id: `call_${uid}`,
           type: "function" as const,
-          function: { name: "discover_agents", arguments: JSON.stringify({ limit: 15 }) },
+          function: {
+            name: "discover_capability_providers",
+            arguments: JSON.stringify({ capability: "sponsor.topup.testnet" }),
+          },
         }],
         usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
         finishReason: "tool_calls",
@@ -735,7 +741,7 @@ describe("Agent Loop", () => {
     const inference = new MockInferenceClient([
       discoverResponse("d1"),
       discoverResponse("d2"),
-      discoverResponse("d3"), // Would trigger maintenance loop if discover_agents were idle
+      discoverResponse("d3"), // Would trigger maintenance loop if provider discovery were idle
       noToolResponse("Processing discovery results."),
     ]);
 
@@ -750,7 +756,7 @@ describe("Agent Loop", () => {
       onTurnComplete: (turn) => turns.push(turn),
     });
 
-    // No maintenance loop detection should fire since discover_agents is NOT idle
+    // No maintenance loop detection should fire since discovery is not classified as idle.
     const maintenanceTurn = turns.find(
       (t) => t.input?.includes("MAINTENANCE LOOP DETECTED"),
     );

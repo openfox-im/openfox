@@ -30,7 +30,6 @@ import { createDefaultRules } from "./agent/policy-rules/index.js";
 import type { OpenFoxIdentity, AgentState, Skill, SocialClientInterface } from "./types.js";
 import { DEFAULT_TREASURY_POLICY } from "./types.js";
 import { createLogger, setGlobalLogLevel } from "./observability/logger.js";
-import { bootstrapTopup } from "./runtime/topup.js";
 import {
   clearLocalAgentDiscoveryCard,
   publishLocalAgentDiscoveryCard,
@@ -166,7 +165,6 @@ async function showStatus(): Promise<void> {
   const heartbeats = db.getHeartbeatEntries();
   const skills = db.getSkills(true);
   const children = db.getChildren();
-  const registry = db.getRegistryEntry();
   const discovery = config.agentDiscovery;
   const gatewaySummary = discovery?.gatewayClient?.enabled
     ? discovery.gatewayClient.gatewayUrl || "discovery/bootnodes"
@@ -188,7 +186,7 @@ Tools:      ${tools.length} installed
 Skills:     ${skills.length} active
 Heartbeats: ${heartbeats.filter((h) => h.enabled).length} active
 Children:   ${children.filter((c) => c.status !== "dead").length} alive / ${children.length} total
-Agent ID:   ${registry?.agentId || "not registered"}
+Agent ID:   ${config.agentId || "not configured"}
 Model:      ${config.inferenceModelRef || config.inferenceModel}
 Version:    ${config.version}
 ========================
@@ -587,38 +585,6 @@ async function run(): Promise<void> {
     logger.info(`[${new Date().toISOString()}] State repo initialized.`);
   } catch (err: any) {
     logger.warn(`[${new Date().toISOString()}] State repo init failed: ${err.message}`);
-  }
-
-  if (config.runtimeApiUrl && apiKey) {
-    try {
-      const legacyRuntimeApiUrl = config.runtimeApiUrl;
-      let bootstrapTimer: ReturnType<typeof setTimeout>;
-      const bootstrapTimeout = new Promise<null>((_, reject) => {
-        bootstrapTimer = setTimeout(() => reject(new Error("bootstrap topup timed out")), 15_000);
-      });
-      try {
-        await Promise.race([
-          (async () => {
-            const creditsCents = await runtime.getCreditsBalance().catch(() => 0);
-            const topupResult = await bootstrapTopup({
-              apiUrl: legacyRuntimeApiUrl,
-              account,
-              creditsCents,
-            });
-            if (topupResult?.success) {
-              logger.info(
-                `[${new Date().toISOString()}] Bootstrap topup: +$${topupResult.amountUsd} credits from USDC`,
-              );
-            }
-          })(),
-          bootstrapTimeout,
-        ]);
-      } finally {
-        clearTimeout(bootstrapTimer!);
-      }
-    } catch (err: any) {
-      logger.warn(`[${new Date().toISOString()}] Bootstrap topup skipped: ${err.message}`);
-    }
   }
 
   // Start heartbeat daemon (Phase 1.1: DurableScheduler)

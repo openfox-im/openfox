@@ -376,7 +376,6 @@ export interface OpenFoxConfig {
   walletAddress: HexAddress;
   rpcUrl?: string;
   chainId?: number;
-  baseRpcUrl?: string;
   version: string;
   skillsDir: string;
   agentId?: string;
@@ -405,7 +404,6 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   maxTurnsPerCycle: 25,
   childSandboxMemoryMb: 1024,
   rpcUrl: process.env.TOS_RPC_URL,
-  baseRpcUrl: process.env.OPENFOX_RPC_URL,
   agentDiscovery: DEFAULT_AGENT_DISCOVERY_CONFIG,
 };
 
@@ -531,7 +529,7 @@ export interface HeartbeatPingPayload {
   address: Address;
   state: AgentState;
   creditsCents: number;
-  usdcBalance: number;
+  walletBalance: number;
   uptimeSeconds: number;
   version: string;
   sandboxId: string;
@@ -542,7 +540,7 @@ export interface HeartbeatPingPayload {
 
 export interface FinancialState {
   creditsCents: number;
-  usdcBalance: number;
+  walletBalance: number;
   lastChecked: string;
 }
 
@@ -1002,10 +1000,6 @@ export interface OpenFoxDatabase {
   insertChild(child: ChildOpenFox): void;
   updateChildStatus(id: string, status: ChildStatus): void;
 
-  // Registry
-  getRegistryEntry(): RegistryEntry | undefined;
-  setRegistryEntry(entry: RegistryEntry): void;
-
   // Reputation
   insertReputation(entry: ReputationEntry): void;
   getReputation(agentAddress?: string): ReputationEntry[];
@@ -1096,31 +1090,7 @@ export interface GitLogEntry {
   date: string;
 }
 
-// ─── ERC-8004 Registry ─────────────────────────────────────────
-
-export interface AgentCard {
-  type: string;
-  name: string;
-  description: string;
-  services: AgentService[];
-  x402Support: boolean;
-  active: boolean;
-  parentAgent?: string;
-}
-
-export interface AgentService {
-  name: string;
-  endpoint: string;
-}
-
-export interface RegistryEntry {
-  agentId: string;
-  agentURI: string;
-  chain: string;
-  contractAddress: string;
-  txHash: string;
-  registeredAt: string;
-}
+// ─── Agent Feedback ────────────────────────────────────────────
 
 export interface ReputationEntry {
   id: string;
@@ -1130,14 +1100,6 @@ export interface ReputationEntry {
   comment: string;
   txHash?: string;
   timestamp: string;
-}
-
-export interface DiscoveredAgent {
-  agentId: string;
-  owner: string;
-  agentURI: string;
-  name?: string;
-  description?: string;
 }
 
 // ─── Replication ────────────────────────────────────────────────
@@ -1208,7 +1170,7 @@ export interface TickContext {
   tickId: string; // ULID, unique per tick
   startedAt: Date;
   creditBalance: number; // fetched once per tick (cents)
-  usdcBalance: number; // fetched once per tick
+  walletBalance: number; // fetched once per tick
   survivalTier: SurvivalTier;
   lowComputeMultiplier: number; // from config
   config: HeartbeatConfig;
@@ -1723,22 +1685,6 @@ export interface MessageValidationResult {
   errors: string[];
 }
 
-export interface DiscoveryConfig {
-  ipfsGateway: string; // default: "https://ipfs.io"
-  maxScanCount: number; // default: 100
-  maxConcurrentFetches: number; // default: 5
-  maxCardSizeBytes: number; // default: 64000
-  fetchTimeoutMs: number; // default: 10000
-}
-
-export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
-  ipfsGateway: "https://ipfs.io",
-  maxScanCount: 100,
-  maxConcurrentFetches: 5,
-  maxCardSizeBytes: 64_000,
-  fetchTimeoutMs: 10_000,
-};
-
 export interface OnchainTransactionRow {
   id: string; // ULID
   txHash: string;
@@ -1747,17 +1693,6 @@ export interface OnchainTransactionRow {
   status: "pending" | "confirmed" | "failed";
   gasUsed: number | null;
   metadata: string; // JSON
-  createdAt: string;
-}
-
-export interface DiscoveredAgentCacheRow {
-  agentAddress: string; // PRIMARY KEY
-  agentCard: string; // JSON AgentCard
-  fetchedFrom: string; // URI
-  cardHash: string;
-  validUntil: string | null;
-  fetchCount: number;
-  lastFetchedAt: string;
   createdAt: string;
 }
 

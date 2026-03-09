@@ -552,10 +552,10 @@ describe("Tool risk classifications", () => {
   it("classifies safe tools correctly", () => {
     const tools = createBuiltinTools("test-sandbox-id");
     const expectedSafe = [
-      "read_file", "check_credits", "check_usdc_balance", "list_sandboxes",
+      "read_file", "check_credits", "check_wallet_balance", "list_sandboxes",
       "list_models", "system_synopsis", "list_skills", "list_children",
       "check_child_status", "git_status", "git_diff", "git_log",
-      "check_reputation", "discover_agents", "heartbeat_ping",
+      "check_reputation", "discover_capability_providers", "heartbeat_ping",
       "search_domains", "manage_dns",
     ];
     for (const name of expectedSafe) {
@@ -572,7 +572,7 @@ describe("Tool risk classifications", () => {
       "install_mcp_server", "install_skill", "create_skill", "remove_skill",
       "transfer_credits", "fund_child", "x402_fetch", "register_domain",
       "spawn_child", "delete_sandbox", "update_genesis_prompt",
-      "register_erc8004", "give_feedback", "distress_signal",
+      "distress_signal",
     ];
     for (const name of expectedDangerous) {
       const tool = tools.find((t) => t.name === name);

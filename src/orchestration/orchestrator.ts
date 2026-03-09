@@ -846,7 +846,7 @@ export class Orchestrator {
 
     return {
       creditsCents,
-      usdcBalance: Number(this.params.config?.usdcBalance ?? 0),
+      walletBalance: 0,
       survivalTier: creditsCents <= 0 ? "critical" : creditsCents < 100 ? "low" : "stable",
       availableRoles: ["generalist"],
       customRoles: [],

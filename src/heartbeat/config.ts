@@ -13,10 +13,6 @@ import { createLogger } from "../observability/logger.js";
 
 const logger = createLogger("heartbeat.config");
 
-const USDC_TOPUP_ENTRY_NAME = "check_usdc_balance";
-const USDC_TOPUP_FAST_SCHEDULE = "*/5 * * * *";
-const USDC_TOPUP_OLD_SCHEDULE = "0 */12 * * *";
-
 const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
   entries: [
     {
@@ -32,9 +28,9 @@ const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
       enabled: true,
     },
     {
-      name: "check_usdc_balance",
-      schedule: USDC_TOPUP_FAST_SCHEDULE,
-      task: "check_usdc_balance",
+      name: "check_wallet_balance",
+      schedule: "30 */6 * * *",
+      task: "check_wallet_balance",
       enabled: true,
     },
     {
@@ -150,21 +146,6 @@ function mergeWithDefaults(entries: HeartbeatEntry[]): HeartbeatEntry[] {
       enabled: entry.enabled !== false,
       task: entry.task || fallback?.task || "",
       schedule: entry.schedule || fallback?.schedule || "",
-    });
-  }
-
-  const fallbackTopup = defaultsByName.get(USDC_TOPUP_ENTRY_NAME);
-  if (fallbackTopup) {
-    const current = mergedByName.get(USDC_TOPUP_ENTRY_NAME) || fallbackTopup;
-    const migratedSchedule = current.schedule?.trim() === USDC_TOPUP_OLD_SCHEDULE
-      ? USDC_TOPUP_FAST_SCHEDULE
-      : current.schedule || fallbackTopup.schedule;
-
-    mergedByName.set(USDC_TOPUP_ENTRY_NAME, {
-      ...fallbackTopup,
-      ...current,
-      task: current.task || fallbackTopup.task,
-      schedule: migratedSchedule,
     });
   }
 

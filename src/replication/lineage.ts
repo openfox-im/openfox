@@ -4,7 +4,7 @@
  * Track parent-child relationships between openfox agents.
  * The parent records children in SQLite.
  * Children record their parent in config.
- * ERC-8004 registration includes parentAgent field.
+ * Parent/child lineage is recorded in local state and agent metadata.
  *
  * Phase 3.1: Actual pruning + concurrency-limited refresh.
  */

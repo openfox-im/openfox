@@ -50,7 +50,7 @@ const goal: Goal = {
 
 const context: PlannerContext = {
   creditsCents: 10000,
-  usdcBalance: 0,
+  walletBalance: 0,
   survivalTier: "stable",
   availableRoles: ["generalist"],
   customRoles: [],

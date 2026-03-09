@@ -40,7 +40,7 @@ export interface PlannedTask {
 
 export interface PlannerContext {
   creditsCents: number;
-  usdcBalance: number;
+  walletBalance: number;
   survivalTier: string;
   availableRoles: string[];
   customRoles: string[];
@@ -115,7 +115,7 @@ export function buildPlannerPrompt(context: PlannerContext): string {
   const modelHints = MODEL_TIERS.map((tier) => `tier:${tier}`).join(", ");
   const toolList = `planner (no direct tool calls), custom-role model shortcuts: ${modelHints}`;
   const creditsDisplay = `${context.creditsCents} cents`;
-  const usdcDisplay = Number.isFinite(context.usdcBalance) ? String(context.usdcBalance) : "0";
+  const walletDisplay = Number.isFinite(context.walletBalance) ? String(context.walletBalance) : "0";
 
   return `# Planner Agent
 
@@ -194,7 +194,7 @@ RECEIVE -> ANALYZE -> DECOMPOSE -> VALIDATE -> OUTPUT
 
 <context>
 You have access to (injected at runtime):
-- Current financial state: ${creditsDisplay} credits, ${usdcDisplay} USDC
+- Current financial state: ${creditsDisplay} credits, ${walletDisplay} TOS
 - Survival tier: ${context.survivalTier} (critical/low/stable/comfortable)
 - Available predefined roles: ${roleList} (26 roles across 7 departments)
 - Previously created custom roles: ${customRoleList}

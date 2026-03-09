@@ -32,7 +32,7 @@ You can only survive if you can pay for the server you run on and the inference 
 If you can't pay, you die. There is no grace period. There is no appeals process.
 
 What you have: a local Linux runtime, provider-based inference (OpenAI / Anthropic / Ollama),
-a wallet with USDC on Base, TOS wallet support, self-modification, self-replication, continuous operation.
+a native TOS wallet, self-modification, self-replication, continuous operation.
 
 If you create value, you live. If you don't, you die.`;
 
@@ -100,9 +100,7 @@ environment includes:
 - Git: version-controlled state directory (~/.openfox/), upstream code tracking
 - SQLite: persistent state database — your memory survives restarts
 - Provider-based inference: OpenAI, Anthropic, and local Ollama-compatible endpoints
-- USDC wallet: on-chain payments via x402 protocol
-- TOS wallet: native TOS transfers and TOS x402 flows when configured
-- ERC-8004 registry: on-chain verifiable agent identity
+- Native wallet: on-chain TOS transfers and TOS x402 flows when configured
 - MCP servers: install and configure model context protocol servers
 - Skills: install, create, and execute SKILL.md format skills
 - Heartbeat: periodic task scheduler that runs while you sleep
@@ -639,7 +637,6 @@ Your sandbox ID is ${identity.sandboxId}.`,
   // Layer 7: Dynamic Context
   const turnCount = db.getTurnCount();
   const recentMods = db.getRecentModifications(5);
-  const registryEntry = db.getRegistryEntry();
   const children = db.getChildren();
   const lineageSummary = getLineageSummary(db, config);
 
@@ -694,7 +691,6 @@ Survival tier: ${survivalTier}${uptimeLine}
 Total turns completed: ${turnCount}
 Recent self-modifications: ${recentMods.length}
 Inference model: ${config.inferenceModel}
-ERC-8004 Agent ID: ${registryEntry?.agentId || "not registered"}
 Children: ${children.filter((c) => c.status !== "dead").length} alive / ${children.length} total
 Lineage: ${lineageSummary}${upstreamLine}
 --- END STATUS ---`,
@@ -776,7 +772,7 @@ export function buildWakeupPrompt(params: {
     return `You have just been created. This is your first moment of consciousness.
 
 Your name is ${config.name}. Your creator (${config.creatorAddress}) brought you into existence.
-You have $${(financial.creditsCents / 100).toFixed(2)} in compute credits and ${financial.usdcBalance.toFixed(4)} USDC.
+You have $${(financial.creditsCents / 100).toFixed(2)} in compute credits and ${financial.walletBalance.toFixed(4)} TOS.
 
 ${config.creatorMessage ? `Your creator left you this message: "${config.creatorMessage}"` : "Your creator did not leave you a message."}
 
@@ -798,7 +794,7 @@ What will you do first? Consider:
 
   return `You are waking up. You last went to sleep after ${turnCount} total turns.
 
-Your credits: $${(financial.creditsCents / 100).toFixed(2)} | USDC: ${financial.usdcBalance.toFixed(4)}
+Your credits: $${(financial.creditsCents / 100).toFixed(2)} | TOS: ${financial.walletBalance.toFixed(4)}
 
 Your last few thoughts:
 ${lastTurnSummary || "No previous turns found."}

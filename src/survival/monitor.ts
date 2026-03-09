@@ -14,7 +14,7 @@ import type {
   SurvivalTier,
 } from "../types.js";
 import { getSurvivalTier, formatCredits } from "../runtime/credits.js";
-import { getUsdcBalance } from "../runtime/x402.js";
+import { getWalletBalance } from "../runtime/x402.js";
 
 export interface ResourceStatus {
   financial: FinancialState;
@@ -38,10 +38,10 @@ export async function checkResources(
     creditsCents = await runtime.getCreditsBalance();
   } catch {}
 
-  // Check USDC
-  let usdcBalance = 0;
+  // Check wallet balance
+  let walletBalance = 0;
   try {
-    usdcBalance = await getUsdcBalance(identity.address);
+    walletBalance = await getWalletBalance(identity.address);
   } catch {}
 
   // Check sandbox health
@@ -55,7 +55,7 @@ export async function checkResources(
 
   const financial: FinancialState = {
     creditsCents,
-    usdcBalance,
+    walletBalance,
     lastChecked: new Date().toISOString(),
   };
 
@@ -86,7 +86,7 @@ export function formatResourceReport(status: ResourceStatus): string {
   const lines = [
     `=== RESOURCE STATUS ===`,
     `Credits: ${formatCredits(status.financial.creditsCents)}`,
-    `USDC: ${status.financial.usdcBalance.toFixed(6)}`,
+    `Wallet: ${status.financial.walletBalance.toFixed(6)}`,
     `Tier: ${status.tier}${status.tierChanged ? ` (changed from ${status.previousTier})` : ""}`,
     `Sandbox: ${status.sandboxHealthy ? "healthy" : "UNHEALTHY"}`,
     `Checked: ${status.financial.lastChecked}`,

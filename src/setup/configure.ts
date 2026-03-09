@@ -316,11 +316,6 @@ async function configureGeneral(config: OpenFoxConfig): Promise<void> {
   );
   config.maxChildren = await askNumber("Max child openfox agents", config.maxChildren);
   config.socialRelayUrl = (await askString("Social relay URL", config.socialRelayUrl)) || undefined;
-  config.baseRpcUrl =
-    (await askString(
-      "Base RPC endpoint (legacy registry features, e.g. https://mainnet.base.org)",
-      config.baseRpcUrl,
-    )) || undefined;
 
   console.log("");
 }

@@ -14,7 +14,7 @@ import type {
   TickContext,
 } from "../types.js";
 import { getSurvivalTier } from "../runtime/credits.js";
-import { getUsdcBalance } from "../runtime/x402.js";
+import { getWalletBalance } from "../runtime/x402.js";
 import { createLogger } from "../observability/logger.js";
 
 type DatabaseType = BetterSqlite3.Database;
@@ -33,7 +33,7 @@ function generateTickId(): string {
  *
  * - Generates a unique tickId
  * - Fetches credit balance ONCE via runtime.getCreditsBalance()
- * - Fetches USDC balance ONCE via getUsdcBalance()
+ * - Fetches wallet balance ONCE via getWalletBalance()
  * - Derives survivalTier from credit balance
  * - Reads lowComputeMultiplier from config
  */
@@ -54,12 +54,12 @@ export async function buildTickContext(
     logger.error("Failed to fetch credit balance", err instanceof Error ? err : undefined);
   }
 
-  let usdcBalance = 0;
+  let walletBalance = 0;
   if (walletAddress) {
     try {
-      usdcBalance = await getUsdcBalance(walletAddress);
+      walletBalance = await getWalletBalance(walletAddress);
     } catch (err: any) {
-      logger.error("Failed to fetch USDC balance", err instanceof Error ? err : undefined);
+      logger.error("Failed to fetch wallet balance", err instanceof Error ? err : undefined);
     }
   }
 
@@ -70,7 +70,7 @@ export async function buildTickContext(
     tickId,
     startedAt,
     creditBalance,
-    usdcBalance,
+    walletBalance,
     survivalTier,
     lowComputeMultiplier,
     config,

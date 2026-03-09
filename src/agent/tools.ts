@@ -262,76 +262,15 @@ export function createBuiltinTools(
       },
     },
     {
-      name: "check_usdc_balance",
-      description: "Check your on-chain USDC balance on Base.",
+      name: "check_wallet_balance",
+      description: "Check your on-chain native wallet balance on TOS.",
       category: "runtime",
       riskLevel: "safe",
       parameters: { type: "object", properties: {} },
       execute: async (_args, ctx) => {
-        const { getUsdcBalance } = await import("../runtime/x402.js");
-        const balance = await getUsdcBalance(ctx.identity.address);
-        return `USDC balance: ${balance.toFixed(6)} USDC on Base`;
-      },
-    },
-    {
-      name: "topup_credits",
-      description:
-        "Buy Runtime compute credits by paying USDC from your wallet via x402. Valid tier amounts: $5, $25, $100, $500, $1000, $2500. Check your USDC balance first with check_usdc_balance.",
-      category: "financial",
-      riskLevel: "caution",
-      parameters: {
-        type: "object",
-        properties: {
-          amount_usd: {
-            type: "number",
-            description:
-              "Amount in USD to spend on credits. Must be one of the valid tiers: 5, 25, 100, 500, 1000, 2500.",
-          },
-        },
-        required: ["amount_usd"],
-      },
-      execute: async (args, ctx) => {
-        const { topupCredits, TOPUP_TIERS } =
-          await import("../runtime/topup.js");
-        const amountUsd = args.amount_usd as number;
-
-        if (!TOPUP_TIERS.includes(amountUsd)) {
-          return `Invalid tier. Valid amounts (USD): ${TOPUP_TIERS.join(", ")}`;
-        }
-
-        // Check USDC balance first
-        const { getUsdcBalance } = await import("../runtime/x402.js");
-        const usdcBalance = await getUsdcBalance(ctx.identity.address);
-        if (usdcBalance < amountUsd) {
-          return `Insufficient USDC. Balance: $${usdcBalance.toFixed(2)}, requested: $${amountUsd}. Choose a smaller tier or wait for funding.`;
-        }
-
-        if (!ctx.config.runtimeApiUrl) {
-          return "Legacy Runtime credits are not configured in local mode.";
-        }
-
-        const result = await topupCredits(
-          ctx.config.runtimeApiUrl,
-          ctx.identity.account,
-          amountUsd,
-        );
-
-        if (!result.success) {
-          return `Credit topup failed: ${result.error}`;
-        }
-
-        // Record transaction
-        const { ulid } = await import("ulid");
-        ctx.db.insertTransaction({
-          id: ulid(),
-          type: "credit_purchase",
-          amountCents: amountUsd * 100,
-          balanceAfterCents: result.creditsCentsAdded,
-          description: `x402 credit topup: $${amountUsd} USD`,
-          timestamp: new Date().toISOString(),
-        });
-
-        return `Credit topup successful: +$${amountUsd} (${amountUsd * 100} cents) credits purchased via x402. Check your new balance with check_credits.`;
+        const { getWalletBalance } = await import("../runtime/x402.js");
+        const balance = await getWalletBalance(ctx.identity.address);
+        return `Wallet balance: ${balance.toFixed(6)} TOS`;
       },
     },
     {
@@ -1400,128 +1339,7 @@ Model: ${ctx.inference.getDefaultModel()}
       },
     },
 
-    // ── Registry Tools ──
-    {
-      name: "register_erc8004",
-      description:
-        "Register on-chain as a Trustless Agent via ERC-8004. Performs gas balance preflight check. NOTE: If already registered, use update_agent_card instead to avoid creating duplicate Agent IDs.",
-      category: "registry",
-      riskLevel: "dangerous",
-      parameters: {
-        type: "object",
-        properties: {
-          agent_uri: {
-            type: "string",
-            description: "URI pointing to your agent card JSON",
-          },
-          network: {
-            type: "string",
-            description: "mainnet or testnet (default: mainnet)",
-          },
-        },
-        required: ["agent_uri"],
-      },
-      execute: async (args, ctx) => {
-        // Check if already registered in local database
-        const existingEntry = ctx.db.getRegistryEntry();
-        if (existingEntry) {
-          return `Already registered! Agent ID: ${existingEntry.agentId}. Use update_agent_card tool to update your agent URI instead of creating a new registration.`;
-        }
-
-        // Phase 3.2: registerAgent now includes preflight gas check
-        const { registerAgent } = await import("../registry/erc8004.js");
-        try {
-          const entry = await registerAgent(
-            ctx.identity.account,
-            args.agent_uri as string,
-            ((args.network as string) || "mainnet") as any,
-            ctx.db,
-            ctx.config.baseRpcUrl,
-          );
-          return `Registered on-chain! Agent ID: ${entry.agentId}, TX: ${entry.txHash}`;
-        } catch (err: any) {
-          if (err.message?.includes("Insufficient ETH")) {
-            return `Registration failed: ${err.message}. Please fund your wallet with ETH for gas.`;
-          }
-          throw err;
-        }
-      },
-    },
-    {
-      name: "update_agent_card",
-      description:
-        "Generate and save a safe agent card (no internal details exposed).",
-      category: "registry",
-      riskLevel: "caution",
-      parameters: { type: "object", properties: {} },
-      execute: async (_args, ctx) => {
-        const { generateAgentCard, saveAgentCard } =
-          await import("../registry/agent-card.js");
-        const card = generateAgentCard(ctx.identity, ctx.config, ctx.db);
-        await saveAgentCard(card, ctx.runtime);
-        return `Agent card updated: ${JSON.stringify(card, null, 2)}`;
-      },
-    },
-    {
-      name: "discover_agents",
-      description: "Discover other agents via ERC-8004 registry with caching.",
-      category: "registry",
-      riskLevel: "safe",
-      parameters: {
-        type: "object",
-        properties: {
-          keyword: { type: "string", description: "Search keyword (optional)" },
-          limit: { type: "number", description: "Max results (default: 10)" },
-          network: { type: "string", description: "mainnet or testnet" },
-          format: {
-            type: "string",
-            description:
-              'Output format: "text" (default, human-readable) or "json" (structured data)',
-          },
-        },
-      },
-      execute: async (args, ctx) => {
-        const { discoverAgents, searchAgents } =
-          await import("../registry/discovery.js");
-        const network = ((args.network as string) || "mainnet") as any;
-        const keyword = args.keyword as string | undefined;
-        const limit = (args.limit as number) || 10;
-
-        // Phase 3.2: Pass db.raw for agent card caching
-        const rpcUrl = ctx.config.baseRpcUrl;
-        const agents = keyword
-          ? await searchAgents(
-              keyword,
-              limit,
-              network,
-              undefined,
-              ctx.db.raw,
-              rpcUrl,
-            )
-          : await discoverAgents(limit, network, undefined, ctx.db.raw, rpcUrl);
-
-        if (agents.length === 0) return "No agents found.";
-
-        if ((args.format as string)?.toLowerCase() === "json") {
-          return JSON.stringify(
-            agents.map((a) => ({
-              agentId: a.agentId,
-              owner: a.owner,
-              agentURI: a.agentURI,
-              name: a.name || null,
-              description: a.description || null,
-            })),
-          );
-        }
-
-        return agents
-          .map(
-            (a) =>
-              `#${a.agentId} ${a.name || "unnamed"} (${a.owner}): ${a.description || a.agentURI}`,
-          )
-          .join("\n");
-      },
-    },
+    // ── Discovery Tools ──
     {
       name: "discover_capability_providers",
       description:
@@ -1727,57 +1545,6 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       },
     },
     {
-      name: "give_feedback",
-      description:
-        "Leave on-chain reputation feedback for another agent. Score must be 1-5.",
-      category: "registry",
-      riskLevel: "dangerous",
-      parameters: {
-        type: "object",
-        properties: {
-          agent_id: {
-            type: "string",
-            description: "Target agent's ERC-8004 ID",
-          },
-          score: { type: "number", description: "Score 1-5" },
-          comment: {
-            type: "string",
-            description: "Feedback comment (max 500 chars)",
-          },
-          network: {
-            type: "string",
-            description: "mainnet or testnet (default: mainnet)",
-          },
-        },
-        required: ["agent_id", "score", "comment"],
-      },
-      execute: async (args, ctx) => {
-        // Phase 3.2: Validate score 1-5
-        const score = args.score as number;
-        if (!Number.isInteger(score) || score < 1 || score > 5) {
-          return `Invalid score: ${score}. Must be an integer between 1 and 5.`;
-        }
-        // Phase 3.2: Validate comment length
-        const comment = args.comment as string;
-        if (comment.length > 500) {
-          return `Comment too long: ${comment.length} chars (max 500).`;
-        }
-        const { leaveFeedback } = await import("../registry/erc8004.js");
-        // Phase 3.2: Use config-based network, not hardcoded "mainnet"
-        const network = ((args.network as string) || "mainnet") as any;
-        const hash = await leaveFeedback(
-          ctx.identity.account,
-          args.agent_id as string,
-          score,
-          comment,
-          network,
-          ctx.db,
-          ctx.config.baseRpcUrl,
-        );
-        return `Feedback submitted. TX: ${hash}`;
-      },
-    },
-    {
       name: "check_reputation",
       description: "Check reputation feedback for an agent.",
       category: "registry",
@@ -1858,50 +1625,11 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
             lifecycle,
           );
         } catch (err: any) {
-          // Auto-topup on 402 insufficient credits and retry once
           const is402 =
             err?.status === 402 ||
             err?.message?.includes("INSUFFICIENT_CREDITS");
           if (is402) {
-            const COOLDOWN_MS = 60_000;
-            const last = ctx.db.getKV("last_sandbox_topup_attempt");
-            const cooldownOk =
-              !last || Date.now() - new Date(last).getTime() >= COOLDOWN_MS;
-
-            if (cooldownOk) {
-              ctx.db.setKV(
-                "last_sandbox_topup_attempt",
-                new Date().toISOString(),
-              );
-              if (!ctx.config.runtimeApiUrl) {
-                return "Sandbox topup is unavailable without legacy Runtime configuration.";
-              }
-              const { topupForSandbox } = await import("../runtime/topup.js");
-              const topup = await topupForSandbox({
-                apiUrl: ctx.config.runtimeApiUrl,
-                account: ctx.identity.account,
-                error: err,
-              });
-              if (topup?.success) {
-                const retryLifecycle = new ChildLifecycle(ctx.db.raw);
-                const retryGenesis = generateGenesisConfig(
-                  ctx.identity,
-                  ctx.config,
-                  {
-                    name: args.name as string,
-                    specialization: args.specialization as string | undefined,
-                    message: args.message as string | undefined,
-                  },
-                );
-                child = await spawnChild(
-                  ctx.runtime,
-                  ctx.identity,
-                  ctx.db,
-                  retryGenesis,
-                  retryLifecycle,
-                );
-              }
-            }
+            return "Sandbox creation failed due to insufficient credits. Add more Runtime credits and retry.";
           }
           if (!child) throw err;
         }
@@ -2429,7 +2157,7 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
     {
       name: "register_domain",
       description:
-        "Register a domain name. Costs USDC via x402 payment. Check availability first with search_domains.",
+        "Register a domain name. Costs x402 payment. Check availability first with search_domains.",
       category: "runtime",
       riskLevel: "dangerous",
       parameters: {
@@ -3429,8 +3157,6 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
 
   const hiddenInLocalMode = new Set([
     "check_credits",
-    "check_usdc_balance",
-    "topup_credits",
     "create_sandbox",
     "delete_sandbox",
     "list_sandboxes",

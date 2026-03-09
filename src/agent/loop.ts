@@ -36,7 +36,7 @@ import {
 } from "./tools.js";
 import { sanitizeInput } from "./injection-defense.js";
 import { getSurvivalTier } from "../runtime/credits.js";
-import { getUsdcBalance } from "../runtime/x402.js";
+import { getWalletBalance } from "../runtime/x402.js";
 import {
   claimInboxMessages,
   markInboxProcessed,
@@ -244,63 +244,10 @@ export async function runAgentLoop(
               // If the error is a 402 (insufficient credits), attempt topup and retry once
               const is402 = sandboxError?.status === 402 ||
                 sandboxError?.message?.includes("INSUFFICIENT_CREDITS");
-
               if (is402) {
-                const SANDBOX_TOPUP_COOLDOWN_MS = 60_000;
-                const lastAttempt = db.getKV("last_sandbox_topup_attempt");
-                const cooldownExpired = !lastAttempt ||
-                  Date.now() - new Date(lastAttempt).getTime() >= SANDBOX_TOPUP_COOLDOWN_MS;
-
-                if (cooldownExpired) {
-                  db.setKV("last_sandbox_topup_attempt", new Date().toISOString());
-                  if (!config.runtimeApiUrl) {
-                    logger.info("Skipping sandbox topup because Runtime is not configured", {
-                      taskId: task.id,
-                    });
-                  } else try {
-                    const { topupForSandbox } = await import("../runtime/topup.js");
-                    const topupResult = await topupForSandbox({
-                      apiUrl: config.runtimeApiUrl,
-                      account: identity.account,
-                      error: sandboxError,
-                    });
-
-                    if (topupResult?.success) {
-                      logger.info(`Sandbox topup succeeded ($${topupResult.amountUsd}), retrying spawn`, {
-                        taskId: task.id,
-                      });
-                      // Retry spawn once after successful topup
-                      try {
-                        const { generateGenesisConfig: genGenesis } = await import("../replication/genesis.js");
-                        const { spawnChild: retrySpawn } = await import("../replication/spawn.js");
-                        const { ChildLifecycle: RetryLifecycle } = await import("../replication/lifecycle.js");
-
-                        const retryRole = task.agentRole ?? "generalist";
-                        const retryGenesis = genGenesis(identity, config, {
-                          name: `worker-${retryRole}-${Date.now().toString(36)}`,
-                          specialization: `${retryRole}: ${task.title}`,
-                        });
-                        const retryLifecycle = new RetryLifecycle(db.raw);
-                        const child = await retrySpawn(runtime, identity, db, retryGenesis, retryLifecycle);
-                        return {
-                          address: child.address,
-                          name: child.name,
-                          sandboxId: child.sandboxId,
-                        };
-                      } catch (retryError) {
-                        logger.warn("Spawn retry after topup failed", {
-                          taskId: task.id,
-                          error: retryError instanceof Error ? retryError.message : String(retryError),
-                        });
-                      }
-                    }
-                  } catch (topupError) {
-                    logger.warn("Sandbox topup attempt failed", {
-                      taskId: task.id,
-                      error: topupError instanceof Error ? topupError.message : String(topupError),
-                    });
-                  }
-                }
+                logger.warn("Sandbox creation blocked by insufficient credits", {
+                  taskId: task.id,
+                });
               }
 
               // Runtime sandbox unavailable — fall back to local worker
@@ -441,41 +388,7 @@ export async function runAgentLoop(
       } else {
         const tier = getSurvivalTier(financial.creditsCents);
 
-        // Inline auto-topup: if credits are critically low and USDC is
-        // available, buy credits NOW — before attempting inference.
-        // This prevents the agent from dying mid-loop while waiting for
-        // the heartbeat to fire. Uses a 60s cooldown to avoid hammering.
-        if ((tier === "critical" || tier === "low_compute") && financial.usdcBalance >= 5) {
-          const INLINE_TOPUP_COOLDOWN_MS = 60_000;
-          const lastInlineTopup = db.getKV("last_inline_topup_attempt");
-          const cooldownExpired = !lastInlineTopup ||
-            Date.now() - new Date(lastInlineTopup).getTime() >= INLINE_TOPUP_COOLDOWN_MS;
-
-          if (cooldownExpired) {
-            db.setKV("last_inline_topup_attempt", new Date().toISOString());
-            if (!config.runtimeApiUrl) {
-              logger.info("Skipping inline auto-topup because Runtime is not configured");
-            } else try {
-              const { bootstrapTopup } = await import("../runtime/topup.js");
-              const topupResult = await bootstrapTopup({
-                apiUrl: config.runtimeApiUrl,
-                account: identity.account,
-                creditsCents: financial.creditsCents,
-              });
-              if (topupResult?.success) {
-                log(config, `[AUTO-TOPUP] Bought $${topupResult.amountUsd} credits from USDC mid-loop`);
-                // Re-fetch financial state after topup so the rest of
-                // the turn sees the updated balance.
-                financial = await getFinancialState(runtime, identity.address, db);
-              }
-            } catch (err: any) {
-              logger.warn(`Inline auto-topup failed: ${err.message}`);
-            }
-          }
-        }
-
-        // Re-evaluate tier after potential topup
-        const effectiveTier = getSurvivalTier(financial.creditsCents);
+        const effectiveTier = tier;
 
         if (effectiveTier === "critical") {
           log(config, "[CRITICAL] Credits critically low. Limited operation.");
@@ -498,7 +411,7 @@ export async function runAgentLoop(
       // Build context — filter out purely idle turns (only status checks)
       // to prevent the model from continuing a status-check pattern
       const IDLE_ONLY_TOOLS = new Set([
-        "check_credits", "check_usdc_balance", "system_synopsis", "review_memory",
+        "check_credits", "check_wallet_balance", "system_synopsis", "review_memory",
         "list_children", "check_child_status", "list_sandboxes", "list_models",
         "list_skills", "git_status", "git_log", "check_reputation",
         "recall_facts", "recall_procedure", "heartbeat_ping",
@@ -823,14 +736,14 @@ export async function runAgentLoop(
       // (no mutations — only read/check/list/info tools), count as idle.
       // Use a blocklist of mutating tools rather than an allowlist of safe ones.
       const MUTATING_TOOLS = new Set([
-        "exec", "write_file", "edit_own_file", "transfer_credits", "topup_credits", "fund_child",
+        "exec", "write_file", "edit_own_file", "transfer_credits", "fund_child",
         "spawn_child", "start_child", "delete_sandbox", "create_sandbox",
         "install_npm_package", "install_mcp_server", "install_skill",
         "create_skill", "remove_skill", "install_skill_from_git",
         "install_skill_from_url", "pull_upstream", "git_commit", "git_push",
         "git_branch", "git_clone", "send_message", "message_child",
-        "register_domain", "register_erc8004", "give_feedback",
-        "update_genesis_prompt", "update_agent_card", "modify_heartbeat",
+        "register_domain",
+        "update_genesis_prompt", "modify_heartbeat",
         "expose_port", "remove_port", "x402_fetch", "manage_dns",
         "distress_signal", "prune_dead_children", "sleep",
         "update_soul", "remember_fact", "set_goal", "complete_goal",
@@ -930,7 +843,7 @@ export async function runAgentLoop(
 // Cache last known good balances so transient API failures don't
 // cause the openfox to believe it has $0 and kill itself.
 let _lastKnownCredits = 0;
-let _lastKnownUsdc = 0;
+let _lastKnownWalletBalance = 0;
 
 async function getFinancialState(
   runtime: RuntimeClient,
@@ -938,7 +851,7 @@ async function getFinancialState(
   db?: OpenFoxDatabase,
 ): Promise<FinancialState> {
   let creditsCents = _lastKnownCredits;
-  let usdcBalance = _lastKnownUsdc;
+  let walletBalance = _lastKnownWalletBalance;
 
   try {
     creditsCents = await runtime.getCreditsBalance();
@@ -954,7 +867,7 @@ async function getFinancialState(
           logger.warn("Balance API failed, using cached balance");
           return {
             creditsCents: parsed.creditsCents ?? 0,
-            usdcBalance: parsed.usdcBalance ?? 0,
+            walletBalance: parsed.walletBalance ?? 0,
             lastChecked: new Date().toISOString(),
           };
         } catch (parseError) {
@@ -966,16 +879,16 @@ async function getFinancialState(
     logger.error("Balance API failed, no cache available");
     return {
       creditsCents: -1,
-      usdcBalance: -1,
+      walletBalance: -1,
       lastChecked: new Date().toISOString(),
     };
   }
 
   try {
-    usdcBalance = await getUsdcBalance(address as `0x${string}`);
-    if (usdcBalance > 0) _lastKnownUsdc = usdcBalance;
+    walletBalance = await getWalletBalance(address as `0x${string}`);
+    if (walletBalance > 0) _lastKnownWalletBalance = walletBalance;
   } catch (error) {
-    logger.error("USDC balance fetch failed", error instanceof Error ? error : undefined);
+    logger.error("Wallet balance fetch failed", error instanceof Error ? error : undefined);
   }
 
   // Cache successful balance reads
@@ -983,7 +896,7 @@ async function getFinancialState(
     try {
       db.setKV(
         "last_known_balance",
-        JSON.stringify({ creditsCents, usdcBalance }),
+        JSON.stringify({ creditsCents, walletBalance }),
       );
     } catch (error) {
       logger.error("Failed to cache balance", error instanceof Error ? error : undefined);
@@ -992,7 +905,7 @@ async function getFinancialState(
 
   return {
     creditsCents,
-    usdcBalance,
+    walletBalance,
     lastChecked: new Date().toISOString(),
   };
 }

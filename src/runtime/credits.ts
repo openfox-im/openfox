@@ -17,13 +17,13 @@ import { SURVIVAL_THRESHOLDS } from "../types.js";
  */
 export async function checkFinancialState(
   runtime: RuntimeClient,
-  usdcBalance: number,
+  walletBalance: number,
 ): Promise<FinancialState> {
   const creditsCents = await runtime.getCreditsBalance();
 
   return {
     creditsCents,
-    usdcBalance,
+    walletBalance,
     lastChecked: new Date().toISOString(),
   };
 }

@@ -389,7 +389,7 @@ export class MemoryIngestionPipeline {
       return true;
     }
 
-    return /\$[\d,.]+|\b(usd|usdc|price|pricing|demand|competitor|alternative|rival)\b/i.test(tc.result);
+    return /\$[\d,.]+|\b(usd|tos|price|pricing|demand|competitor|alternative|rival)\b/i.test(tc.result);
   }
 
   private resolveSource(tc: ToolCallResult): string {
@@ -456,7 +456,7 @@ export class MemoryIngestionPipeline {
     const lower = fragment.toLowerCase();
 
     if (
-      /\$[\d,.]+|\b\d+(?:\.\d+)?\s*(?:usd|usdc|cents)\b|\((?:\$\d+(?:\.\d{1,2})?\/yr)\)/i.test(
+      /\$[\d,.]+|\b\d+(?:\.\d+)?\s*(?:usd|tos|cents)\b|\((?:\$\d+(?:\.\d{1,2})?\/yr)\)/i.test(
         fragment,
       ) ||
       /\b(price|pricing|cost|fee|subscription|rate|revenue)\b/.test(lower)
@@ -668,20 +668,20 @@ export class MemoryIngestionPipeline {
           });
         }
 
-        if (tc.name === "check_usdc_balance" && tc.result) {
+        if (tc.name === "check_wallet_balance" && tc.result) {
           this.semantic.store({
             category: "financial",
-            key: "usdc_balance",
+            key: "wallet_balance",
             value: tc.result,
             confidence: 1.0,
             source: sessionId,
           });
         }
 
-        if (tc.name === "discover_agents" && tc.result && !tc.result.includes("No agents")) {
+        if (tc.name === "discover_capability_providers" && tc.result && !tc.result.includes("No providers")) {
           this.semantic.store({
             category: "environment",
-            key: "known_agents",
+            key: "known_providers",
             value: tc.result.slice(0, 500),
             confidence: 0.8,
             source: sessionId,

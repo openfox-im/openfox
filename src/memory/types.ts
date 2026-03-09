@@ -52,8 +52,6 @@ const STRATEGIC_TOOLS = new Set([
   "edit_own_file",
   "modify_heartbeat",
   "spawn_child",
-  "register_erc8004",
-  "update_agent_card",
   "install_mcp_server",
   "update_soul",
 ]);
@@ -78,13 +76,12 @@ const PRODUCTIVE_TOOLS = new Set([
 const COMMUNICATION_TOOLS = new Set([
   "send_message",
   "check_social_inbox",
-  "give_feedback",
   "note_about_agent",
 ]);
 
 const MAINTENANCE_TOOLS = new Set([
   "check_credits",
-  "check_usdc_balance",
+  "check_wallet_balance",
   "system_synopsis",
   "heartbeat_ping",
   "list_sandboxes",
@@ -98,7 +95,7 @@ const MAINTENANCE_TOOLS = new Set([
   "review_memory",
   "recall_facts",
   "recall_procedure",
-  "discover_agents",
+  "discover_capability_providers",
   "search_domains",
 ]);
 

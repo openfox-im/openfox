@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -127,16 +127,6 @@ export const CREATE_TABLES = `
     status TEXT NOT NULL DEFAULT 'spawning',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_checked TEXT
-  );
-
-  -- ERC-8004 registration state
-  CREATE TABLE IF NOT EXISTS registry (
-    agent_id TEXT PRIMARY KEY,
-    agent_uri TEXT NOT NULL,
-    chain TEXT NOT NULL DEFAULT 'eip155:8453',
-    contract_address TEXT NOT NULL,
-    tx_hash TEXT NOT NULL,
-    registered_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   -- Reputation feedback received and given
@@ -340,15 +330,6 @@ export const MIGRATION_V2 = `
     last_checked TEXT
   );
 
-  CREATE TABLE IF NOT EXISTS registry (
-    agent_id TEXT PRIMARY KEY,
-    agent_uri TEXT NOT NULL,
-    chain TEXT NOT NULL DEFAULT 'eip155:8453',
-    contract_address TEXT NOT NULL,
-    tx_hash TEXT NOT NULL,
-    registered_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
   CREATE TABLE IF NOT EXISTS reputation (
     id TEXT PRIMARY KEY,
     from_agent TEXT NOT NULL,
@@ -540,18 +521,7 @@ export const MIGRATION_V7 = `
 
   CREATE INDEX IF NOT EXISTS idx_child_events ON child_lifecycle_events(child_id, created_at);
 
-  -- === Phase 3.2: Social & Registry ===
-
-  CREATE TABLE IF NOT EXISTS discovered_agents_cache (
-    agent_address TEXT PRIMARY KEY,
-    agent_card TEXT NOT NULL,
-    fetched_from TEXT NOT NULL,
-    card_hash TEXT NOT NULL,
-    valid_until TEXT,
-    fetch_count INTEGER NOT NULL DEFAULT 1,
-    last_fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
+  -- === Phase 3.2: On-chain Activity ===
 
   CREATE TABLE IF NOT EXISTS onchain_transactions (
     id TEXT PRIMARY KEY,
@@ -670,4 +640,9 @@ export const MIGRATION_V10 = `
 
   CREATE INDEX idx_knowledge_category ON knowledge_store(category);
   CREATE INDEX idx_knowledge_key ON knowledge_store(key);
+`;
+
+export const MIGRATION_V11 = `
+  DROP TABLE IF EXISTS registry;
+  DROP TABLE IF EXISTS discovered_agents_cache;
 `;

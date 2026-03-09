@@ -791,24 +791,6 @@ describe("MIGRATION_V7", () => {
     db.close();
   });
 
-  it("creates discovered_agents_cache table", () => {
-    const db = new Database(":memory:");
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS schema_version (
-        version INTEGER PRIMARY KEY,
-        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-    `);
-    db.exec(MIGRATION_V7);
-
-    const stmt = db.prepare(
-      "INSERT INTO discovered_agents_cache (agent_address, agent_card, fetched_from, card_hash) VALUES (?, ?, ?, ?)",
-    );
-    expect(() => stmt.run("0x123", "{}", "ipfs://...", "abc123")).not.toThrow();
-
-    db.close();
-  });
-
   it("creates onchain_transactions table", () => {
     const db = new Database(":memory:");
     db.exec(`

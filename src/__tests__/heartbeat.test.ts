@@ -21,7 +21,7 @@ function createMockTickContext(db: OpenFoxDatabase, overrides?: Partial<TickCont
     tickId: "test-tick-1",
     startedAt: new Date(),
     creditBalance: 10_000,
-    usdcBalance: 1.5,
+    walletBalance: 1.5,
     survivalTier: "normal",
     lowComputeMultiplier: 4,
     config: {
@@ -343,13 +343,13 @@ describe("Heartbeat Tasks", () => {
     });
   });
 
-  // ─── check_usdc_balance ─────────────────────────────────────
+  // ─── check_wallet_balance ─────────────────────────────────────
 
-  describe("check_usdc_balance", () => {
-    it("does not wake when no USDC and enough credits", async () => {
+  describe("check_wallet_balance", () => {
+    it("does not wake when wallet is empty and credits are healthy", async () => {
       const tickCtx = createMockTickContext(db, {
         creditBalance: 10_000,
-        usdcBalance: 0,
+        walletBalance: 0,
       });
       const taskCtx: HeartbeatLegacyContext = {
         identity: createTestIdentity(),
@@ -358,15 +358,15 @@ describe("Heartbeat Tasks", () => {
         runtime,
       };
 
-      const result = await BUILTIN_TASKS.check_usdc_balance(tickCtx, taskCtx);
+      const result = await BUILTIN_TASKS.check_wallet_balance(tickCtx, taskCtx);
 
       expect(result.shouldWake).toBe(false);
     });
 
-    it("wakes when has USDC but critically low credits", async () => {
+    it("wakes when wallet has funds but credits are critically low", async () => {
       const tickCtx = createMockTickContext(db, {
         creditBalance: 0, // critical tier
-        usdcBalance: 10.0, // > 5
+        walletBalance: 10.0, // > 5
         survivalTier: "critical",
       });
       const taskCtx: HeartbeatLegacyContext = {
@@ -376,16 +376,16 @@ describe("Heartbeat Tasks", () => {
         runtime,
       };
 
-      const result = await BUILTIN_TASKS.check_usdc_balance(tickCtx, taskCtx);
+      const result = await BUILTIN_TASKS.check_wallet_balance(tickCtx, taskCtx);
 
       expect(result.shouldWake).toBe(true);
-      expect(result.message).toContain("USDC");
+      expect(result.message).toContain("TOS");
     });
 
-    it("does not wake when USDC below threshold", async () => {
+    it("does not wake when credits are not critical", async () => {
       const tickCtx = createMockTickContext(db, {
         creditBalance: 200,
-        usdcBalance: 3.0, // < 5
+        walletBalance: 3.0,
       });
       const taskCtx: HeartbeatLegacyContext = {
         identity: createTestIdentity(),
@@ -394,7 +394,7 @@ describe("Heartbeat Tasks", () => {
         runtime,
       };
 
-      const result = await BUILTIN_TASKS.check_usdc_balance(tickCtx, taskCtx);
+      const result = await BUILTIN_TASKS.check_wallet_balance(tickCtx, taskCtx);
 
       expect(result.shouldWake).toBe(false);
     });

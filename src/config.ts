@@ -562,18 +562,6 @@ export function loadConfig(): OpenFoxConfig | null {
         : typeof raw?.chainId === "number"
           ? raw.chainId
           : DEFAULT_CONFIG.chainId,
-    baseRpcUrl:
-      typeof process.env.OPENFOX_RPC_URL === "string" &&
-      process.env.OPENFOX_RPC_URL.trim()
-        ? process.env.OPENFOX_RPC_URL.trim()
-        : typeof raw?.baseRpcUrl === "string" && raw.baseRpcUrl.trim()
-          ? raw.baseRpcUrl.trim()
-          : typeof raw?.rpcUrl === "string" &&
-              raw.rpcUrl.trim() &&
-              typeof raw?.rpcUrl === "string" &&
-              raw.rpcUrl.trim()
-            ? raw.rpcUrl.trim()
-            : DEFAULT_CONFIG.baseRpcUrl,
     socialRelayUrl:
       typeof raw?.socialRelayUrl === "string" && raw.socialRelayUrl.trim()
         ? raw.socialRelayUrl.trim()
@@ -630,7 +618,6 @@ export function createConfig(params: {
   walletAddress: HexAddress;
   rpcUrl?: string;
   chainId?: number;
-  baseRpcUrl?: string;
   apiKey?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
@@ -671,7 +658,6 @@ export function createConfig(params: {
     walletAddress: params.walletAddress,
     rpcUrl: params.rpcUrl,
     chainId: params.chainId,
-    baseRpcUrl: params.baseRpcUrl,
     version: DEFAULT_CONFIG.version || "0.2.1",
     skillsDir: DEFAULT_CONFIG.skillsDir || "~/.openfox/skills",
     maxChildren: DEFAULT_CONFIG.maxChildren || 3,

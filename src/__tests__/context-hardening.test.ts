@@ -261,7 +261,7 @@ describe("buildSystemPrompt SOUL.md sanitization", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -294,7 +294,7 @@ describe("buildSystemPrompt genesis prompt sanitization", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -316,7 +316,7 @@ describe("buildSystemPrompt genesis prompt sanitization", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -352,7 +352,7 @@ describe("buildSystemPrompt status block", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -367,6 +367,7 @@ describe("buildSystemPrompt status block", () => {
 
     // Wallet address should NOT appear in status block
     expect(statusBlock).not.toContain("USDC Balance:");
+    expect(statusBlock).not.toContain("USDC:");
     expect(statusBlock).not.toContain(identity.address);
   });
 
@@ -377,7 +378,7 @@ describe("buildSystemPrompt status block", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -400,7 +401,7 @@ describe("buildSystemPrompt status block", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -421,7 +422,7 @@ describe("buildSystemPrompt status block", () => {
     const prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5000, usdcBalance: 10, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5000, walletBalance: 10, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -443,7 +444,7 @@ describe("buildSystemPrompt status block", () => {
     let prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 30, usdcBalance: 0, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 30, walletBalance: 0, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -455,7 +456,7 @@ describe("buildSystemPrompt status block", () => {
     prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 5, usdcBalance: 0, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 5, walletBalance: 0, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],
@@ -467,7 +468,7 @@ describe("buildSystemPrompt status block", () => {
     prompt = buildSystemPrompt({
       identity,
       config,
-      financial: { creditsCents: 0, usdcBalance: 0, lastChecked: new Date().toISOString() },
+      financial: { creditsCents: 0, walletBalance: 0, lastChecked: new Date().toISOString() },
       state: "running",
       db,
       tools: [],

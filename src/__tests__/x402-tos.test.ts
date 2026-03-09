@@ -66,7 +66,7 @@ describe("x402 TOS payments", () => {
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
 
-  it("prefers TOS exact payment when the server offers both TOS and USDC", async () => {
+  it("accepts TOS exact payment requirements", async () => {
     const account = privateKeyToAccount(TEST_PRIVATE_KEY);
     let paidRequestHeaders: Headers | null = null;
 
@@ -81,13 +81,6 @@ describe("x402 TOS payments", () => {
           const paymentRequired = {
             x402Version: 1,
             accepts: [
-              {
-                scheme: "exact",
-                network: "eip155:8453",
-                maxAmountRequired: "250000",
-                payToAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                usdcAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-              },
               {
                 scheme: "exact",
                 network: "tos:1337",

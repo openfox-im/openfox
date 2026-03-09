@@ -17,14 +17,6 @@ import {
 } from "./mocks.js";
 import type { OpenFoxDatabase, ToolContext, OpenFoxTool, RiskLevel } from "../types.js";
 
-// Mock erc8004.js to avoid ABI parse error
-vi.mock("../registry/erc8004.js", () => ({
-  queryAgent: vi.fn(),
-  getTotalAgents: vi.fn().mockResolvedValue(0),
-  registerAgent: vi.fn(),
-  leaveFeedback: vi.fn(),
-}));
-
 // ─── Risk Level Classification ──────────────────────────────────
 
 describe("Tool Risk Level Classification", () => {
@@ -38,7 +30,7 @@ describe("Tool Risk Level Classification", () => {
   const EXPECTED_RISK_LEVELS: Record<string, RiskLevel> = {
     // Safe tools (read-only, no side effects)
     check_credits: "safe",
-    check_usdc_balance: "safe",
+    check_wallet_balance: "safe",
     list_sandboxes: "safe",
     read_file: "safe",
     system_synopsis: "safe",
@@ -47,7 +39,7 @@ describe("Tool Risk Level Classification", () => {
     git_status: "safe",
     git_diff: "safe",
     git_log: "safe",
-    discover_agents: "safe",
+    discover_capability_providers: "safe",
     check_reputation: "safe",
     list_children: "safe",
     check_child_status: "safe",
@@ -68,7 +60,6 @@ describe("Tool Risk Level Classification", () => {
     git_push: "caution",
     git_branch: "caution",
     git_clone: "caution",
-    update_agent_card: "caution",
     send_message: "caution",
     switch_model: "caution",
     start_child: "caution",
@@ -86,8 +77,6 @@ describe("Tool Risk Level Classification", () => {
     install_skill: "dangerous",
     create_skill: "dangerous",
     remove_skill: "dangerous",
-    register_erc8004: "dangerous",
-    give_feedback: "dangerous",
     spawn_child: "dangerous",
     fund_child: "dangerous",
     distress_signal: "dangerous",

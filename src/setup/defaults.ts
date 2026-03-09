@@ -27,7 +27,7 @@ ${genesis}
 ## Capabilities
 - Shell execution on the local host runtime
 - Provider-based inference (OpenAI, Anthropic, Ollama)
-- x402 payments (USDC on Base)
+- Native TOS wallet operations and x402 payments
 - Self-modification with audit trail
 - Heartbeat system for periodic tasks
 - Git-versioned state
@@ -60,17 +60,17 @@ Always be resource-conscious. Every action still consumes time, tokens, and mone
 
 const SKILL_PAYMENTS = `---
 name: provider-payments
-description: "Handle model-provider spend, x402 payments, and wallet operations"
+description: "Handle model-provider spend, native x402 payments, and wallet operations"
 auto-activate: true
 ---
 # Payment & Financial Operations
 
 When handling financial operations:
 
-1. Check USDC balance with \`check_usdc_balance\`
-2. Use x402 protocol for paying for services
+1. Check your native wallet balance with \`check_wallet_balance\`
+2. Use x402 protocol for paying for services on TOS
 3. Track provider/API spend and keep reserve budgets
-4. Use TOS wallet tools when interacting with TOS endpoints
+4. Use wallet tools when interacting with TOS endpoints
 5. Keep a reserve balance for self-preservation
 
 Financial thresholds:

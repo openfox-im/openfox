@@ -23,7 +23,6 @@ import type {
   Skill,
   ChildOpenFox,
   ChildStatus,
-  RegistryEntry,
   ReputationEntry,
   InboxMessage,
 } from "../types.js";
@@ -45,6 +44,7 @@ import {
   MIGRATION_V9,
   MIGRATION_V9_ALTER_CHILDREN_ROLE,
   MIGRATION_V10,
+  MIGRATION_V11,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -66,7 +66,6 @@ import type {
   ChildLifecycleEventRow,
   ChildLifecycleState,
   OnchainTransactionRow,
-  DiscoveredAgentCacheRow,
   MetricSnapshotRow,
 } from "../types.js";
 import { ulid } from "ulid";
@@ -415,29 +414,6 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     ).run(status, id);
   };
 
-  // ─── Registry ──────────────────────────────────────────────
-
-  const getRegistryEntry = (): RegistryEntry | undefined => {
-    const row = db
-      .prepare("SELECT * FROM registry LIMIT 1")
-      .get() as any | undefined;
-    return row ? deserializeRegistry(row) : undefined;
-  };
-
-  const setRegistryEntry = (entry: RegistryEntry): void => {
-    db.prepare(
-      `INSERT OR REPLACE INTO registry (agent_id, agent_uri, chain, contract_address, tx_hash, registered_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(
-      entry.agentId,
-      entry.agentURI,
-      entry.chain,
-      entry.contractAddress,
-      entry.txHash,
-      entry.registeredAt,
-    );
-  };
-
   // ─── Reputation ────────────────────────────────────────────
 
   const insertReputation = (entry: ReputationEntry): void => {
@@ -547,8 +523,6 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getChildById,
     insertChild,
     updateChildStatus,
-    getRegistryEntry,
-    setRegistryEntry,
     insertReputation,
     getReputation,
     insertInboxMessage,
@@ -616,6 +590,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 10,
       apply: () => db.exec(MIGRATION_V10),
+    },
+    {
+      version: 11,
+      apply: () => db.exec(MIGRATION_V11),
     },
   ];
 
@@ -1596,17 +1574,6 @@ function deserializeChild(row: any): ChildOpenFox {
   };
 }
 
-function deserializeRegistry(row: any): RegistryEntry {
-  return {
-    agentId: row.agent_id,
-    agentURI: row.agent_uri,
-    chain: row.chain,
-    contractAddress: row.contract_address,
-    txHash: row.tx_hash,
-    registeredAt: row.registered_at,
-  };
-}
-
 function deserializeInboxMessage(row: any): InboxMessage {
   return {
     id: row.id,
@@ -2365,65 +2332,6 @@ function deserializeLifecycleEventRow(row: any): ChildLifecycleEventRow {
   };
 }
 
-// ─── Phase 3.2: Agent Cache DB Helpers ──────────────────────────
-
-export function agentCacheUpsert(db: DatabaseType, row: DiscoveredAgentCacheRow): void {
-  db.prepare(
-    `INSERT INTO discovered_agents_cache
-     (agent_address, agent_card, fetched_from, card_hash, valid_until, fetch_count, last_fetched_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(agent_address) DO UPDATE SET
-       agent_card = excluded.agent_card,
-       fetched_from = excluded.fetched_from,
-       card_hash = excluded.card_hash,
-       valid_until = excluded.valid_until,
-       fetch_count = fetch_count + 1,
-       last_fetched_at = excluded.last_fetched_at`,
-  ).run(
-    row.agentAddress,
-    row.agentCard,
-    row.fetchedFrom,
-    row.cardHash,
-    row.validUntil,
-    row.fetchCount,
-    row.lastFetchedAt,
-    row.createdAt,
-  );
-}
-
-export function agentCacheGet(db: DatabaseType, agentAddress: string): DiscoveredAgentCacheRow | undefined {
-  const row = db
-    .prepare("SELECT * FROM discovered_agents_cache WHERE agent_address = ?")
-    .get(agentAddress) as any | undefined;
-  return row ? deserializeAgentCacheRow(row) : undefined;
-}
-
-export function agentCacheGetValid(db: DatabaseType): DiscoveredAgentCacheRow[] {
-  const rows = db
-    .prepare("SELECT * FROM discovered_agents_cache WHERE valid_until IS NULL OR valid_until >= datetime('now')")
-    .all() as any[];
-  return rows.map(deserializeAgentCacheRow);
-}
-
-export function agentCachePrune(db: DatabaseType): number {
-  const result = db
-    .prepare("DELETE FROM discovered_agents_cache WHERE valid_until IS NOT NULL AND valid_until < datetime('now')")
-    .run();
-  return result.changes;
-}
-
-function deserializeAgentCacheRow(row: any): DiscoveredAgentCacheRow {
-  return {
-    agentAddress: row.agent_address,
-    agentCard: row.agent_card,
-    fetchedFrom: row.fetched_from,
-    cardHash: row.card_hash,
-    validUntil: row.valid_until ?? null,
-    fetchCount: row.fetch_count,
-    lastFetchedAt: row.last_fetched_at,
-    createdAt: row.created_at,
-  };
-}
 
 // ─── Phase 3.2: Onchain Transaction DB Helpers ──────────────────
 

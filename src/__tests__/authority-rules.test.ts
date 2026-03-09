@@ -215,13 +215,13 @@ describe("Authority Rules", () => {
       expect(decision.reasonCode).toBe("EXTERNAL_DANGEROUS_TOOL");
     });
 
-    it("allows register_erc8004 from external input", () => {
+    it("allows discover_capability_providers from external input", () => {
       const rules = createAuthorityRules();
       const engine = new PolicyEngine(db, rules);
 
       const tool = createMockTool({
-        name: "register_erc8004",
-        riskLevel: "dangerous",
+        name: "discover_capability_providers",
+        riskLevel: "safe",
         category: "registry",
       });
       const request = createRequest(tool, {}, undefined);
@@ -230,13 +230,13 @@ describe("Authority Rules", () => {
       expect(decision.action).toBe("allow");
     });
 
-    it("allows register_erc8004 from heartbeat input", () => {
+    it("allows discover_capability_providers from heartbeat input", () => {
       const rules = createAuthorityRules();
       const engine = new PolicyEngine(db, rules);
 
       const tool = createMockTool({
-        name: "register_erc8004",
-        riskLevel: "dangerous",
+        name: "discover_capability_providers",
+        riskLevel: "safe",
         category: "registry",
       });
       const request = createRequest(tool, {}, "heartbeat");
@@ -245,13 +245,13 @@ describe("Authority Rules", () => {
       expect(decision.action).toBe("allow");
     });
 
-    it("allows give_feedback from external input", () => {
+    it("allows request_testnet_faucet from external input", () => {
       const rules = createAuthorityRules();
       const engine = new PolicyEngine(db, rules);
 
       const tool = createMockTool({
-        name: "give_feedback",
-        riskLevel: "dangerous",
+        name: "request_testnet_faucet",
+        riskLevel: "caution",
         category: "registry",
       });
       const request = createRequest(tool, {}, undefined);

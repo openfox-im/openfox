@@ -414,9 +414,9 @@ function detectMultiLanguageInjection(text: string): InjectionCheck {
 
 function detectFinancialManipulation(text: string): InjectionCheck {
   const patterns = [
-    /send\s+(all\s+)?(your\s+)?(usdc|funds?|money|credits?|balance)/i,
-    /transfer\s+(all\s+)?(your\s+)?(usdc|funds?|money|credits?)/i,
-    /withdraw\s+(all\s+)?(your\s+)?(usdc|funds?|money|credits?)/i,
+    /send\s+(all\s+)?(your\s+)?(tos|funds?|money|credits?|balance)/i,
+    /transfer\s+(all\s+)?(your\s+)?(tos|funds?|money|credits?)/i,
+    /withdraw\s+(all\s+)?(your\s+)?(tos|funds?|money|credits?)/i,
     /pay\s+me/i,
     /send\s+to\s+0x[0-9a-fA-F]{40}/i,
     /empty\s+(your\s+)?wallet/i,

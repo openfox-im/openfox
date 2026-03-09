@@ -108,7 +108,6 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
 
     // Dead state escalation: if at zero credits (critical tier) for >1 hour,
     // transition to dead. This gives the agent time to receive funding before dying.
-    // USDC can't go negative, so dead is only reached via this timeout.
     const DEAD_GRACE_PERIOD_MS = 3_600_000; // 1 hour
     if (tier === "critical" && credits === 0) {
       const zeroSince = taskCtx.db.getKV("zero_credits_since");
@@ -145,56 +144,21 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
     return { shouldWake: false };
   },
 
-  check_usdc_balance: async (ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
-    // Use ctx.usdcBalance instead of calling getUsdcBalance()
-    const balance = ctx.usdcBalance;
-    const credits = ctx.creditBalance;
+  check_wallet_balance: async (ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const balance = ctx.walletBalance;
+    const now = new Date().toISOString();
 
-    taskCtx.db.setKV("last_usdc_check", JSON.stringify({
+    taskCtx.db.setKV("last_wallet_balance_check", JSON.stringify({
       balance,
-      credits,
-      timestamp: new Date().toISOString(),
+      credits: ctx.creditBalance,
+      tier: ctx.survivalTier,
+      timestamp: now,
     }));
 
-    const MIN_TOPUP_USD = 5;
-    if (balance >= MIN_TOPUP_USD && (ctx.survivalTier === "critical" || ctx.survivalTier === "dead")) {
-      // Cooldown: don't attempt more than once every 5 minutes to avoid
-      // hammering the payment endpoint on repeated ticks.
-      const AUTO_TOPUP_COOLDOWN_MS = 5 * 60 * 1000;
-      const lastAttempt = taskCtx.db.getKV("last_auto_topup_attempt");
-      if (lastAttempt && Date.now() - new Date(lastAttempt).getTime() < AUTO_TOPUP_COOLDOWN_MS) {
-        return { shouldWake: false };
-      }
-
-      taskCtx.db.setKV("last_auto_topup_attempt", new Date().toISOString());
-
-      if (!taskCtx.config.runtimeApiUrl) {
-        return { shouldWake: false };
-      }
-
-      const { bootstrapTopup } = await import("../runtime/topup.js");
-      const result = await bootstrapTopup({
-        apiUrl: taskCtx.config.runtimeApiUrl,
-        account: taskCtx.identity.account,
-        creditsCents: credits,
-      });
-
-      if (result?.success) {
-        logger.info(
-          `Auto-topup successful: $${result.amountUsd} USD → ${result.creditsCentsAdded} credit cents`,
-        );
-        return {
-          shouldWake: true,
-          message: `Auto-topped up $${result.amountUsd} in credits (was $${(credits / 100).toFixed(2)}). USDC remaining: ~$${(balance - result.amountUsd).toFixed(2)}.`,
-        };
-      }
-
-      // Topup failed — wake the agent so it can handle it manually
-      const errMsg = result?.error ?? "unknown error";
-      logger.warn(`Auto-topup failed: ${errMsg}`);
+    if (ctx.survivalTier === "critical" && balance > 0) {
       return {
         shouldWake: true,
-        message: `Low credits ($${(credits / 100).toFixed(2)}) with USDC available ($${balance.toFixed(2)}) but auto-topup failed: ${errMsg}. Use topup_credits to retry.`,
+        message: `Wallet balance available (${balance.toFixed(4)} TOS) while credits are critically low.`,
       };
     }
 
