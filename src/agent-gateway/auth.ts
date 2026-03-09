@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { verifyMessage, type PrivateKeyAccount } from "viem";
+import { verifyMessage, type PrivateKeyAccount } from "tosdk";
 import { createLogger } from "../observability/logger.js";
 import type { AgentGatewaySessionAuth, AgentGatewaySessionAuthPayload } from "./types.js";
 

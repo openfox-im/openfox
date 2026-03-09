@@ -21,8 +21,8 @@ import {
   encodeFunctionData,
   type Address,
   type PrivateKeyAccount,
-} from "viem";
-import { base, baseSepolia } from "viem/chains";
+} from "tosdk";
+import { base, baseSepolia } from "tosdk/chains";
 import type {
   RegistryEntry,
   DiscoveredAgent,

@@ -1,4 +1,4 @@
-import { verifyMessage } from "viem";
+import { verifyMessage } from "tosdk";
 import type {
   AgentGatewayBootnodeConfig,
   AgentGatewaySignedBootnodeList,

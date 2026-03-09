@@ -7,7 +7,7 @@
  */
 
 import type BetterSqlite3 from "better-sqlite3";
-import type { Address } from "viem";
+import type { Address } from "tosdk";
 import type {
   RuntimeClient,
   HeartbeatConfig,

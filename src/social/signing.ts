@@ -11,7 +11,7 @@ import {
   type PrivateKeyAccount,
   keccak256,
   toBytes,
-} from "viem";
+} from "tosdk";
 import type { SignedMessagePayload } from "../types.js";
 
 export const MESSAGE_LIMITS = {

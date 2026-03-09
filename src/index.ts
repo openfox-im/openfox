@@ -50,7 +50,7 @@ import {
   registerTOSCapabilityName as registerCapabilityName,
 } from "./tos/client.js";
 import { randomUUID } from "crypto";
-import { keccak256, toHex } from "viem";
+import { keccak256, toHex } from "tosdk";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";

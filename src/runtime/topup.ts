@@ -13,7 +13,7 @@
  * Valid tiers: 5, 25, 100, 500, 1000, 2500 (USD)
  */
 
-import type { PrivateKeyAccount, Address } from "viem";
+import type { PrivateKeyAccount, Address } from "tosdk";
 import { x402Fetch, getUsdcBalance } from "./x402.js";
 import { createLogger } from "../observability/logger.js";
 

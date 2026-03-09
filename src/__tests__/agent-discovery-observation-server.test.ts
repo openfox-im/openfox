@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "tosdk/accounts";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 
 const TEST_PRIVATE_KEY =

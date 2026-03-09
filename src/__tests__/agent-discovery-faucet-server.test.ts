@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "tosdk/accounts";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 
 const getBalanceMock = vi.fn(async () => 10_000_000_000_000_000_000n);

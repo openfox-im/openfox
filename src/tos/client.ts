@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { etc, sign as signSecp256k1 } from "@noble/secp256k1";
-import type { PrivateKeyAccount } from "viem";
-import { keccak256, parseUnits, toHex } from "viem";
+import type { PrivateKeyAccount } from "tosdk";
+import { keccak256, parseUnits, toHex } from "tosdk";
 import {
   deriveTOSAddressFromPrivateKey,
   normalizeTOSAddress,

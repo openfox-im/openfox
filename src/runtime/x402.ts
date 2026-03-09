@@ -11,8 +11,8 @@ import {
   parseUnits,
   type Address,
   type PrivateKeyAccount,
-} from "viem";
-import { base, baseSepolia } from "viem/chains";
+} from "tosdk";
+import { base, baseSepolia } from "tosdk/chains";
 import { loadConfig } from "../config.js";
 import { buildTOSX402Payment as buildNativePayment } from "../tos/client.js";
 import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";

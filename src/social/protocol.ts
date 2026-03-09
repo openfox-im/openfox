@@ -13,7 +13,7 @@ import {
   keccak256,
   toBytes,
   verifyMessage,
-} from "viem";
+} from "tosdk";
 
 /**
  * A fully signed social message.

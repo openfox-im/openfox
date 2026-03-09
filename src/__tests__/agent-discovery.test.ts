@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "tosdk/accounts";
 import type { OpenFoxConfig, OpenFoxIdentity } from "../types.js";
 import {
   buildSignedAgentDiscoveryCard,

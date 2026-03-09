@@ -15,7 +15,7 @@ import type {
 } from "../types.js";
 import { DEFAULT_DISCOVERY_CONFIG } from "../types.js";
 import { queryAgent, getTotalAgents, getRegisteredAgentsByEvents } from "./erc8004.js";
-import { keccak256, toBytes } from "viem";
+import { keccak256, toBytes } from "tosdk";
 import { createLogger } from "../observability/logger.js";
 const logger = createLogger("registry.discovery");
 

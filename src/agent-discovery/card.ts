@@ -1,5 +1,5 @@
-import type { PrivateKeyAccount } from "viem";
-import { verifyMessage } from "viem";
+import type { PrivateKeyAccount } from "tosdk";
+import { verifyMessage } from "tosdk";
 import type { OpenFoxConfig, OpenFoxIdentity } from "../types.js";
 import {
   capabilityFromConfig,

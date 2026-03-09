@@ -44,12 +44,12 @@ importers:
       siwe:
         specifier: ^2.3.0
         version: 2.3.2(ethers@6.16.0)
+      tosdk:
+        specifier: link:../tosdk
+        version: link:../tosdk
       ulid:
         specifier: ^2.3.0
         version: 2.4.0
-      viem:
-        specifier: link:../tosdk/src
-        version: link:../tosdk/src
       ws:
         specifier: ^8.19.0
         version: 8.19.0

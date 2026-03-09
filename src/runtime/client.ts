@@ -24,8 +24,8 @@ import type {
 } from "../types.js";
 import { ResilientHttpClient } from "./http-client.js";
 import { ulid } from "ulid";
-import { keccak256, toHex } from "viem";
-import type { Address, PrivateKeyAccount } from "viem";
+import { keccak256, toHex } from "tosdk";
+import type { Address, PrivateKeyAccount } from "tosdk";
 import type { HexAddress } from "../types.js";
 import { randomUUID } from "crypto";
 

@@ -4,7 +4,7 @@
  * All shared interfaces for the sovereign AI agent runtime.
  */
 
-import type { PrivateKeyAccount, Address } from "viem";
+import type { PrivateKeyAccount, Address } from "tosdk";
 
 export type HexAddress = `0x${string}`;
 

@@ -8,8 +8,8 @@
  */
 
 import { loadConfig } from "@openfox/openfox/config.js";
-import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
-import { keccak256, toBytes } from "viem";
+import { privateKeyToAccount, type PrivateKeyAccount } from "tosdk/accounts";
+import { keccak256, toBytes } from "tosdk";
 import fs from "fs";
 import path from "path";
 
