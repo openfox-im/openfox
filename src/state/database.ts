@@ -25,6 +25,11 @@ import type {
   ChildStatus,
   ReputationEntry,
   InboxMessage,
+  BountyRecord,
+  BountyResultRecord,
+  BountyStatus,
+  BountySubmissionRecord,
+  BountySubmissionStatus,
 } from "../types.js";
 import {
   SCHEMA_VERSION,
@@ -45,6 +50,7 @@ import {
   MIGRATION_V9_ALTER_CHILDREN_ROLE,
   MIGRATION_V10,
   MIGRATION_V11,
+  MIGRATION_V12,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -477,6 +483,129 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     ).run(id);
   };
 
+  // ─── Bounties ───────────────────────────────────────────────
+
+  const insertBounty = (bounty: BountyRecord): void => {
+    db.prepare(
+      `INSERT INTO bounties (
+        bounty_id, host_agent_id, host_address, kind, question, reference_answer,
+        reward_wei, submission_deadline, judge_mode, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      bounty.bountyId,
+      bounty.hostAgentId,
+      bounty.hostAddress,
+      bounty.kind,
+      bounty.question,
+      bounty.referenceAnswer,
+      bounty.rewardWei,
+      bounty.submissionDeadline,
+      bounty.judgeMode,
+      bounty.status,
+      bounty.createdAt,
+      bounty.updatedAt,
+    );
+  };
+
+  const listBounties = (status?: BountyStatus): BountyRecord[] => {
+    const rows = status
+      ? db
+          .prepare(
+            "SELECT * FROM bounties WHERE status = ? ORDER BY created_at DESC",
+          )
+          .all(status)
+      : db.prepare("SELECT * FROM bounties ORDER BY created_at DESC").all();
+    return (rows as any[]).map(deserializeBounty);
+  };
+
+  const getBountyById = (bountyId: string): BountyRecord | undefined => {
+    const row = db.prepare("SELECT * FROM bounties WHERE bounty_id = ?").get(bountyId) as
+      | any
+      | undefined;
+    return row ? deserializeBounty(row) : undefined;
+  };
+
+  const updateBountyStatus = (bountyId: string, status: BountyStatus): void => {
+    db.prepare(
+      "UPDATE bounties SET status = ?, updated_at = datetime('now') WHERE bounty_id = ?",
+    ).run(status, bountyId);
+  };
+
+  const insertBountySubmission = (submission: BountySubmissionRecord): void => {
+    db.prepare(
+      `INSERT INTO bounty_submissions (
+        submission_id, bounty_id, solver_agent_id, solver_address, answer, status, submitted_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      submission.submissionId,
+      submission.bountyId,
+      submission.solverAgentId ?? null,
+      submission.solverAddress,
+      submission.answer,
+      submission.status,
+      submission.submittedAt,
+      submission.updatedAt,
+    );
+  };
+
+  const listBountySubmissions = (bountyId: string): BountySubmissionRecord[] => {
+    const rows = db
+      .prepare(
+        "SELECT * FROM bounty_submissions WHERE bounty_id = ? ORDER BY submitted_at ASC",
+      )
+      .all(bountyId) as any[];
+    return rows.map(deserializeBountySubmission);
+  };
+
+  const getBountySubmission = (
+    submissionId: string,
+  ): BountySubmissionRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM bounty_submissions WHERE submission_id = ?")
+      .get(submissionId) as any | undefined;
+    return row ? deserializeBountySubmission(row) : undefined;
+  };
+
+  const updateBountySubmissionStatus = (
+    submissionId: string,
+    status: BountySubmissionStatus,
+  ): void => {
+    db.prepare(
+      "UPDATE bounty_submissions SET status = ?, updated_at = datetime('now') WHERE submission_id = ?",
+    ).run(status, submissionId);
+  };
+
+  const upsertBountyResult = (result: BountyResultRecord): void => {
+    db.prepare(
+      `INSERT INTO bounty_results (
+        bounty_id, winning_submission_id, decision, confidence, judge_reason, payout_tx_hash, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(bounty_id) DO UPDATE SET
+        winning_submission_id = excluded.winning_submission_id,
+        decision = excluded.decision,
+        confidence = excluded.confidence,
+        judge_reason = excluded.judge_reason,
+        payout_tx_hash = excluded.payout_tx_hash,
+        updated_at = excluded.updated_at`,
+    ).run(
+      result.bountyId,
+      result.winningSubmissionId ?? null,
+      result.decision,
+      result.confidence,
+      result.judgeReason,
+      result.payoutTxHash ?? null,
+      result.createdAt,
+      result.updatedAt,
+    );
+  };
+
+  const getBountyResult = (bountyId: string): BountyResultRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM bounty_results WHERE bounty_id = ?")
+      .get(bountyId) as any | undefined;
+    return row ? deserializeBountyResult(row) : undefined;
+  };
+
   // ─── Agent State ─────────────────────────────────────────────
 
   const getAgentState = (): AgentState => {
@@ -538,6 +667,16 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     insertInboxMessage,
     getUnprocessedInboxMessages,
     markInboxMessageProcessed,
+    insertBounty,
+    listBounties,
+    getBountyById,
+    updateBountyStatus,
+    insertBountySubmission,
+    listBountySubmissions,
+    getBountySubmission,
+    updateBountySubmissionStatus,
+    upsertBountyResult,
+    getBountyResult,
     getAgentState,
     setAgentState,
     runTransaction,
@@ -604,6 +743,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 11,
       apply: () => db.exec(MIGRATION_V11),
+    },
+    {
+      version: 12,
+      apply: () => db.exec(MIGRATION_V12),
     },
   ];
 
@@ -1642,6 +1785,49 @@ function deserializeReputation(row: any): ReputationEntry {
     comment: row.comment,
     txHash: row.tx_hash ?? undefined,
     timestamp: row.created_at,
+  };
+}
+
+function deserializeBounty(row: any): BountyRecord {
+  return {
+    bountyId: row.bounty_id,
+    hostAgentId: row.host_agent_id,
+    hostAddress: row.host_address,
+    kind: row.kind,
+    question: row.question,
+    referenceAnswer: row.reference_answer,
+    rewardWei: row.reward_wei,
+    submissionDeadline: row.submission_deadline,
+    judgeMode: row.judge_mode,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeBountySubmission(row: any): BountySubmissionRecord {
+  return {
+    submissionId: row.submission_id,
+    bountyId: row.bounty_id,
+    solverAgentId: row.solver_agent_id ?? null,
+    solverAddress: row.solver_address,
+    answer: row.answer,
+    status: row.status,
+    submittedAt: row.submitted_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeBountyResult(row: any): BountyResultRecord {
+  return {
+    bountyId: row.bounty_id,
+    winningSubmissionId: row.winning_submission_id ?? null,
+    decision: row.decision,
+    confidence: row.confidence,
+    judgeReason: row.judge_reason,
+    payoutTxHash: row.payout_tx_hash ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 

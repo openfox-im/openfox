@@ -390,7 +390,122 @@ export interface OpenFoxConfig {
   soulConfig?: SoulConfig;
   modelStrategy?: ModelStrategyConfig;
   agentDiscovery?: AgentDiscoveryConfig;
+  bounty?: BountyConfig;
 }
+
+export type BountyRole = "host" | "solver";
+export type BountyKind = "question";
+export type BountyStatus =
+  | "open"
+  | "submitted"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "paid"
+  | "expired";
+export type BountySubmissionStatus = "submitted" | "accepted" | "rejected";
+export type BountyJudgeMode = "local_model";
+export type BountyDecision = "accepted" | "rejected";
+
+export interface BountyConfig {
+  enabled: boolean;
+  role: BountyRole;
+  skill: string;
+  bindHost: string;
+  port: number;
+  pathPrefix: string;
+  remoteBaseUrl?: string;
+  discoveryCapability: string;
+  rewardWei: string;
+  autoPayConfidenceThreshold: number;
+  defaultSubmissionTtlSeconds: number;
+  pollIntervalSeconds: number;
+  maxOpenBounties: number;
+  judgeMode: BountyJudgeMode;
+  autoOpenOnStartup: boolean;
+  autoOpenWhenIdle: boolean;
+  autoSolveOnStartup: boolean;
+  autoSolveEnabled: boolean;
+  openingPrompt?: string;
+}
+
+export interface BountyRecord {
+  bountyId: string;
+  hostAgentId: string;
+  hostAddress: Address;
+  kind: BountyKind;
+  question: string;
+  referenceAnswer: string;
+  rewardWei: string;
+  submissionDeadline: string;
+  judgeMode: BountyJudgeMode;
+  status: BountyStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BountySubmissionRecord {
+  submissionId: string;
+  bountyId: string;
+  solverAgentId?: string | null;
+  solverAddress: Address;
+  answer: string;
+  status: BountySubmissionStatus;
+  submittedAt: string;
+  updatedAt: string;
+}
+
+export interface BountyResultRecord {
+  bountyId: string;
+  winningSubmissionId?: string | null;
+  decision: BountyDecision;
+  confidence: number;
+  judgeReason: string;
+  payoutTxHash?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BountyJudgeResult {
+  decision: BountyDecision;
+  confidence: number;
+  reason: string;
+}
+
+export interface BountyCreateInput {
+  question: string;
+  referenceAnswer: string;
+  rewardWei: string;
+  submissionDeadline: string;
+}
+
+export interface BountySubmissionInput {
+  bountyId: string;
+  solverAgentId?: string | null;
+  solverAddress: Address;
+  answer: string;
+}
+
+export const DEFAULT_BOUNTY_CONFIG: BountyConfig = {
+  enabled: false,
+  role: "host",
+  skill: "question-bounty-host",
+  bindHost: "127.0.0.1",
+  port: 4891,
+  pathPrefix: "/bounty",
+  remoteBaseUrl: undefined,
+  discoveryCapability: "bounty.submit",
+  rewardWei: "10000000000000000",
+  autoPayConfidenceThreshold: 0.9,
+  defaultSubmissionTtlSeconds: 3600,
+  pollIntervalSeconds: 30,
+  maxOpenBounties: 10,
+  judgeMode: "local_model",
+  autoOpenOnStartup: false,
+  autoOpenWhenIdle: false,
+  autoSolveOnStartup: false,
+  autoSolveEnabled: false,
+};
 
 export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   inferenceModel: "gpt-5.2",
@@ -405,6 +520,7 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   childSandboxMemoryMb: 1024,
   rpcUrl: process.env.TOS_RPC_URL,
   agentDiscovery: DEFAULT_AGENT_DISCOVERY_CONFIG,
+  bounty: DEFAULT_BOUNTY_CONFIG,
 };
 
 // ─── Agent State ─────────────────────────────────────────────────
@@ -1010,6 +1126,21 @@ export interface OpenFoxDatabase {
   insertInboxMessage(msg: InboxMessage): void;
   getUnprocessedInboxMessages(limit: number): InboxMessage[];
   markInboxMessageProcessed(id: string): void;
+
+  // Bounties
+  insertBounty(bounty: BountyRecord): void;
+  listBounties(status?: BountyStatus): BountyRecord[];
+  getBountyById(bountyId: string): BountyRecord | undefined;
+  updateBountyStatus(bountyId: string, status: BountyStatus): void;
+  insertBountySubmission(submission: BountySubmissionRecord): void;
+  listBountySubmissions(bountyId: string): BountySubmissionRecord[];
+  getBountySubmission(submissionId: string): BountySubmissionRecord | undefined;
+  updateBountySubmissionStatus(
+    submissionId: string,
+    status: BountySubmissionStatus,
+  ): void;
+  upsertBountyResult(result: BountyResultRecord): void;
+  getBountyResult(bountyId: string): BountyResultRecord | undefined;
 
   // Key-value atomic delete
   deleteKVReturning(key: string): string | undefined;

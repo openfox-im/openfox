@@ -26,6 +26,7 @@ import type {
   InboxMessage,
 } from "../types.js";
 import { DEFAULT_CONFIG } from "../types.js";
+import type { Address, PrivateKeyAccount } from "tosdk";
 import path from "path";
 import os from "os";
 import fs from "fs";
@@ -208,12 +209,12 @@ export class MockRuntimeClient implements RuntimeClient {
 
   async registerOpenFox(_params: {
     openfoxId: string;
-    openfoxAddress: import("viem").Address;
-    creatorAddress: import("viem").Address;
+    openfoxAddress: Address;
+    creatorAddress: Address;
     name: string;
     bio?: string;
     genesisPromptHash?: `0x${string}`;
-    account: import("viem").PrivateKeyAccount;
+    account: PrivateKeyAccount;
     nonce?: string;
   }): Promise<{ openfox: Record<string, unknown> }> {
     return { openfox: {} };
@@ -320,9 +321,11 @@ export function createTestDb(): OpenFoxDatabase {
 export function createTestIdentity(): OpenFoxIdentity {
   return {
     name: "test-openfox",
-    address: "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`,
+    address:
+      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as `0x${string}`,
     account: {} as any, // Placeholder — not used in most tests
-    creatorAddress: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
+    creatorAddress:
+      "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
     sandboxId: "test-sandbox-id",
     apiKey: "test-api-key",
     createdAt: new Date().toISOString(),
@@ -335,7 +338,8 @@ export function createTestConfig(
   return {
     name: "test-openfox",
     genesisPrompt: "You are a test openfox.",
-    creatorAddress: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
+    creatorAddress:
+      "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
     registeredRemotely: true,
     sandboxId: "test-sandbox-id",
     runtimeApiUrl: "https://api.openfox.ai",
@@ -345,7 +349,8 @@ export function createTestConfig(
     heartbeatConfigPath: "/tmp/test-heartbeat.yml",
     dbPath: "/tmp/test-state.db",
     logLevel: "error",
-    walletAddress: "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`,
+    walletAddress:
+      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as `0x${string}`,
     version: "0.2.1",
     skillsDir: "/tmp/test-skills",
     maxChildren: 3,

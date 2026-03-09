@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTestConfig, createTestDb } from "./mocks.js";
 import {
+  buildHealthSnapshot,
   buildDoctorReport,
   buildHealthSnapshotReport,
 } from "../doctor/report.js";
@@ -23,6 +24,10 @@ describe("doctor report formatting", () => {
       discoveryEnabled: true,
       gatewayEnabled: false,
       providerEnabled: false,
+      bountyEnabled: true,
+      bountyRole: "host" as const,
+      bountyAutoEnabled: true,
+      bountyRemoteConfigured: false,
       managedService: {
         manager: "systemd-user" as const,
         available: true,
@@ -66,6 +71,7 @@ describe("doctor report formatting", () => {
     const doctor = buildDoctorReport(snapshot);
 
     expect(health).toContain("=== OPENFOX HEALTH ===");
+    expect(health).toContain("Bounty enabled: yes (host)");
     expect(health).toContain("service status report");
     expect(doctor).toContain("=== OPENFOX DOCTOR ===");
     expect(doctor).toContain("Warnings: 2");
@@ -73,5 +79,43 @@ describe("doctor report formatting", () => {
 
     db.close();
     void config;
+  });
+
+  it("flags a solver auto mode with no remote host and no discovery source", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        rpcUrl: "http://127.0.0.1:8545",
+        bounty: {
+          enabled: true,
+          role: "solver",
+          skill: "question-bounty-solver",
+          bindHost: "127.0.0.1",
+          port: 4891,
+          pathPrefix: "/bounty",
+          discoveryCapability: "bounty.submit",
+          rewardWei: "1000",
+          autoPayConfidenceThreshold: 0.9,
+          defaultSubmissionTtlSeconds: 3600,
+          pollIntervalSeconds: 30,
+          maxOpenBounties: 10,
+          judgeMode: "local_model",
+          autoOpenOnStartup: false,
+          autoOpenWhenIdle: false,
+          autoSolveOnStartup: true,
+          autoSolveEnabled: true,
+        },
+        agentDiscovery: {
+          enabled: false,
+          publishCard: false,
+          cardTtlSeconds: 3600,
+          endpoints: [],
+          capabilities: [],
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some((finding) => finding.id === "bounty-solver-no-source"),
+    ).toBe(true);
   });
 });

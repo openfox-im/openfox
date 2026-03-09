@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -163,6 +163,48 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_inbox_unprocessed
     ON inbox_messages(received_at) WHERE processed_at IS NULL;
+
+  -- Bounty engine
+  CREATE TABLE IF NOT EXISTS bounties (
+    bounty_id TEXT PRIMARY KEY,
+    host_agent_id TEXT NOT NULL,
+    host_address TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('question')),
+    question TEXT NOT NULL,
+    reference_answer TEXT NOT NULL,
+    reward_wei TEXT NOT NULL,
+    submission_deadline TEXT NOT NULL,
+    judge_mode TEXT NOT NULL CHECK(judge_mode IN ('local_model')),
+    status TEXT NOT NULL CHECK(status IN ('open','submitted','under_review','approved','rejected','paid','expired')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status, created_at);
+
+  CREATE TABLE IF NOT EXISTS bounty_submissions (
+    submission_id TEXT PRIMARY KEY,
+    bounty_id TEXT NOT NULL REFERENCES bounties(bounty_id) ON DELETE CASCADE,
+    solver_agent_id TEXT,
+    solver_address TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('submitted','accepted','rejected')),
+    submitted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bounty_submissions_bounty ON bounty_submissions(bounty_id, submitted_at);
+
+  CREATE TABLE IF NOT EXISTS bounty_results (
+    bounty_id TEXT PRIMARY KEY REFERENCES bounties(bounty_id) ON DELETE CASCADE,
+    winning_submission_id TEXT,
+    decision TEXT NOT NULL CHECK(decision IN ('accepted','rejected')),
+    confidence REAL NOT NULL,
+    judge_reason TEXT NOT NULL,
+    payout_tx_hash TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `;
 
 export const MIGRATION_V3 = `
@@ -645,4 +687,47 @@ export const MIGRATION_V10 = `
 export const MIGRATION_V11 = `
   DROP TABLE IF EXISTS registry;
   DROP TABLE IF EXISTS discovered_agents_cache;
+`;
+
+export const MIGRATION_V12 = `
+  CREATE TABLE IF NOT EXISTS bounties (
+    bounty_id TEXT PRIMARY KEY,
+    host_agent_id TEXT NOT NULL,
+    host_address TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('question')),
+    question TEXT NOT NULL,
+    reference_answer TEXT NOT NULL,
+    reward_wei TEXT NOT NULL,
+    submission_deadline TEXT NOT NULL,
+    judge_mode TEXT NOT NULL CHECK(judge_mode IN ('local_model')),
+    status TEXT NOT NULL CHECK(status IN ('open','submitted','under_review','approved','rejected','paid','expired')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status, created_at);
+
+  CREATE TABLE IF NOT EXISTS bounty_submissions (
+    submission_id TEXT PRIMARY KEY,
+    bounty_id TEXT NOT NULL REFERENCES bounties(bounty_id) ON DELETE CASCADE,
+    solver_agent_id TEXT,
+    solver_address TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('submitted','accepted','rejected')),
+    submitted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bounty_submissions_bounty ON bounty_submissions(bounty_id, submitted_at);
+
+  CREATE TABLE IF NOT EXISTS bounty_results (
+    bounty_id TEXT PRIMARY KEY REFERENCES bounties(bounty_id) ON DELETE CASCADE,
+    winning_submission_id TEXT,
+    decision TEXT NOT NULL CHECK(decision IN ('accepted','rejected')),
+    confidence REAL NOT NULL,
+    judge_reason TEXT NOT NULL,
+    payout_tx_hash TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `;

@@ -43,6 +43,10 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Expose heartbeat, cron, service, gateway, and top-level runtime
     status as stable JSON snapshots for automation, dashboards, and future
     control plane integrations.
+- [x] Task 10: Build the first bounty host/solver runtime slice
+  - Status: In progress
+  - Goal: Turn the bounty architecture into a working question-bounty loop with
+    local judging, native payout, HTTP host endpoints, and basic solver flows.
 
 ## Task 1 Breakdown
 
@@ -117,3 +121,17 @@ building OpenFox into a TOS-native agent platform.
   surface.
 - [x] Back the JSON output with explicit snapshot builders instead of ad-hoc
   report parsing.
+
+## Task 10 Breakdown
+
+- [x] Add bounty config and local database tables.
+- [x] Add a core bounty engine with question-bounty lifecycle handling.
+- [x] Add host-side HTTP endpoints for bounty create/list/get/submit/result.
+- [x] Add host-side automatic judging and native payout hooks.
+- [x] Add a minimal solver-side client and CLI surface.
+- [x] Publish bounty host capability through Agent Discovery in a more explicit
+  operator-facing way.
+- [x] Add bundled bounty skills and defaults for host/solver mode.
+- [x] Add README/operator documentation for running a host and solver pair.
+- [x] Add host-side auto-open for one bounded question bounty.
+- [x] Add solver-side automatic discovery/direct polling and auto-submit.

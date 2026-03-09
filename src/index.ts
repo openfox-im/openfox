@@ -106,6 +106,16 @@ import {
 } from "./doctor/report.js";
 import { buildModelStatusReport, buildModelStatusSnapshot } from "./models/status.js";
 import { runOnboard } from "./commands/onboard.js";
+import { createBountyEngine } from "./bounty/engine.js";
+import { startBountyHttpServer } from "./bounty/http.js";
+import { createNativeBountyPayoutSender } from "./bounty/payout.js";
+import { startBountyAutomation } from "./bounty/automation.js";
+import {
+  fetchRemoteBounties,
+  fetchRemoteBounty,
+  solveRemoteQuestionBounty,
+  submitRemoteBountyAnswer,
+} from "./bounty/client.js";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";
@@ -170,6 +180,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "bounty") {
+    await handleBountyCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "status") {
     await showStatus({ asJson: args.includes("--json") });
     process.exit(0);
@@ -197,6 +212,7 @@ Usage:
   openfox models ...     Inspect model/provider readiness
   openfox onboard        Run setup and optionally install the managed service
   openfox logs           Show recent OpenFox service logs
+  openfox bounty ...     Open, inspect, and solve question bounties
   openfox status         Show the current runtime status
   openfox --version      Show version
   openfox --help         Show this help
@@ -931,6 +947,199 @@ Usage:
   logger.info(buildServiceLogsReport({ tail }));
 }
 
+async function handleBountyCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox bounty
+
+Usage:
+  openfox bounty list [--url <base-url>]
+  openfox bounty status <bounty-id> [--url <base-url>]
+  openfox bounty open --question "<text>" --answer "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>]
+  openfox bounty submit <bounty-id> --answer "<text>" [--url <base-url>]
+  openfox bounty solve <bounty-id> --url <base-url>
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+  if (!config.bounty?.enabled) {
+    throw new Error("Bounty mode is not enabled in openfox.json");
+  }
+
+  const remoteBaseUrl = readOption(args, "--url");
+
+  if (command === "list") {
+    if (remoteBaseUrl) {
+      logger.info(JSON.stringify(await fetchRemoteBounties(remoteBaseUrl), null, 2));
+      return;
+    }
+    const db = createDatabase(resolvePath(config.dbPath));
+    try {
+      logger.info(JSON.stringify(db.listBounties(), null, 2));
+      return;
+    } finally {
+      db.close();
+    }
+  }
+
+  if (command === "status") {
+    const bountyId = args[1];
+    if (!bountyId) throw new Error("Usage: openfox bounty status <bounty-id> [--url <base-url>]");
+    if (remoteBaseUrl) {
+      logger.info(JSON.stringify(await fetchRemoteBounty(remoteBaseUrl, bountyId), null, 2));
+      return;
+    }
+    const db = createDatabase(resolvePath(config.dbPath));
+    try {
+      const bounty = db.getBountyById(bountyId);
+      if (!bounty) throw new Error(`Bounty not found: ${bountyId}`);
+      logger.info(
+        JSON.stringify(
+          {
+            bounty,
+            submissions: db.listBountySubmissions(bountyId),
+            result: db.getBountyResult(bountyId) ?? null,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    } finally {
+      db.close();
+    }
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    const { account, privateKey } = await getWallet();
+    const apiKey = config.runtimeApiKey || loadApiKeyFromConfig() || "";
+    const modelRegistry = new ModelRegistry(db.raw);
+    modelRegistry.initialize();
+    const inference = createInferenceClient({
+      apiUrl: config.runtimeApiUrl || "",
+      apiKey,
+      defaultModel: config.inferenceModelRef || config.inferenceModel,
+      maxTokens: config.maxTokensPerTurn,
+      lowComputeModel: config.modelStrategy?.lowComputeModel || "gpt-5-mini",
+      openaiApiKey: config.openaiApiKey,
+      anthropicApiKey: config.anthropicApiKey,
+      ollamaBaseUrl: process.env.OLLAMA_BASE_URL || config.ollamaBaseUrl,
+      getModelProvider: (modelId) => modelRegistry.get(modelId)?.provider,
+    });
+    const engine = createBountyEngine({
+      identity: {
+        name: config.name,
+        address: config.walletAddress || deriveAddressFromPrivateKey(privateKey),
+        account,
+        creatorAddress: config.creatorAddress,
+        sandboxId: config.sandboxId,
+        apiKey,
+        createdAt: db.getIdentity("createdAt") || new Date().toISOString(),
+      },
+      db,
+      inference,
+      bountyConfig: config.bounty,
+      payoutSender:
+        config.rpcUrl && config.bounty.role === "host"
+          ? createNativeBountyPayoutSender({ rpcUrl: config.rpcUrl, privateKey })
+          : undefined,
+    });
+
+    if (command === "open") {
+      const question = readOption(args, "--question");
+      const answer = readOption(args, "--answer");
+      if (!question || !answer) {
+        throw new Error(
+          'Usage: openfox bounty open --question "<text>" --answer "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>]',
+        );
+      }
+      const ttlSeconds = readNumberOption(
+        args,
+        "--ttl-seconds",
+        config.bounty.defaultSubmissionTtlSeconds,
+      );
+      const bounty = engine.openQuestionBounty({
+        question,
+        referenceAnswer: answer,
+        rewardWei: readOption(args, "--reward-wei") || config.bounty.rewardWei,
+        submissionDeadline: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+      });
+      logger.info(JSON.stringify(bounty, null, 2));
+      return;
+    }
+
+    if (command === "submit") {
+      const bountyId = args[1];
+      const answer = readOption(args, "--answer");
+      if (!bountyId || !answer) {
+        throw new Error(
+          'Usage: openfox bounty submit <bounty-id> --answer "<text>" [--url <base-url>]',
+        );
+      }
+      if (remoteBaseUrl) {
+        logger.info(
+          JSON.stringify(
+            await submitRemoteBountyAnswer({
+              baseUrl: remoteBaseUrl,
+              bountyId,
+              solverAddress: config.walletAddress,
+              answer,
+              solverAgentId: config.agentId || null,
+            }),
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+      logger.info(
+        JSON.stringify(
+          await engine.submitAnswer({
+            bountyId,
+            answer,
+            solverAddress: config.walletAddress,
+            solverAgentId: config.agentId || null,
+          }),
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    if (command === "solve") {
+      const bountyId = args[1];
+      if (!bountyId || !remoteBaseUrl) {
+        throw new Error("Usage: openfox bounty solve <bounty-id> --url <base-url>");
+      }
+      logger.info(
+        JSON.stringify(
+          await solveRemoteQuestionBounty({
+            baseUrl: remoteBaseUrl,
+            bountyId,
+            solverAddress: config.walletAddress,
+            solverAgentId: config.agentId || null,
+            inference,
+          }),
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    throw new Error(`Unknown bounty command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
 // ─── Status Command ────────────────────────────────────────────
 
 async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
@@ -977,6 +1186,22 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
     },
     creator: config.creatorAddress || null,
     sandboxId: config.sandboxId || null,
+    bounty: config.bounty
+      ? {
+          enabled: config.bounty.enabled,
+          role: config.bounty.role,
+          skill: config.bounty.skill,
+          bind: `${config.bounty.bindHost}:${config.bounty.port}`,
+          pathPrefix: config.bounty.pathPrefix,
+          remoteBaseUrl: config.bounty.remoteBaseUrl || null,
+          discoveryCapability: config.bounty.discoveryCapability,
+          pollIntervalSeconds: config.bounty.pollIntervalSeconds,
+          autoOpenOnStartup: config.bounty.autoOpenOnStartup,
+          autoOpenWhenIdle: config.bounty.autoOpenWhenIdle,
+          autoSolveOnStartup: config.bounty.autoSolveOnStartup,
+          autoSolveEnabled: config.bounty.autoSolveEnabled,
+        }
+      : null,
     state,
     turns: turnCount,
     toolsInstalled: tools.length,
@@ -1005,6 +1230,8 @@ Wallet:     ${config.walletAddress}
 Service:    ${managedService.installed ? managedService.active || "installed" : "not installed"}
 Discovery:  ${discovery?.enabled ? "enabled" : "disabled"}
 Gateway:    ${gatewaySummary}
+Bounty:     ${config.bounty?.enabled ? `${config.bounty.role} @ ${config.bounty.bindHost}:${config.bounty.port}${config.bounty.pathPrefix}` : "disabled"}
+Bounty auto: ${config.bounty?.enabled ? `open=${config.bounty.autoOpenOnStartup || config.bounty.autoOpenWhenIdle ? "on" : "off"} solve=${config.bounty.autoSolveOnStartup || config.bounty.autoSolveEnabled ? "on" : "off"}` : "disabled"}
 Creator:    ${config.creatorAddress}
 Sandbox:    ${config.sandboxId}
 State:      ${state}
@@ -1093,6 +1320,12 @@ async function run(): Promise<void> {
     | undefined;
   let observationServer:
     | Awaited<ReturnType<typeof startAgentDiscoveryObservationServer>>
+    | undefined;
+  let bountyServer:
+    | Awaited<ReturnType<typeof startBountyHttpServer>>
+    | undefined;
+  let bountyAutomation:
+    | Awaited<ReturnType<typeof startBountyAutomation>>
     | undefined;
   let gatewayServer:
     | Awaited<ReturnType<typeof startAgentGatewayServer>>
@@ -1229,6 +1462,43 @@ async function run(): Promise<void> {
         gatewayServer,
         gatewayServerConfig: config.agentDiscovery?.gatewayServer,
       });
+    }
+    if (current && bountyServer && config.bounty?.enabled && config.bounty.role === "host") {
+      const endpointUrl = bountyServer.url;
+      current = {
+        ...current,
+        endpoints: [
+          ...current.endpoints,
+          {
+            kind: "http",
+            url: endpointUrl,
+            role: "requester_invocation",
+          },
+        ],
+        capabilities: [
+          ...current.capabilities,
+          {
+            name: "bounty.list",
+            mode: "sponsored",
+            description: "List currently open question bounties",
+          },
+          {
+            name: "bounty.get",
+            mode: "sponsored",
+            description: "Fetch a bounty and its current status",
+          },
+          {
+            name: "bounty.submit",
+            mode: "sponsored",
+            description: "Submit an answer to an open bounty",
+          },
+          {
+            name: "bounty.result",
+            mode: "sponsored",
+            description: "Read the latest bounty result",
+          },
+        ],
+      };
     }
     return current;
   };
@@ -1380,6 +1650,58 @@ async function run(): Promise<void> {
     logger.info(`[${new Date().toISOString()}] Ollama backend: ${ollamaBaseUrl}`);
   }
 
+  if (config.bounty?.enabled && config.bounty.role === "host") {
+    try {
+      const bountyEngine = createBountyEngine({
+        identity,
+        db,
+        inference,
+        bountyConfig: config.bounty,
+        payoutSender: config.rpcUrl
+          ? createNativeBountyPayoutSender({
+              rpcUrl: config.rpcUrl,
+              privateKey,
+            })
+          : undefined,
+      });
+      bountyServer = await startBountyHttpServer({
+        bountyConfig: config.bounty,
+        engine: bountyEngine,
+      });
+      bountyAutomation = startBountyAutomation({
+        identity,
+        config,
+        db,
+        inference,
+        engine: bountyEngine,
+        onEvent: (message) => logger.info(`[bounty] ${message}`),
+      });
+      logger.info(`Bounty host server enabled at ${bountyServer.url}`);
+      if (config.agentDiscovery?.enabled && config.agentDiscovery.publishCard) {
+        await syncPublishedAgentDiscoveryCard("bounty server startup");
+      }
+    } catch (error) {
+      logger.warn(
+        `Bounty host server failed to start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  } else if (config.bounty?.enabled && config.bounty.role === "solver") {
+    try {
+      bountyAutomation = startBountyAutomation({
+        identity,
+        config,
+        db,
+        inference,
+        onEvent: (message) => logger.info(`[bounty] ${message}`),
+      });
+      logger.info("Bounty solver automation enabled");
+    } catch (error) {
+      logger.warn(
+        `Bounty solver automation failed to start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   // Create social client
   let social: SocialClientInterface | undefined;
   if (config.socialRelayUrl) {
@@ -1441,6 +1763,8 @@ async function run(): Promise<void> {
     heartbeat.stop();
     db.setAgentState("sleeping");
     Promise.allSettled([
+      bountyServer?.close(),
+      bountyAutomation?.close(),
       gatewayProviderSessions?.close(),
       gatewayServer?.close(),
       faucetServer?.close(),

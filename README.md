@@ -284,6 +284,7 @@ openfox doctor
 openfox models status
 openfox onboard --install-daemon
 openfox logs --tail 200
+openfox bounty --help
 ```
 
 To run OpenFox as a long-lived Linux user service:
@@ -506,6 +507,40 @@ OpenFox is especially well suited to long-running background tasks such as:
 - wallet-aware on-chain workflows
 - small automated work pipelines
 - persistent personal agents
+
+## Bounty MVP Surface
+
+OpenFox now includes the first bounty runtime slice for the `question-bounty`
+MVP.
+
+Host-side:
+
+```bash
+openfox bounty open --question "Capital of France?" --answer "Paris"
+openfox bounty list
+openfox bounty status <bounty-id>
+```
+
+Solver-side:
+
+```bash
+openfox bounty list --url http://127.0.0.1:4891/bounty
+openfox bounty solve <bounty-id> --url http://127.0.0.1:4891/bounty
+```
+
+When bounty mode is enabled in `openfox.json` and the role is `host`, OpenFox
+also starts a local bounty HTTP server during `openfox --run`.
+
+The current runtime also supports:
+
+- host-side automatic bounty opening via `autoOpenOnStartup` / `autoOpenWhenIdle`
+- solver-side automatic polling and solving via `autoSolveOnStartup` / `autoSolveEnabled`
+- direct solver-to-host mode with `remoteBaseUrl`
+- discovery-based solver mode through `bounty.submit`
+
+For a concrete host/solver walkthrough, see:
+
+- [OpenFox-Bounty-Host-Solver-Guide.md](./docs/OpenFox-Bounty-Host-Solver-Guide.md)
 
 The longer-term fit is even stronger for:
 

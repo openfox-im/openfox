@@ -15,6 +15,7 @@ import type {
   SoulConfig,
   AgentDiscoveryConfig,
   HexAddress,
+  BountyConfig,
 } from "./types.js";
 import {
   DEFAULT_CONFIG,
@@ -30,6 +31,7 @@ import {
   DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES,
   DEFAULT_AGENT_DISCOVERY_REPUTATION_UPDATE_CONFIG,
   DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
+  DEFAULT_BOUNTY_CONFIG,
 } from "./types.js";
 import { getOpenFoxDir } from "./identity/wallet.js";
 import { loadApiKeyFromConfig } from "./identity/provision.js";
@@ -489,6 +491,11 @@ export function loadConfig(): OpenFoxConfig | null {
     },
   };
 
+  const bounty: BountyConfig = {
+    ...DEFAULT_BOUNTY_CONFIG,
+    ...((raw?.bounty as JsonRecord | undefined) ?? {}),
+  };
+
   const modelRef =
     (typeof raw?.inferenceModelRef === "string" &&
       raw.inferenceModelRef.trim()) ||
@@ -570,6 +577,7 @@ export function loadConfig(): OpenFoxConfig | null {
     modelStrategy,
     soulConfig,
     agentDiscovery,
+    bounty,
   } as OpenFoxConfig;
 }
 
@@ -589,6 +597,7 @@ export function saveConfig(config: OpenFoxConfig): void {
     modelStrategy: config.modelStrategy ?? DEFAULT_MODEL_STRATEGY_CONFIG,
     soulConfig: config.soulConfig ?? DEFAULT_SOUL_CONFIG,
     agentDiscovery: config.agentDiscovery ?? DEFAULT_AGENT_DISCOVERY_CONFIG,
+    bounty: config.bounty ?? DEFAULT_BOUNTY_CONFIG,
   };
   fs.writeFileSync(configPath, JSON.stringify(toSave, null, 2), {
     mode: 0o600,
@@ -668,5 +677,6 @@ export function createConfig(params: {
       inferenceModel,
     },
     agentDiscovery: DEFAULT_AGENT_DISCOVERY_CONFIG,
+    bounty: DEFAULT_BOUNTY_CONFIG,
   };
 }
