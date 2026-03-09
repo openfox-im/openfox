@@ -265,6 +265,15 @@ export class TOSRpcClient {
     );
   }
 
+  async getTransactionByHash(
+    txHash: HexString,
+  ): Promise<Record<string, unknown> | null> {
+    return await this.call<Record<string, unknown> | null>(
+      "tos_getTransactionByHash",
+      [txHash],
+    );
+  }
+
   async getAccount(
     address: TOSAddress,
     blockTag: string = "latest",

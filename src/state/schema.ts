@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -299,6 +299,78 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_market_callback_status
     ON market_contract_callbacks(status, kind, next_attempt_at);
+
+  CREATE TABLE IF NOT EXISTS x402_payments (
+    payment_id TEXT PRIMARY KEY,
+    service_kind TEXT NOT NULL CHECK(service_kind IN ('observation','oracle','gateway_request','gateway_session')),
+    request_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    payer_address TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    chain_id TEXT NOT NULL,
+    tx_nonce TEXT NOT NULL,
+    tx_hash TEXT NOT NULL UNIQUE,
+    raw_transaction TEXT NOT NULL,
+    amount_wei TEXT NOT NULL,
+    confirmation_policy TEXT NOT NULL CHECK(confirmation_policy IN ('broadcast','receipt')),
+    status TEXT NOT NULL CHECK(status IN ('verified','submitted','confirmed','failed','replaced')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    receipt_json TEXT,
+    last_error TEXT,
+    next_attempt_at TEXT,
+    bound_kind TEXT,
+    bound_subject_id TEXT,
+    artifact_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_request
+    ON x402_payments(service_kind, request_key, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_status
+    ON x402_payments(status, service_kind, next_attempt_at);
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_binding
+    ON x402_payments(bound_kind, bound_subject_id);
+`;
+
+export const MIGRATION_V17 = `
+  CREATE TABLE IF NOT EXISTS x402_payments (
+    payment_id TEXT PRIMARY KEY,
+    service_kind TEXT NOT NULL CHECK(service_kind IN ('observation','oracle','gateway_request','gateway_session')),
+    request_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    payer_address TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    chain_id TEXT NOT NULL,
+    tx_nonce TEXT NOT NULL,
+    tx_hash TEXT NOT NULL UNIQUE,
+    raw_transaction TEXT NOT NULL,
+    amount_wei TEXT NOT NULL,
+    confirmation_policy TEXT NOT NULL CHECK(confirmation_policy IN ('broadcast','receipt')),
+    status TEXT NOT NULL CHECK(status IN ('verified','submitted','confirmed','failed','replaced')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    receipt_json TEXT,
+    last_error TEXT,
+    next_attempt_at TEXT,
+    bound_kind TEXT,
+    bound_subject_id TEXT,
+    artifact_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_request
+    ON x402_payments(service_kind, request_key, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_status
+    ON x402_payments(status, service_kind, next_attempt_at);
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_binding
+    ON x402_payments(bound_kind, bound_subject_id);
 `;
 
 export const MIGRATION_V3 = `

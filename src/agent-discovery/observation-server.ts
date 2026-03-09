@@ -3,19 +3,19 @@ import { createHash } from "crypto";
 import net from "net";
 import { URL } from "url";
 import { createLogger } from "../observability/logger.js";
-import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 import {
-  TOSRpcClient as RpcClient,
-  formatTOSNetwork as formatNetwork,
-} from "../tos/client.js";
+  DEFAULT_X402_SERVER_CONFIG,
+  type OpenFoxConfig,
+  type OpenFoxDatabase,
+  type OpenFoxIdentity,
+} from "../types.js";
 import {
-  readTOSPaymentEnvelope,
-  submitTOSPayment,
-  verifyTOSPayment,
-  writeTOSPaymentRequired,
-  type TOSPaymentRequirement,
-  type VerifiedTOSPayment,
-} from "../tos/x402.js";
+  buildX402ServerRequirement,
+  createX402PaymentManager,
+  hashX402RequestPayload,
+  writeX402RequirementResponse,
+  X402ServerPaymentRejectedError,
+} from "../tos/x402-server.js";
 import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
 import {
   buildObservationServerUrl,
@@ -127,38 +127,6 @@ function validateRequest(
   return { requestNonce, targetUrl };
 }
 
-async function requirePayment(params: {
-  req: IncomingMessage;
-  res: ServerResponse;
-  config: OpenFoxConfig;
-  providerAddress: string;
-  amountWei: string;
-}): Promise<VerifiedTOSPayment | null> {
-  const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
-  if (!rpcUrl) {
-    throw new Error("Chain RPC is required to run the observation server");
-  }
-  const client = new RpcClient({ rpcUrl });
-  const chainId = params.config.chainId ? BigInt(params.config.chainId) : await client.getChainId();
-  const requirement: TOSPaymentRequirement = {
-    scheme: "exact",
-    network: formatNetwork(chainId),
-    maxAmountRequired: params.amountWei,
-    payToAddress: normalizeAddress(params.providerAddress),
-    asset: "native",
-    requiredDeadlineSeconds: 300,
-    description: "OpenFox observation.once payment",
-  };
-  const envelope = readTOSPaymentEnvelope(params.req);
-  if (!envelope) {
-    writeTOSPaymentRequired(params.res, requirement);
-    return null;
-  }
-  const verified = verifyTOSPayment(requirement, envelope);
-  await submitTOSPayment(rpcUrl, verified);
-  return verified;
-}
-
 function buildObservationJobId(request: ObservationInvocationRequest): string {
   return createHash("sha256")
     .update(
@@ -252,6 +220,16 @@ export async function startAgentDiscoveryObservationServer(
   const healthzPath = `${path}/healthz`;
   const resultPathPrefix = "/jobs/";
   const requestPaths = new Set([path, "/observe"]);
+  const rpcUrl = config.rpcUrl || process.env.TOS_RPC_URL;
+  const x402Config = config.x402Server ?? DEFAULT_X402_SERVER_CONFIG;
+  const paymentManager =
+    x402Config.enabled && rpcUrl
+      ? createX402PaymentManager({
+          db,
+          rpcUrl,
+          config: x402Config,
+        })
+      : null;
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -280,17 +258,17 @@ export async function startAgentDiscoveryObservationServer(
         return;
       }
       if (requestPaths.has(url.pathname) && req.method === "HEAD") {
-        const paid = await requirePayment({
-          req,
-          res,
-          config,
+        if (!rpcUrl) {
+          throw new Error("Chain RPC is required to run the observation server");
+        }
+        const requirement = await buildX402ServerRequirement({
+          rpcUrl,
+          chainId: config.chainId,
           providerAddress: address,
           amountWei: observationConfig.priceWei,
+          description: "OpenFox observation.once payment",
         });
-        if (paid) {
-          res.statusCode = 200;
-          res.end();
-        }
+        writeX402RequirementResponse({ res, requirement });
         return;
       }
       if (req.method !== "POST" || !requestPaths.has(url.pathname)) {
@@ -302,6 +280,12 @@ export async function startAgentDiscoveryObservationServer(
       const { requestNonce, targetUrl } = validateRequest(body, observationConfig);
       const requesterIdentity = body.requester.identity.value.toLowerCase();
       const requestKey = buildObservationRequestKey(body);
+      const requestHash = hashX402RequestPayload({
+        capability: body.capability,
+        requester_identity: body.requester.identity.value.toLowerCase(),
+        target_url: body.target_url,
+        reason: body.reason ?? "",
+      });
       const existingJobId = db.getKV(requestKey);
       if (existingJobId) {
         const existingJob = loadStoredObservationJob(db, existingJobId);
@@ -330,14 +314,29 @@ export async function startAgentDiscoveryObservationServer(
         nonce: requestNonce,
       });
 
-      const paid = await requirePayment({
+      if (!paymentManager) {
+        throw new Error("x402 payment manager is unavailable; configure rpcUrl");
+      }
+      const payment = await paymentManager.requirePayment({
         req,
-        res,
-        config,
+        serviceKind: "observation",
         providerAddress: address,
+        requestKey,
+        requestHash,
         amountWei: observationConfig.priceWei,
+        description: "OpenFox observation.once payment",
       });
-      if (!paid) {
+      if (payment.state === "required") {
+        writeX402RequirementResponse({ res, requirement: payment.requirement });
+        return;
+      }
+      if (payment.state === "pending") {
+        json(res, 202, {
+          status: "pending",
+          reason: payment.reason,
+          payment_tx_hash: payment.payment.txHash,
+          payment_status: payment.payment.status,
+        });
         return;
       }
 
@@ -359,7 +358,8 @@ export async function startAgentDiscoveryObservationServer(
       );
       result.job_id = jobId;
       result.result_url = resultPath;
-      result.payment_tx_hash = paid.txHash;
+      result.payment_tx_hash = payment.payment.txHash;
+      result.payment_status = payment.payment.status;
       if (marketBindingPublisher) {
         const binding = marketBindingPublisher.publish({
           kind: "observation",
@@ -371,7 +371,7 @@ export async function startAgentDiscoveryObservationServer(
               ? (normalizeAddress(body.requester.identity.value) as `0x${string}`)
               : undefined,
           artifactUrl: resultPath,
-          paymentTxHash: paid.txHash,
+          paymentTxHash: payment.payment.txHash,
           metadata: {
             requester_agent_id: body.requester.agent_id,
             target_url: result.target_url,
@@ -396,7 +396,7 @@ export async function startAgentDiscoveryObservationServer(
               ? (normalizeAddress(body.requester.identity.value) as `0x${string}`)
               : undefined,
           artifactUrl: resultPath,
-          paymentTxHash: paid.txHash,
+          paymentTxHash: payment.payment.txHash,
           result,
           metadata: {
             requester_agent_id: body.requester.agent_id,
@@ -410,6 +410,12 @@ export async function startAgentDiscoveryObservationServer(
           await settlementCallbacks.dispatch(settlement);
         }
       }
+      paymentManager.bindPayment({
+        paymentId: payment.payment.paymentId,
+        boundKind: "observation_job",
+        boundSubjectId: jobId,
+        artifactUrl: resultPath,
+      });
       db.setKV(
         "agent_discovery:observation:last_served",
         JSON.stringify({
@@ -431,10 +437,12 @@ export async function startAgentDiscoveryObservationServer(
       });
       json(res, 200, result);
     } catch (error) {
+      const statusCode =
+        error instanceof X402ServerPaymentRejectedError ? error.statusCode : 400;
       logger.warn(
         `Observation request failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      json(res, 400, {
+      json(res, statusCode, {
         status: "rejected",
         reason: error instanceof Error ? error.message : String(error),
       });

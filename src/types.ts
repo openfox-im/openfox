@@ -430,6 +430,7 @@ export interface OpenFoxConfig {
   opportunityScout?: OpportunityScoutConfig;
   settlement?: SettlementConfig;
   marketContracts?: MarketContractConfig;
+  x402Server?: X402ServerConfig;
 }
 
 export interface WalletFundingConfig {
@@ -706,6 +707,55 @@ export interface MarketContractCallbackRecord {
   updatedAt: string;
 }
 
+export type X402PaymentServiceKind =
+  | "observation"
+  | "oracle"
+  | "gateway_request"
+  | "gateway_session";
+export type X402ConfirmationPolicy = "broadcast" | "receipt";
+export type X402PaymentStatus =
+  | "verified"
+  | "submitted"
+  | "confirmed"
+  | "failed"
+  | "replaced";
+
+export interface X402ServerConfig {
+  enabled: boolean;
+  confirmationPolicy: X402ConfirmationPolicy;
+  receiptTimeoutMs: number;
+  receiptPollIntervalMs: number;
+  retryBatchSize: number;
+  retryAfterSeconds: number;
+  maxAttempts: number;
+}
+
+export interface X402PaymentRecord {
+  paymentId: Hex;
+  serviceKind: X402PaymentServiceKind;
+  requestKey: string;
+  requestHash: Hex;
+  payerAddress: Address;
+  providerAddress: Address;
+  chainId: string;
+  txNonce: string;
+  txHash: Hex;
+  rawTransaction: Hex;
+  amountWei: string;
+  confirmationPolicy: X402ConfirmationPolicy;
+  status: X402PaymentStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  receipt?: Record<string, unknown> | null;
+  lastError?: string | null;
+  nextAttemptAt?: string | null;
+  boundKind?: string | null;
+  boundSubjectId?: string | null;
+  artifactUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const DEFAULT_BOUNTY_POLICY: BountyPolicy = {
   maxSubmissionsPerSolver: 1,
   solverCooldownSeconds: 3600,
@@ -845,6 +895,16 @@ export const DEFAULT_MARKET_CONTRACT_CONFIG: MarketContractConfig = {
   },
 };
 
+export const DEFAULT_X402_SERVER_CONFIG: X402ServerConfig = {
+  enabled: true,
+  confirmationPolicy: "broadcast",
+  receiptTimeoutMs: 15000,
+  receiptPollIntervalMs: 1000,
+  retryBatchSize: 10,
+  retryAfterSeconds: 30,
+  maxAttempts: 5,
+};
+
 export const DEFAULT_WALLET_FUNDING_CONFIG: WalletFundingConfig = {
   localDefaultAmountWei: "5000000000000000000",
   localFunderAddress: undefined,
@@ -872,6 +932,7 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   opportunityScout: DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
   settlement: DEFAULT_SETTLEMENT_CONFIG,
   marketContracts: DEFAULT_MARKET_CONTRACT_CONFIG,
+  x402Server: DEFAULT_X402_SERVER_CONFIG,
 };
 
 // ─── Agent State ─────────────────────────────────────────────────
@@ -1550,6 +1611,21 @@ export interface OpenFoxDatabase {
     limit: number,
     nowIso?: string,
   ): MarketContractCallbackRecord[];
+  upsertX402Payment(payment: X402PaymentRecord): void;
+  getX402Payment(paymentId: Hex): X402PaymentRecord | undefined;
+  getLatestX402PaymentByRequestKey(
+    serviceKind: X402PaymentServiceKind,
+    requestKey: string,
+  ): X402PaymentRecord | undefined;
+  listX402Payments(
+    limit: number,
+    filters?: {
+      serviceKind?: X402PaymentServiceKind;
+      status?: X402PaymentStatus;
+      bound?: boolean;
+    },
+  ): X402PaymentRecord[];
+  listPendingX402Payments(limit: number, nowIso?: string): X402PaymentRecord[];
 
   // Key-value atomic delete
   deleteKVReturning(key: string): string | undefined;

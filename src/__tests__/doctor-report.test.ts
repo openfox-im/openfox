@@ -28,6 +28,12 @@ describe("doctor report formatting", () => {
       bountyRole: "host" as const,
       bountyAutoEnabled: true,
       bountyRemoteConfigured: false,
+      x402ServerEnabled: true,
+      x402ServerReady: true,
+      x402RecentPayments: 2,
+      x402PendingPayments: 1,
+      x402FailedPayments: 0,
+      x402UnboundPayments: 0,
       settlementEnabled: true,
       settlementReady: true,
       settlementRecentCount: 1,
@@ -83,6 +89,7 @@ describe("doctor report formatting", () => {
 
     expect(health).toContain("=== OPENFOX HEALTH ===");
     expect(health).toContain("Bounty enabled: yes (host)");
+    expect(health).toContain("x402 server: yes (2 recent, 1 pending, 0 failed)");
     expect(health).toContain("Settlement enabled: yes (1 recent)");
     expect(health).toContain("Settlement callbacks: yes (2 pending)");
     expect(health).toContain("Market bindings: yes (1 recent, 1 pending callbacks)");
@@ -183,6 +190,30 @@ describe("doctor report formatting", () => {
 
     expect(
       snapshot.findings.some((finding) => finding.id === "settlement-enabled" && finding.severity === "error"),
+    ).toBe(true);
+  });
+
+  it("flags x402 server mode without an RPC URL", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        rpcUrl: undefined,
+        x402Server: {
+          enabled: true,
+          confirmationPolicy: "receipt",
+          receiptTimeoutMs: 15000,
+          receiptPollIntervalMs: 1000,
+          retryBatchSize: 10,
+          retryAfterSeconds: 30,
+          maxAttempts: 5,
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "x402-server-enabled" && finding.severity === "error",
+      ),
     ).toBe(true);
   });
 

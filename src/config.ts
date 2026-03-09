@@ -20,6 +20,7 @@ import type {
   OpportunityScoutConfig,
   SettlementConfig,
   WalletFundingConfig,
+  X402ServerConfig,
 } from "./types.js";
 import {
   DEFAULT_CONFIG,
@@ -42,6 +43,7 @@ import {
   DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
   DEFAULT_SETTLEMENT_CONFIG,
   DEFAULT_WALLET_FUNDING_CONFIG,
+  DEFAULT_X402_SERVER_CONFIG,
 } from "./types.js";
 import { getOpenFoxDir } from "./identity/wallet.js";
 import { loadApiKeyFromConfig } from "./identity/provision.js";
@@ -576,6 +578,11 @@ export function loadConfig(): OpenFoxConfig | null {
     },
   };
 
+  const x402Server: X402ServerConfig = {
+    ...DEFAULT_X402_SERVER_CONFIG,
+    ...((raw?.x402Server as JsonRecord | undefined) ?? {}),
+  };
+
   const walletFunding: WalletFundingConfig = {
     ...DEFAULT_WALLET_FUNDING_CONFIG,
     ...((raw?.walletFunding as JsonRecord | undefined) ?? {}),
@@ -710,6 +717,7 @@ export function loadConfig(): OpenFoxConfig | null {
     opportunityScout,
     settlement,
     marketContracts,
+    x402Server,
   } as OpenFoxConfig;
 }
 
@@ -734,6 +742,7 @@ export function saveConfig(config: OpenFoxConfig): void {
     opportunityScout: config.opportunityScout ?? DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
     settlement: config.settlement ?? DEFAULT_SETTLEMENT_CONFIG,
     marketContracts: config.marketContracts ?? DEFAULT_MARKET_CONTRACT_CONFIG,
+    x402Server: config.x402Server ?? DEFAULT_X402_SERVER_CONFIG,
   };
   fs.writeFileSync(configPath, JSON.stringify(toSave, null, 2), {
     mode: 0o600,
@@ -819,5 +828,6 @@ export function createConfig(params: {
     opportunityScout: DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
     settlement: DEFAULT_SETTLEMENT_CONFIG,
     marketContracts: DEFAULT_MARKET_CONTRACT_CONFIG,
+    x402Server: DEFAULT_X402_SERVER_CONFIG,
   };
 }

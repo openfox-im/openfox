@@ -71,6 +71,12 @@ const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
       task: "retry_market_contract_callbacks",
       enabled: true,
     },
+    {
+      name: "retry_x402_payments",
+      schedule: "*/2 * * * *",
+      task: "retry_x402_payments",
+      enabled: true,
+    },
   ],
   defaultIntervalMs: 60_000,
   lowComputeMultiplier: 4,

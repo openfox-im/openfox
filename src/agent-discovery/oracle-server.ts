@@ -1,5 +1,8 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { createHash } from "crypto";
+import {
+  DEFAULT_X402_SERVER_CONFIG,
+} from "../types.js";
 import type {
   InferenceClient,
   OpenFoxConfig,
@@ -8,17 +11,12 @@ import type {
 } from "../types.js";
 import { createLogger } from "../observability/logger.js";
 import {
-  TOSRpcClient as RpcClient,
-  formatTOSNetwork as formatNetwork,
-} from "../tos/client.js";
-import {
-  readTOSPaymentEnvelope,
-  submitTOSPayment,
-  verifyTOSPayment,
-  writeTOSPaymentRequired,
-  type TOSPaymentRequirement,
-  type VerifiedTOSPayment,
-} from "../tos/x402.js";
+  buildX402ServerRequirement,
+  createX402PaymentManager,
+  hashX402RequestPayload,
+  writeX402RequirementResponse,
+  X402ServerPaymentRejectedError,
+} from "../tos/x402-server.js";
 import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
 import {
   buildOracleServerUrl,
@@ -184,38 +182,6 @@ function validateRequest(
   return request.requester.identity.value.toLowerCase();
 }
 
-async function requirePayment(params: {
-  req: IncomingMessage;
-  res: ServerResponse;
-  config: OpenFoxConfig;
-  providerAddress: string;
-  amountWei: string;
-}): Promise<VerifiedTOSPayment | null> {
-  const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
-  if (!rpcUrl) {
-    throw new Error("Chain RPC is required to run the oracle server");
-  }
-  const client = new RpcClient({ rpcUrl });
-  const chainId = params.config.chainId ? BigInt(params.config.chainId) : await client.getChainId();
-  const requirement: TOSPaymentRequirement = {
-    scheme: "exact",
-    network: formatNetwork(chainId),
-    maxAmountRequired: params.amountWei,
-    payToAddress: normalizeAddress(params.providerAddress),
-    asset: "native",
-    requiredDeadlineSeconds: 300,
-    description: "OpenFox oracle.resolve payment",
-  };
-  const envelope = readTOSPaymentEnvelope(params.req);
-  if (!envelope) {
-    writeTOSPaymentRequired(params.res, requirement);
-    return null;
-  }
-  const verified = verifyTOSPayment(requirement, envelope);
-  await submitTOSPayment(rpcUrl, verified);
-  return verified;
-}
-
 async function resolveOracleRequest(params: {
   inference: InferenceClient;
   request: OracleResolutionRequest;
@@ -284,6 +250,16 @@ export async function startAgentDiscoveryOracleServer(
   const resultPathPrefix = "/oracle/result/";
   const requestPaths = new Set([path, "/oracle/resolve"]);
   const quotePaths = new Set(["/oracle/quote"]);
+  const rpcUrl = config.rpcUrl || process.env.TOS_RPC_URL;
+  const x402Config = config.x402Server ?? DEFAULT_X402_SERVER_CONFIG;
+  const paymentManager =
+    x402Config.enabled && rpcUrl
+      ? createX402PaymentManager({
+          db,
+          rpcUrl,
+          config: x402Config,
+        })
+      : null;
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -323,17 +299,17 @@ export async function startAgentDiscoveryOracleServer(
         return;
       }
       if (requestPaths.has(url.pathname) && req.method === "HEAD") {
-        const paid = await requirePayment({
-          req,
-          res,
-          config,
+        if (!rpcUrl) {
+          throw new Error("Chain RPC is required to run the oracle server");
+        }
+        const requirement = await buildX402ServerRequirement({
+          rpcUrl,
+          chainId: config.chainId,
           providerAddress: address,
           amountWei: oracleConfig.priceWei,
+          description: "OpenFox oracle.resolve payment",
         });
-        if (paid) {
-          res.statusCode = 200;
-          res.end();
-        }
+        writeX402RequirementResponse({ res, requirement });
         return;
       }
       if (req.method !== "POST" || !requestPaths.has(url.pathname)) {
@@ -345,6 +321,15 @@ export async function startAgentDiscoveryOracleServer(
       const requesterIdentity = validateRequest(body, oracleConfig);
       const requestNonce = normalizeNonce(body.request_nonce);
       const requestKey = buildOracleRequestKey(body);
+      const requestHash = hashX402RequestPayload({
+        capability: body.capability,
+        requester_identity: body.requester.identity.value.toLowerCase(),
+        query: body.query,
+        query_kind: body.query_kind,
+        context: body.context ?? "",
+        options: body.options ?? [],
+        reason: body.reason ?? "",
+      });
       const existingResultId = db.getKV(requestKey);
       if (existingResultId) {
         const existingJob = loadStoredOracleJob(db, existingResultId);
@@ -376,14 +361,29 @@ export async function startAgentDiscoveryOracleServer(
         nonce: requestNonce,
       });
 
-      const paid = await requirePayment({
+      if (!paymentManager) {
+        throw new Error("x402 payment manager is unavailable; configure rpcUrl");
+      }
+      const payment = await paymentManager.requirePayment({
         req,
-        res,
-        config,
+        serviceKind: "oracle",
         providerAddress: address,
+        requestKey,
+        requestHash,
         amountWei: oracleConfig.priceWei,
+        description: "OpenFox oracle.resolve payment",
       });
-      if (!paid) {
+      if (payment.state === "required") {
+        writeX402RequirementResponse({ res, requirement: payment.requirement });
+        return;
+      }
+      if (payment.state === "pending") {
+        json(res, 202, {
+          status: "pending",
+          reason: payment.reason,
+          payment_tx_hash: payment.payment.txHash,
+          payment_status: payment.payment.status,
+        });
         return;
       }
 
@@ -405,7 +405,8 @@ export async function startAgentDiscoveryOracleServer(
         status: "ok",
         result_id: resultId,
         result_url: buildOracleResultPath(resultId),
-        payment_tx_hash: paid.txHash,
+        payment_tx_hash: payment.payment.txHash,
+        payment_status: payment.payment.status,
         resolved_at: Math.floor(Date.now() / 1000),
         query: body.query,
         query_kind: body.query_kind,
@@ -425,7 +426,7 @@ export async function startAgentDiscoveryOracleServer(
               ? (normalizeAddress(body.requester.identity.value) as `0x${string}`)
               : undefined,
           artifactUrl: response.result_url,
-          paymentTxHash: paid.txHash,
+          paymentTxHash: payment.payment.txHash,
           metadata: {
             requester_agent_id: body.requester.agent_id,
             query: body.query,
@@ -452,7 +453,7 @@ export async function startAgentDiscoveryOracleServer(
               ? (normalizeAddress(body.requester.identity.value) as `0x${string}`)
               : undefined,
           artifactUrl: response.result_url,
-          paymentTxHash: paid.txHash,
+          paymentTxHash: payment.payment.txHash,
           result: {
             query: body.query,
             query_kind: body.query_kind,
@@ -473,6 +474,12 @@ export async function startAgentDiscoveryOracleServer(
           await settlementCallbacks.dispatch(settlement);
         }
       }
+      paymentManager.bindPayment({
+        paymentId: payment.payment.paymentId,
+        boundKind: "oracle_result",
+        boundSubjectId: resultId,
+        artifactUrl: response.result_url,
+      });
 
       db.setKV(
         "agent_discovery:oracle:last_served",
@@ -496,10 +503,12 @@ export async function startAgentDiscoveryOracleServer(
       });
       json(res, 200, response);
     } catch (error) {
+      const statusCode =
+        error instanceof X402ServerPaymentRejectedError ? error.statusCode : 400;
       logger.warn(
         `Oracle request failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      json(res, 400, {
+      json(res, statusCode, {
         status: "rejected",
         reason: error instanceof Error ? error.message : String(error),
       });

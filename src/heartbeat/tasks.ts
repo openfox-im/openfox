@@ -24,6 +24,7 @@ import { AlertEngine, createDefaultAlertRules } from "../observability/alerts.js
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import { createMarketContractDispatcher } from "../market/contracts.js";
+import { createX402PaymentManager } from "../tos/x402-server.js";
 import { metricsInsertSnapshot, metricsPruneOld } from "../state/database.js";
 import { ulid } from "ulid";
 
@@ -252,6 +253,34 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       message:
         result.failed > 0
           ? `Market contract callbacks have ${result.failed} failed item(s).`
+          : undefined,
+    };
+  },
+
+  retry_x402_payments: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const x402Config = taskCtx.config.x402Server;
+    if (!x402Config?.enabled || !taskCtx.config.rpcUrl) {
+      return { shouldWake: false };
+    }
+
+    const paymentManager = createX402PaymentManager({
+      db: taskCtx.db,
+      rpcUrl: taskCtx.config.rpcUrl,
+      config: x402Config,
+    });
+    const result = await paymentManager.retryPending();
+    taskCtx.db.setKV(
+      "last_x402_payment_retry",
+      JSON.stringify({
+        ...result,
+        at: new Date().toISOString(),
+      }),
+    );
+    return {
+      shouldWake: result.failed > 0,
+      message:
+        result.failed > 0
+          ? `x402 payments have ${result.failed} failed item(s).`
           : undefined,
     };
   },

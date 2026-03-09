@@ -166,10 +166,12 @@ export interface ObservationInvocationRequest {
 }
 
 export interface ObservationInvocationResponse {
-  status: "ok";
+  status: "ok" | "pending";
   job_id?: string;
   result_url?: string;
   payment_tx_hash?: string;
+  payment_status?: string;
+  reason?: string;
   binding_id?: string;
   binding_hash?: string;
   market_callback_tx_hash?: string;
@@ -205,10 +207,12 @@ export interface OracleResolutionRequest {
 }
 
 export interface OracleResolutionResponse {
-  status: "ok";
+  status: "ok" | "pending";
   result_id?: string;
   result_url?: string;
   payment_tx_hash?: string;
+  payment_status?: string;
+  reason?: string;
   binding_id?: string;
   binding_hash?: string;
   market_callback_tx_hash?: string;

@@ -123,6 +123,7 @@ import { createNativeSettlementPublisher } from "./settlement/publisher.js";
 import { createNativeSettlementCallbackDispatcher } from "./settlement/callbacks.js";
 import { createMarketBindingPublisher } from "./market/publisher.js";
 import { createMarketContractDispatcher } from "./market/contracts.js";
+import { createX402PaymentManager } from "./tos/x402-server.js";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";
@@ -236,6 +237,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "payments") {
+    await handlePaymentsCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "scout") {
     await handleScoutCommand(args.slice(1));
     process.exit(0);
@@ -272,6 +278,7 @@ Usage:
   openfox bounty ...     Open, inspect, and solve task bounties
   openfox settlement ... Inspect on-chain settlement receipts and anchors
   openfox market ...     Inspect contract-native market bindings and callbacks
+  openfox payments ...   Inspect and recover server-side x402 payments
   openfox scout ...      Discover earning opportunities and task surfaces
   openfox status         Show the current runtime status
   openfox --version      Show version
@@ -1492,6 +1499,153 @@ Updated:     ${record.updatedAt}
   }
 }
 
+async function handlePaymentsCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox payments
+
+Usage:
+  openfox payments list [--service <observation|oracle|gateway_request|gateway_session>] [--status <verified|submitted|confirmed|failed|replaced>] [--bound <true|false>] [--limit N] [--json]
+  openfox payments get --payment-id <id> [--json]
+  openfox payments get --service <observation|oracle|gateway_request|gateway_session> --request-key <key> [--json]
+  openfox payments retry [--limit N] [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    if (command === "list") {
+      const serviceKind = readOption(args, "--service") as
+        | "observation"
+        | "oracle"
+        | "gateway_request"
+        | "gateway_session"
+        | undefined;
+      const status = readOption(args, "--status") as
+        | "verified"
+        | "submitted"
+        | "confirmed"
+        | "failed"
+        | "replaced"
+        | undefined;
+      const boundRaw = readOption(args, "--bound");
+      const bound =
+        boundRaw === "true" ? true : boundRaw === "false" ? false : undefined;
+      const limit = readNumberOption(args, "--limit", 20);
+      const items = db.listX402Payments(limit, { serviceKind, status, bound });
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (items.length === 0) {
+        logger.info("No x402 payments found.");
+        return;
+      }
+      logger.info("=== OPENFOX X402 PAYMENTS ===");
+      for (const item of items) {
+        logger.info(
+          `${item.paymentId}  [${item.serviceKind}]  status=${item.status}  amount=${item.amountWei}  tx=${item.txHash}`,
+        );
+        logger.info(
+          `  request=${item.requestKey}  payer=${item.payerAddress}  bound=${item.boundSubjectId ? `${item.boundKind}:${item.boundSubjectId}` : "(none)"}`,
+        );
+        if (item.lastError) {
+          logger.info(`  error=${item.lastError}`);
+        }
+      }
+      return;
+    }
+
+    if (command === "get") {
+      const paymentId = readOption(args, "--payment-id");
+      const serviceKind = readOption(args, "--service") as
+        | "observation"
+        | "oracle"
+        | "gateway_request"
+        | "gateway_session"
+        | undefined;
+      const requestKey = readOption(args, "--request-key");
+      const record = paymentId
+        ? db.getX402Payment(paymentId as `0x${string}`)
+        : serviceKind && requestKey
+          ? db.getLatestX402PaymentByRequestKey(serviceKind, requestKey)
+          : undefined;
+      if (!record) {
+        throw new Error(
+          paymentId
+            ? `x402 payment not found: ${paymentId}`
+            : "Usage: openfox payments get --payment-id <id> | --service <service> --request-key <key>",
+        );
+      }
+      if (asJson) {
+        logger.info(JSON.stringify(record, null, 2));
+        return;
+      }
+      logger.info(`
+=== OPENFOX X402 PAYMENT ===
+Payment:     ${record.paymentId}
+Service:     ${record.serviceKind}
+Request key: ${record.requestKey}
+Request hash:${record.requestHash}
+Payer:       ${record.payerAddress}
+Provider:    ${record.providerAddress}
+Nonce:       ${record.txNonce}
+Amount:      ${record.amountWei}
+Status:      ${record.status}
+Policy:      ${record.confirmationPolicy}
+Attempts:    ${record.attemptCount}/${record.maxAttempts}
+Tx hash:     ${record.txHash}
+Bound:       ${record.boundSubjectId ? `${record.boundKind}:${record.boundSubjectId}` : "(none)"}
+Artifact:    ${record.artifactUrl || "(none)"}
+Last error:  ${record.lastError || "(none)"}
+Updated:     ${record.updatedAt}
+============================
+`);
+      return;
+    }
+
+    if (command === "retry") {
+      if (!config.rpcUrl) {
+        throw new Error("x402 payment retries require rpcUrl to be configured.");
+      }
+      if (!config.x402Server?.enabled) {
+        throw new Error("x402 server-side payment handling is disabled in config.");
+      }
+      const limit = readNumberOption(args, "--limit", config.x402Server.retryBatchSize);
+      const result = await createX402PaymentManager({
+        db,
+        rpcUrl: config.rpcUrl,
+        config: config.x402Server,
+      }).retryPending(limit);
+      if (asJson) {
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+      logger.info(`
+=== OPENFOX X402 RETRY ===
+Processed: ${result.processed}
+Confirmed: ${result.confirmed}
+Pending:   ${result.pending}
+Failed:    ${result.failed}
+==========================
+`);
+      return;
+    }
+
+    throw new Error(`Unknown payments command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
 async function handleScoutCommand(args: string[]): Promise<void> {
   const command = args[0] || "list";
   const asJson = args.includes("--json");
@@ -1562,6 +1716,13 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
   const pendingMarketCallbacks = db.listMarketContractCallbacks(100, {
     status: "pending",
   }).length;
+  const x402Payments = db.listX402Payments(5);
+  const pendingX402Payments =
+    db.listX402Payments(100, { status: "verified" }).length +
+    db.listX402Payments(100, { status: "submitted" }).length;
+  const failedX402Payments = db.listX402Payments(100, {
+    status: "failed",
+  }).length;
   const discovery = config.agentDiscovery;
   const gatewaySummary = discovery?.gatewayClient?.enabled
     ? discovery.gatewayClient.gatewayUrl || "discovery/bootnodes"
@@ -1598,6 +1759,26 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
           autoSolveOnStartup: config.bounty.autoSolveOnStartup,
           autoSolveEnabled: config.bounty.autoSolveEnabled,
           policy: config.bounty.policy,
+        }
+      : null,
+    x402Payments: config.x402Server
+      ? {
+          enabled: config.x402Server.enabled,
+          confirmationPolicy: config.x402Server.confirmationPolicy,
+          retryBatchSize: config.x402Server.retryBatchSize,
+          retryAfterSeconds: config.x402Server.retryAfterSeconds,
+          maxAttempts: config.x402Server.maxAttempts,
+          pendingCount: pendingX402Payments,
+          failedCount: failedX402Payments,
+          recentPayments: x402Payments.map((item) => ({
+            paymentId: item.paymentId,
+            serviceKind: item.serviceKind,
+            status: item.status,
+            requestKey: item.requestKey,
+            txHash: item.txHash,
+            boundKind: item.boundKind,
+            boundSubjectId: item.boundSubjectId,
+          })),
         }
       : null,
     settlement: config.settlement
@@ -1694,6 +1875,7 @@ Discovery:  ${discovery?.enabled ? "enabled" : "disabled"}
 Gateway:    ${gatewaySummary}
 Bounty:     ${config.bounty?.enabled ? `${config.bounty.role}/${config.bounty.defaultKind} @ ${config.bounty.bindHost}:${config.bounty.port}${config.bounty.pathPrefix}` : "disabled"}
 Bounty auto: ${config.bounty?.enabled ? `open=${config.bounty.autoOpenOnStartup || config.bounty.autoOpenWhenIdle ? "on" : "off"} solve=${config.bounty.autoSolveOnStartup || config.bounty.autoSolveEnabled ? "on" : "off"}` : "disabled"}
+x402:       ${config.x402Server?.enabled ? `enabled (${x402Payments.length} recent payment${x402Payments.length === 1 ? "" : "s"}, ${pendingX402Payments} pending, ${failedX402Payments} failed)` : "disabled"}
 Settlement: ${config.settlement?.enabled ? `enabled (${settlements.length} recent receipt${settlements.length === 1 ? "" : "s"}, ${pendingSettlementCallbacks} pending callback${pendingSettlementCallbacks === 1 ? "" : "s"})` : "disabled"}
 Market:     ${config.marketContracts?.enabled ? `enabled (${marketBindings.length} recent binding${marketBindings.length === 1 ? "" : "s"}, ${pendingMarketCallbacks} pending callback${pendingMarketCallbacks === 1 ? "" : "s"})` : "disabled"}
 Scout:      ${config.opportunityScout?.enabled ? "enabled" : "disabled"}

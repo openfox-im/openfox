@@ -38,6 +38,9 @@ import type {
   BountyStatus,
   BountySubmissionRecord,
   BountySubmissionStatus,
+  X402PaymentRecord,
+  X402PaymentServiceKind,
+  X402PaymentStatus,
 } from "../types.js";
 import { DEFAULT_BOUNTY_POLICY } from "../types.js";
 import {
@@ -64,6 +67,7 @@ import {
   MIGRATION_V14,
   MIGRATION_V15,
   MIGRATION_V16,
+  MIGRATION_V17,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -976,6 +980,134 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     return rows.map(deserializeMarketContractCallbackRecord);
   };
 
+  const upsertX402Payment = (payment: X402PaymentRecord): void => {
+    db.prepare(
+      `INSERT INTO x402_payments (
+        payment_id, service_kind, request_key, request_hash, payer_address,
+        provider_address, chain_id, tx_nonce, tx_hash, raw_transaction,
+        amount_wei, confirmation_policy, status, attempt_count, max_attempts,
+        receipt_json, last_error, next_attempt_at, bound_kind, bound_subject_id,
+        artifact_url, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(payment_id) DO UPDATE SET
+        service_kind = excluded.service_kind,
+        request_key = excluded.request_key,
+        request_hash = excluded.request_hash,
+        payer_address = excluded.payer_address,
+        provider_address = excluded.provider_address,
+        chain_id = excluded.chain_id,
+        tx_nonce = excluded.tx_nonce,
+        tx_hash = excluded.tx_hash,
+        raw_transaction = excluded.raw_transaction,
+        amount_wei = excluded.amount_wei,
+        confirmation_policy = excluded.confirmation_policy,
+        status = excluded.status,
+        attempt_count = excluded.attempt_count,
+        max_attempts = excluded.max_attempts,
+        receipt_json = excluded.receipt_json,
+        last_error = excluded.last_error,
+        next_attempt_at = excluded.next_attempt_at,
+        bound_kind = excluded.bound_kind,
+        bound_subject_id = excluded.bound_subject_id,
+        artifact_url = excluded.artifact_url,
+        updated_at = excluded.updated_at`,
+    ).run(
+      payment.paymentId,
+      payment.serviceKind,
+      payment.requestKey,
+      payment.requestHash,
+      payment.payerAddress,
+      payment.providerAddress,
+      payment.chainId,
+      payment.txNonce,
+      payment.txHash,
+      payment.rawTransaction,
+      payment.amountWei,
+      payment.confirmationPolicy,
+      payment.status,
+      payment.attemptCount,
+      payment.maxAttempts,
+      payment.receipt ? JSON.stringify(payment.receipt) : null,
+      payment.lastError ?? null,
+      payment.nextAttemptAt ?? null,
+      payment.boundKind ?? null,
+      payment.boundSubjectId ?? null,
+      payment.artifactUrl ?? null,
+      payment.createdAt,
+      payment.updatedAt,
+    );
+  };
+
+  const getX402Payment = (paymentId: string): X402PaymentRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM x402_payments WHERE payment_id = ?")
+      .get(paymentId) as any | undefined;
+    return row ? deserializeX402PaymentRecord(row) : undefined;
+  };
+
+  const getLatestX402PaymentByRequestKey = (
+    serviceKind: X402PaymentServiceKind,
+    requestKey: string,
+  ): X402PaymentRecord | undefined => {
+    const row = db
+      .prepare(
+        `SELECT * FROM x402_payments
+         WHERE service_kind = ? AND request_key = ?
+         ORDER BY updated_at DESC, created_at DESC
+         LIMIT 1`,
+      )
+      .get(serviceKind, requestKey) as any | undefined;
+    return row ? deserializeX402PaymentRecord(row) : undefined;
+  };
+
+  const listX402Payments = (
+    limit: number,
+    filters?: {
+      serviceKind?: X402PaymentServiceKind;
+      status?: X402PaymentStatus;
+      bound?: boolean;
+    },
+  ): X402PaymentRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.serviceKind) {
+      clauses.push("service_kind = ?");
+      params.push(filters.serviceKind);
+    }
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    if (filters?.bound === true) {
+      clauses.push("bound_subject_id IS NOT NULL");
+    } else if (filters?.bound === false) {
+      clauses.push("bound_subject_id IS NULL");
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM x402_payments ${where} ORDER BY updated_at DESC, created_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeX402PaymentRecord);
+  };
+
+  const listPendingX402Payments = (
+    limit: number,
+    nowIso?: string,
+  ): X402PaymentRecord[] => {
+    const rows = db
+      .prepare(
+        `SELECT * FROM x402_payments
+         WHERE status IN ('verified', 'submitted', 'failed')
+           AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         ORDER BY updated_at ASC
+         LIMIT ?`,
+      )
+      .all(nowIso ?? new Date().toISOString(), limit) as any[];
+    return rows.map(deserializeX402PaymentRecord);
+  };
+
   // ─── Agent State ─────────────────────────────────────────────
 
   const getAgentState = (): AgentState => {
@@ -1065,6 +1197,11 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getMarketContractCallbackByBindingId,
     listMarketContractCallbacks,
     listPendingMarketContractCallbacks,
+    upsertX402Payment,
+    getX402Payment,
+    getLatestX402PaymentByRequestKey,
+    listX402Payments,
+    listPendingX402Payments,
     getAgentState,
     setAgentState,
     runTransaction,
@@ -1151,6 +1288,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 16,
       apply: () => db.exec(MIGRATION_V16),
+    },
+    {
+      version: 17,
+      apply: () => db.exec(MIGRATION_V17),
     },
   ];
 
@@ -2370,6 +2511,40 @@ function deserializeMarketContractCallbackRecord(
       : null,
     lastError: row.last_error ?? null,
     nextAttemptAt: row.next_attempt_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeX402PaymentRecord(row: any): X402PaymentRecord {
+  return {
+    paymentId: row.payment_id,
+    serviceKind: row.service_kind,
+    requestKey: row.request_key,
+    requestHash: row.request_hash,
+    payerAddress: row.payer_address,
+    providerAddress: row.provider_address,
+    chainId: row.chain_id,
+    txNonce: row.tx_nonce,
+    txHash: row.tx_hash,
+    rawTransaction: row.raw_transaction,
+    amountWei: row.amount_wei,
+    confirmationPolicy: row.confirmation_policy,
+    status: row.status,
+    attemptCount: Number(row.attempt_count || 0),
+    maxAttempts: Number(row.max_attempts || 0),
+    receipt: row.receipt_json
+      ? parseJsonSafe(
+          row.receipt_json,
+          null as X402PaymentRecord["receipt"],
+          "deserializeX402PaymentRecord.receipt_json",
+        )
+      : null,
+    lastError: row.last_error ?? null,
+    nextAttemptAt: row.next_attempt_at ?? null,
+    boundKind: row.bound_kind ?? null,
+    boundSubjectId: row.bound_subject_id ?? null,
+    artifactUrl: row.artifact_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

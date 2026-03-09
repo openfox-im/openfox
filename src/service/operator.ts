@@ -25,6 +25,15 @@ export interface ServiceStatusSnapshot {
   discoveryEnabled: boolean;
   rpcUrl: string | null;
   chainId: number | null;
+  x402Server:
+    | {
+        enabled: true;
+        confirmationPolicy: string;
+        retryBatchSize: number;
+        retryAfterSeconds: number;
+        maxAttempts: number;
+      }
+    | { enabled: false };
   providerSurfaces: {
     faucet:
       | {
@@ -290,6 +299,16 @@ export function buildServiceStatusReport(
     `RPC: ${snapshot.rpcUrl || "(unset)"}${snapshot.chainId ? ` (chain ${snapshot.chainId})` : ""}`,
   ];
 
+  lines.push("", "x402 server:");
+  if (snapshot.x402Server.enabled) {
+    lines.push(`  - confirmation policy: ${snapshot.x402Server.confirmationPolicy}`);
+    lines.push(`  - retry batch size: ${snapshot.x402Server.retryBatchSize}`);
+    lines.push(`  - retry after seconds: ${snapshot.x402Server.retryAfterSeconds}`);
+    lines.push(`  - max attempts: ${snapshot.x402Server.maxAttempts}`);
+  } else {
+    lines.push("  (disabled)");
+  }
+
   lines.push("", "Provider surfaces:");
   if (snapshot.providerSurfaces.faucet) {
     lines.push(
@@ -376,6 +395,15 @@ export function buildServiceStatusSnapshot(
     discoveryEnabled: config.agentDiscovery?.enabled === true,
     rpcUrl: config.rpcUrl || null,
     chainId: config.chainId ?? null,
+    x402Server: config.x402Server?.enabled
+      ? {
+          enabled: true,
+          confirmationPolicy: config.x402Server.confirmationPolicy,
+          retryBatchSize: config.x402Server.retryBatchSize,
+          retryAfterSeconds: config.x402Server.retryAfterSeconds,
+          maxAttempts: config.x402Server.maxAttempts,
+        }
+      : { enabled: false },
     providerSurfaces: {
       faucet:
         faucet?.enabled && faucet.port > 0

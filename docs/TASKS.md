@@ -110,6 +110,16 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Make market bindings and contract callback delivery visible,
     inspectable, and retryable through the same operator/runtime surfaces used
     for settlement callbacks.
+- [x] Task 25: Add a durable server-side x402 payment ledger
+  - Status: Complete
+  - Goal: Turn paid provider requests into recoverable, replay-safe, auditable
+    payment flows backed by persistent payment records instead of transient
+    request handling.
+- [x] Task 26: Add operator UX and heartbeat retries for x402 payments
+  - Status: Complete
+  - Goal: Make server-side x402 payments inspectable, retryable, and visible
+    through CLI, status, health, and doctor surfaces just like settlement and
+    market callbacks.
 
 ## Task 1 Breakdown
 
@@ -322,3 +332,21 @@ building OpenFox into a TOS-native agent platform.
   resubmitting.
 - [x] Update roadmap and README so contract-native market binding is part of the
   visible operator/runtime surface.
+
+## Task 25 Breakdown
+
+- [x] Add persistent x402 payment storage and schema migration.
+- [x] Add auditable request hashing and payment-to-result binding.
+- [x] Add duplicate payment detection and replay protection.
+- [x] Add recovery semantics after broadcast failure.
+- [x] Add nonce replacement handling for same-request payment retries.
+- [x] Add receipt-aware confirmation policy support.
+
+## Task 26 Breakdown
+
+- [x] Add a built-in heartbeat task for pending x402 payment retries.
+- [x] Add `openfox payments list|get|retry`.
+- [x] Surface x402 payment status in `openfox status`.
+- [x] Add x402 payment findings to `openfox doctor` and `openfox health`.
+- [x] Update roadmap and README so server-side x402 productionization is part
+  of the visible operator/runtime surface.

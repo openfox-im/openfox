@@ -142,6 +142,8 @@ It supports:
 - persisted result lookup with `GET /jobs/:id`
 - paid capabilities such as `oracle.resolve`
 - a built-in paid oracle resolver with `POST /oracle/quote`, `POST /oracle/resolve`, and `GET /oracle/result/:id`
+- a durable server-side `x402` payment ledger for paid provider requests
+- `openfox payments list|get|retry` for operator-visible payment delivery and recovery
 - canonical settlement receipts and on-chain settlement anchors for bounty, observation, and oracle flows
 - contract callback adapters and heartbeat-driven retry for contract-bound settlement flows
 - contract-native market bindings for bounty, observation, and oracle creation flows
@@ -207,6 +209,7 @@ pnpm openfox --setup
 pnpm openfox --run
 pnpm openfox onboard --install-daemon
 pnpm openfox wallet status
+pnpm openfox payments list
 pnpm openfox settlement list
 pnpm openfox market list
 pnpm openfox onboard --fund-local
@@ -219,6 +222,7 @@ openfox --setup
 openfox --run
 openfox onboard --install-daemon
 openfox wallet status
+openfox payments list
 openfox settlement list
 openfox market list
 ```
@@ -253,6 +257,7 @@ openfox wallet status
 openfox onboard --fund-local
 openfox onboard --fund-testnet
 openfox wallet bootstrap-signer --type ed25519
+openfox payments list
 openfox settlement list
 ```
 
@@ -444,6 +449,7 @@ Current support includes:
 - native TOS transfer signing
 - native TOS transfer sending
 - TOS `x402` exact payment selection and payment flow
+- durable server-side `x402` payment ledger and retry semantics for paid services
 
 CLI examples:
 

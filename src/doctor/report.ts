@@ -40,6 +40,12 @@ export interface HealthSnapshot {
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
   bountyRemoteConfigured: boolean;
+  x402ServerEnabled: boolean;
+  x402ServerReady: boolean;
+  x402RecentPayments: number;
+  x402PendingPayments: number;
+  x402FailedPayments: number;
+  x402UnboundPayments: number;
   settlementEnabled: boolean;
   settlementReady: boolean;
   settlementRecentCount: number;
@@ -102,6 +108,12 @@ async function buildConfigSnapshot(
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
   bountyRemoteConfigured: boolean;
+  x402ServerEnabled: boolean;
+  x402ServerReady: boolean;
+  x402RecentPayments: number;
+  x402PendingPayments: number;
+  x402FailedPayments: number;
+  x402UnboundPayments: number;
   settlementEnabled: boolean;
   settlementReady: boolean;
   settlementRecentCount: number;
@@ -146,6 +158,19 @@ async function buildConfigSnapshot(
           config.bounty.autoSolveEnabled),
     ),
     bountyRemoteConfigured: Boolean(config.bounty?.remoteBaseUrl),
+    x402ServerEnabled: config.x402Server?.enabled === true,
+    x402ServerReady: Boolean(!config.x402Server?.enabled || config.rpcUrl),
+    x402RecentPayments: config.x402Server?.enabled ? db.listX402Payments(20).length : 0,
+    x402PendingPayments: config.x402Server?.enabled
+      ? db.listX402Payments(100, { status: "verified" }).length +
+        db.listX402Payments(100, { status: "submitted" }).length
+      : 0,
+    x402FailedPayments: config.x402Server?.enabled
+      ? db.listX402Payments(100, { status: "failed" }).length
+      : 0,
+    x402UnboundPayments: config.x402Server?.enabled
+      ? db.listX402Payments(100, { bound: false }).length
+      : 0,
     settlementEnabled: config.settlement?.enabled === true,
     settlementReady: Boolean(!config.settlement?.enabled || config.rpcUrl),
     settlementRecentCount: config.settlement?.enabled
@@ -414,6 +439,46 @@ function collectFindings(
     }
   }
 
+  if (snapshot.x402ServerEnabled) {
+    findings.push({
+      id: "x402-server-enabled",
+      severity: snapshot.x402ServerReady ? "ok" : "error",
+      summary: snapshot.x402ServerReady
+        ? `Server-side x402 payments are enabled (${snapshot.x402RecentPayments} recent ledgered payment${snapshot.x402RecentPayments === 1 ? "" : "s"}).`
+        : "Server-side x402 payments are enabled but no chain RPC is configured.",
+      recommendation: snapshot.x402ServerReady
+        ? undefined
+        : "Set `rpcUrl` so OpenFox can verify, broadcast, and confirm incoming x402 payments.",
+    });
+    if (snapshot.x402FailedPayments > 0) {
+      findings.push({
+        id: "x402-payments-failed",
+        severity: "warn",
+        summary: `${snapshot.x402FailedPayments} x402 payment ledger item(s) are currently failed.`,
+        recommendation:
+          "Run `openfox payments list --status failed` and `openfox payments retry` to inspect and recover failed payment sends.",
+      });
+    }
+    if (snapshot.x402PendingPayments > 0) {
+      findings.push({
+        id: "x402-payments-pending",
+        severity: "warn",
+        summary: `${snapshot.x402PendingPayments} x402 payment ledger item(s) are pending submission or confirmation.`,
+        recommendation:
+          "Run `openfox payments list --status submitted` or `openfox payments list --status verified` to inspect pending payment delivery.",
+      });
+    }
+    if (snapshot.x402UnboundPayments > 0) {
+      findings.push({
+        id: "x402-payments-unbound",
+        severity: "warn",
+        summary: `${snapshot.x402UnboundPayments} x402 payment ledger item(s) are not yet bound to a service result.`,
+        recommendation:
+          "Run `openfox payments list --bound false` to verify that each accepted payment is attached to a stored business artifact.",
+      });
+    }
+  }
+
   if (snapshot.settlementEnabled) {
     findings.push({
       id: "settlement-enabled",
@@ -493,6 +558,12 @@ export async function buildHealthSnapshot(
       bountyRole: undefined,
       bountyAutoEnabled: false,
       bountyRemoteConfigured: false,
+      x402ServerEnabled: false,
+      x402ServerReady: false,
+      x402RecentPayments: 0,
+      x402PendingPayments: 0,
+      x402FailedPayments: 0,
+      x402UnboundPayments: 0,
       settlementEnabled: false,
       settlementReady: false,
       settlementRecentCount: 0,
@@ -557,6 +628,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,
+    `x402 server: ${yesNo(snapshot.x402ServerEnabled)}${snapshot.x402ServerEnabled ? ` (${snapshot.x402RecentPayments} recent, ${snapshot.x402PendingPayments} pending, ${snapshot.x402FailedPayments} failed)` : ""}`,
     `Settlement enabled: ${yesNo(snapshot.settlementEnabled)}${snapshot.settlementEnabled ? ` (${snapshot.settlementRecentCount} recent)` : ""}`,
     `Settlement callbacks: ${yesNo(snapshot.settlementCallbacksEnabled)}${snapshot.settlementCallbacksEnabled ? ` (${snapshot.settlementPendingCallbacks} pending)` : ""}`,
     `Market bindings: ${yesNo(snapshot.marketContractsEnabled)}${snapshot.marketContractsEnabled ? ` (${snapshot.marketBindingsRecentCount} recent, ${snapshot.marketPendingCallbacks} pending callbacks)` : ""}`,

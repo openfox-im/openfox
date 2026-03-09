@@ -52,6 +52,15 @@ describe("service operator", () => {
     const config = createTestConfig({
       rpcUrl: "http://127.0.0.1:8545",
       chainId: 1666,
+      x402Server: {
+        enabled: true,
+        confirmationPolicy: "receipt",
+        receiptTimeoutMs: 15000,
+        receiptPollIntervalMs: 1000,
+        retryBatchSize: 10,
+        retryAfterSeconds: 30,
+        maxAttempts: 5,
+      },
       agentDiscovery: {
         enabled: true,
         publishCard: true,
@@ -100,9 +109,11 @@ describe("service operator", () => {
     expect(snapshot.roles).toEqual(["requester", "provider", "gateway"]);
     expect(snapshot.gatewayCache?.providerSessionCacheEntries).toBe(1);
     expect(snapshot.gatewayCache?.serverSessionCacheEntries).toBe(1);
+    expect(snapshot.x402Server.enabled).toBe(true);
 
     const report = buildServiceStatusReport(config, db.raw);
     expect(report).toContain("Roles: requester, provider, gateway");
+    expect(report).toContain("x402 server:");
     expect(report).toContain("provider session cache entries: 1");
     expect(report).toContain("server session cache entries: 1");
 

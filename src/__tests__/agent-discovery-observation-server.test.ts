@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { privateKeyToAccount } from "tosdk/accounts";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
+import { createDatabase } from "../state/database.js";
 
 const TEST_PRIVATE_KEY =
   "0x59c6995e998f97a5a0044966f094538e4a2e0d7a5b5d5b4b8b1c1d1e1f1a1b1c" as const;
@@ -66,16 +67,8 @@ function makeIdentity(): OpenFoxIdentity {
   };
 }
 
-function makeDb(): OpenFoxDatabase {
-  const store = new Map<string, string>();
-  return {
-    getKV(key: string) {
-      return store.get(key);
-    },
-    setKV(key: string, value: string) {
-      store.set(key, value);
-    },
-  } as OpenFoxDatabase;
+function makeDb(root: string): OpenFoxDatabase {
+  return createDatabase(path.join(root, ".openfox", "state.db"));
 }
 
 describe("agent discovery observation server", () => {
@@ -119,11 +112,12 @@ describe("agent discovery observation server", () => {
     const config = makeConfig();
     const { startAgentDiscoveryObservationServer } = await import("../agent-discovery/observation-server.js");
     const { x402Fetch } = await import("../runtime/x402.js");
+    const db = makeDb(tempHome);
     const server = await startAgentDiscoveryObservationServer({
       identity: makeIdentity(),
       config,
       address: config.walletAddress!,
-      db: makeDb(),
+      db,
       observationConfig: config.agentDiscovery!.observationServer!,
       marketBindingPublisher: {
         publish(input) {
@@ -227,6 +221,11 @@ describe("agent discovery observation server", () => {
             return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x682" }), {
               status: 200,
             });
+          case "tos_getTransactionReceipt":
+          case "tos_getTransactionByHash":
+            return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: null }), {
+              status: 200,
+            });
           case "tos_getTransactionCount":
             return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x1" }), {
               status: 200,
@@ -326,6 +325,7 @@ describe("agent discovery observation server", () => {
       expect(submittedPayments).toBe(1);
     } finally {
       await server.close();
+      db.close();
     }
   });
 });

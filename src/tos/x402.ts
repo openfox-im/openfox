@@ -49,6 +49,7 @@ export interface VerifiedTOSPayment {
   rawTransaction: HexString;
   txHash: HexString;
   chainId: bigint;
+  nonce: bigint;
   from: TOSAddress;
   to: TOSAddress;
   value: bigint;
@@ -236,6 +237,7 @@ export function verifyTOSPayment(
     rawTransaction,
     txHash: keccak256(rawTransaction) as HexString,
     chainId: tx.chainId,
+    nonce: tx.nonce,
     from: tx.from,
     to: tx.to,
     value: tx.value,

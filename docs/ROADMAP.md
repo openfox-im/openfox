@@ -308,7 +308,7 @@ Delivered surface so far:
 
 ### Phase 4: Productionize the x402 Server Side
 
-Status: not complete
+Status: completed
 
 Goal:
 
@@ -328,6 +328,18 @@ Acceptance criteria:
 
 - the server handles duplicate requests, broadcast failures, timeouts, and retries correctly
 - the same payment envelope cannot be replayed to unlock the same service repeatedly
+
+Delivered surface:
+
+- durable server-side x402 payment ledger in OpenFox
+- auditable request hashing and payment-to-result binding
+- duplicate payment detection and replay protection
+- nonce replacement handling for same-request payment retries
+- receipt-aware confirmation policy for paid services
+- recovery semantics after broadcast failure and retryable payment replay
+- `openfox payments list|get|retry`
+- heartbeat-driven x402 payment retries
+- x402 payment visibility in `openfox status`, `openfox health`, and `openfox doctor`
 
 ### Phase 5: Ecosystem and SDK Productization
 
@@ -355,10 +367,9 @@ Suggested priority order:
 
 ### P0: Do Immediately
 
-- productionize the server-side `x402` payment path
-- add duplicate payment detection and replay protection
-- add a durable payment ledger and recovery semantics after broadcast failure
-- tighten auditable payment-to-result binding across paid services
+- extract third-party operator templates and quickstarts
+- document the full `setup -> fund -> discover -> pay -> receive result` path
+- harden multi-node production deployment guidance
 
 ### P1: Do Next
 
@@ -390,7 +401,7 @@ The more reasonable strategy for now is:
 
 There are only two next steps that matter most:
 
-1. make the current `x402` and callback path reliable under retries, duplicate requests, and broadcast failures
-2. make a third-party operator able to complete `setup -> fund -> discover provider -> pay in TOS -> receive a real service result` without reading internal code
+1. make a third-party operator able to complete `setup -> fund -> discover provider -> pay in TOS -> receive a real service result` without reading internal code
+2. extract and document the reusable SDK/runtime surfaces so external builders can integrate independently
 
 Only after these two steps are complete should we expand into broader marketplace and ecosystem-facing phases.
