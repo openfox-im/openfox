@@ -35,6 +35,10 @@ export interface HealthSnapshot {
   discoveryEnabled: boolean;
   gatewayEnabled: boolean;
   providerEnabled: boolean;
+  bountyEnabled: boolean;
+  bountyRole?: "host" | "solver";
+  bountyAutoEnabled: boolean;
+  bountyRemoteConfigured: boolean;
   managedService: ManagedServiceStatus;
   heartbeatPaused: boolean;
   pendingWakes: number;
@@ -78,6 +82,10 @@ async function buildConfigSnapshot(
   discoveryEnabled: boolean;
   gatewayEnabled: boolean;
   providerEnabled: boolean;
+  bountyEnabled: boolean;
+  bountyRole?: "host" | "solver";
+  bountyAutoEnabled: boolean;
+  bountyRemoteConfigured: boolean;
   skillCount: number;
   ineligibleEnabledSkills: string[];
   heartbeatPaused: boolean;
@@ -100,6 +108,16 @@ async function buildConfigSnapshot(
       config.agentDiscovery?.gatewayServer?.enabled === true ||
       config.agentDiscovery?.gatewayClient?.enabled === true,
     providerEnabled: isProviderEnabled(config),
+    bountyEnabled: config.bounty?.enabled === true,
+    bountyRole: config.bounty?.enabled ? config.bounty.role : undefined,
+    bountyAutoEnabled: Boolean(
+      config.bounty?.enabled &&
+        (config.bounty.autoOpenOnStartup ||
+          config.bounty.autoOpenWhenIdle ||
+          config.bounty.autoSolveOnStartup ||
+          config.bounty.autoSolveEnabled),
+    ),
+    bountyRemoteConfigured: Boolean(config.bounty?.remoteBaseUrl),
     skillCount: enabledSkills.length,
     ineligibleEnabledSkills,
     heartbeatPaused: isHeartbeatPaused(db.raw),
@@ -270,6 +288,38 @@ function collectFindings(
     });
   }
 
+  if (snapshot.bountyEnabled) {
+    findings.push({
+      id: "bounty-enabled",
+      severity: "ok",
+      summary: `Bounty mode is enabled (${snapshot.bountyRole || "unknown"}).`,
+    });
+    if (snapshot.bountyRole === "host" && !snapshot.rpcConfigured) {
+      findings.push({
+        id: "bounty-host-rpc-missing",
+        severity: "error",
+        summary: "Bounty host is enabled but no chain RPC is configured.",
+        recommendation:
+          "Set `rpcUrl` so the host can send native TOS rewards after judging.",
+      });
+    }
+    if (
+      snapshot.bountyRole === "solver" &&
+      snapshot.bountyAutoEnabled &&
+      !snapshot.bountyRemoteConfigured &&
+      !snapshot.discoveryEnabled
+    ) {
+      findings.push({
+        id: "bounty-solver-no-source",
+        severity: "error",
+        summary:
+          "Bounty solver automation is enabled but no remote host or discovery source is configured.",
+        recommendation:
+          "Set `bounty.remoteBaseUrl` or enable Agent Discovery so the solver can find hosts.",
+      });
+    }
+  }
+
   return findings;
 }
 
@@ -292,6 +342,10 @@ export async function buildHealthSnapshot(
       discoveryEnabled: false,
       gatewayEnabled: false,
       providerEnabled: false,
+      bountyEnabled: false,
+      bountyRole: undefined,
+      bountyAutoEnabled: false,
+      bountyRemoteConfigured: false,
       managedService,
       heartbeatPaused: false,
       pendingWakes: 0,
@@ -328,6 +382,8 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Discovery enabled: ${yesNo(snapshot.discoveryEnabled)}`,
     `Provider enabled: ${yesNo(snapshot.providerEnabled)}`,
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
+    `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
+    `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,
     `Heartbeat paused: ${yesNo(snapshot.heartbeatPaused)}`,
     `Pending wakes: ${snapshot.pendingWakes}`,
     `Enabled skills: ${snapshot.skillCount}`,
