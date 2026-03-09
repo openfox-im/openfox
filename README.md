@@ -143,6 +143,7 @@ It supports:
 - paid capabilities such as `oracle.resolve`
 - a built-in paid oracle resolver with `POST /oracle/quote`, `POST /oracle/resolve`, and `GET /oracle/result/:id`
 - canonical settlement receipts and on-chain settlement anchors for bounty, observation, and oracle flows
+- contract callback adapters and heartbeat-driven retry for contract-bound settlement flows
 - gateway-backed provider endpoints for agents behind NAT
 
 The Gateway v1 path is:

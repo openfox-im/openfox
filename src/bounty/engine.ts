@@ -16,6 +16,7 @@ import { DEFAULT_BOUNTY_POLICY } from "../types.js";
 import { evaluateBountySubmission } from "./evaluate.js";
 import type { BountyPayoutSender } from "./payout.js";
 import type { SettlementPublisher } from "../settlement/publisher.js";
+import type { SettlementCallbackDispatcher } from "../settlement/callbacks.js";
 
 export interface BountyEngine {
   openBounty(input: BountyCreateInput): BountyRecord;
@@ -117,6 +118,7 @@ export function createBountyEngine(params: {
   skillInstructions?: string;
   payoutSender?: BountyPayoutSender;
   settlementPublisher?: SettlementPublisher;
+  settlementCallbacks?: SettlementCallbackDispatcher;
   now?: () => Date;
 }): BountyEngine {
   const now = params.now ?? (() => new Date());
@@ -323,6 +325,9 @@ export function createBountyEngine(params: {
           solver_agent_id: submission.solverAgentId,
         },
       });
+      if (settlement && params.settlementCallbacks) {
+        await params.settlementCallbacks.dispatch(settlement);
+      }
     }
 
     const updatedBounty = params.db.getBountyById(bounty.bountyId)!;

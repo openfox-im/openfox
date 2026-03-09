@@ -576,6 +576,7 @@ export interface SettlementConfig {
   publishBounties: boolean;
   publishObservations: boolean;
   publishOracleResults: boolean;
+  callbacks: SettlementCallbackConfig;
 }
 
 export interface SettlementRecord {
@@ -589,6 +590,52 @@ export interface SettlementRecord {
   payoutTxHash?: Hex | null;
   settlementTxHash?: Hex | null;
   settlementReceipt?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SettlementCallbackPayloadMode =
+  | "canonical_receipt"
+  | "receipt_hash";
+export type SettlementCallbackStatus = "pending" | "confirmed" | "failed";
+
+export interface SettlementCallbackTargetConfig {
+  enabled: boolean;
+  contractAddress?: Address;
+  gas: string;
+  valueWei: string;
+  waitForReceipt: boolean;
+  receiptTimeoutMs: number;
+  payloadMode: SettlementCallbackPayloadMode;
+  prefixHex?: Hex;
+  maxAttempts: number;
+}
+
+export interface SettlementCallbackConfig {
+  enabled: boolean;
+  retryBatchSize: number;
+  retryAfterSeconds: number;
+  bounty: SettlementCallbackTargetConfig;
+  observation: SettlementCallbackTargetConfig;
+  oracle: SettlementCallbackTargetConfig;
+}
+
+export interface SettlementCallbackRecord {
+  callbackId: string;
+  receiptId: string;
+  kind: SettlementKind;
+  subjectId: string;
+  contractAddress: Address;
+  payloadMode: SettlementCallbackPayloadMode;
+  payloadHex: Hex;
+  payloadHash: Hex;
+  status: SettlementCallbackStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  callbackTxHash?: Hex | null;
+  callbackReceipt?: Record<string, unknown> | null;
+  lastError?: string | null;
+  nextAttemptAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -650,6 +697,44 @@ export const DEFAULT_SETTLEMENT_CONFIG: SettlementConfig = {
   publishBounties: true,
   publishObservations: true,
   publishOracleResults: true,
+  callbacks: {
+    enabled: false,
+    retryBatchSize: 10,
+    retryAfterSeconds: 120,
+    bounty: {
+      enabled: false,
+      contractAddress: undefined,
+      gas: "220000",
+      valueWei: "0",
+      waitForReceipt: true,
+      receiptTimeoutMs: 60000,
+      payloadMode: "canonical_receipt",
+      prefixHex: undefined,
+      maxAttempts: 3,
+    },
+    observation: {
+      enabled: false,
+      contractAddress: undefined,
+      gas: "220000",
+      valueWei: "0",
+      waitForReceipt: true,
+      receiptTimeoutMs: 60000,
+      payloadMode: "canonical_receipt",
+      prefixHex: undefined,
+      maxAttempts: 3,
+    },
+    oracle: {
+      enabled: false,
+      contractAddress: undefined,
+      gas: "220000",
+      valueWei: "0",
+      waitForReceipt: true,
+      receiptTimeoutMs: 60000,
+      payloadMode: "canonical_receipt",
+      prefixHex: undefined,
+      maxAttempts: 3,
+    },
+  },
 };
 
 export const DEFAULT_WALLET_FUNDING_CONFIG: WalletFundingConfig = {
@@ -1310,6 +1395,24 @@ export interface OpenFoxDatabase {
     limit: number,
     kind?: SettlementKind,
   ): SettlementRecord[];
+  upsertSettlementCallback(callback: SettlementCallbackRecord): void;
+  getSettlementCallbackById(
+    callbackId: string,
+  ): SettlementCallbackRecord | undefined;
+  getSettlementCallbackByReceiptId(
+    receiptId: string,
+  ): SettlementCallbackRecord | undefined;
+  listSettlementCallbacks(
+    limit: number,
+    filters?: {
+      status?: SettlementCallbackStatus;
+      kind?: SettlementKind;
+    },
+  ): SettlementCallbackRecord[];
+  listPendingSettlementCallbacks(
+    limit: number,
+    nowIso?: string,
+  ): SettlementCallbackRecord[];
 
   // Key-value atomic delete
   deleteKVReturning(key: string): string | undefined;

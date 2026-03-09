@@ -290,13 +290,14 @@ Delivered surface so far:
   - paid oracle results
 - idempotent settlement publication per `(kind, subject_id)`
 - `openfox settlement list|get`
+- `openfox settlement callbacks`
 - settlement visibility in `openfox status`, `openfox health`, and `openfox doctor`
+- contract callback adapters for bounty, observation, and oracle receipts
+- scheduler-driven settlement callback confirmation and retry through heartbeat
 
 Still pending in this phase:
 
 - contract-native task/query market contracts
-- callback binding between service results and contract-owned market state
-- scheduler-driven settlement hooks
 
 ### Phase 4: Productionize the x402 Server Side
 

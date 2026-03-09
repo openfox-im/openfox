@@ -30,6 +30,7 @@ import {
   validateRequestExpiry,
 } from "./security.js";
 import type { SettlementPublisher } from "../settlement/publisher.js";
+import type { SettlementCallbackDispatcher } from "../settlement/callbacks.js";
 
 const logger = createLogger("agent-discovery.observation");
 
@@ -45,6 +46,7 @@ export interface StartAgentDiscoveryObservationServerParams {
   db: OpenFoxDatabase;
   observationConfig: AgentDiscoveryObservationServerConfig;
   settlementPublisher?: SettlementPublisher;
+  settlementCallbacks?: SettlementCallbackDispatcher;
 }
 
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -232,7 +234,14 @@ async function fetchObservation(
 export async function startAgentDiscoveryObservationServer(
   params: StartAgentDiscoveryObservationServerParams,
 ): Promise<AgentDiscoveryObservationServer> {
-  const { observationConfig, config, db, address, settlementPublisher } = params;
+  const {
+    observationConfig,
+    config,
+    db,
+    address,
+    settlementPublisher,
+    settlementCallbacks,
+  } = params;
   const path = observationConfig.path.startsWith("/") ? observationConfig.path : `/${observationConfig.path}`;
   const healthzPath = `${path}/healthz`;
   const resultPathPrefix = "/jobs/";
@@ -366,6 +375,9 @@ export async function startAgentDiscoveryObservationServer(
         result.receipt_id = settlement.receiptId;
         result.receipt_hash = settlement.receiptHash;
         result.settlement_tx_hash = settlement.settlementTxHash ?? undefined;
+        if (settlementCallbacks) {
+          await settlementCallbacks.dispatch(settlement);
+        }
       }
       db.setKV(
         "agent_discovery:observation:last_served",

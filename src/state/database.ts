@@ -29,6 +29,8 @@ import type {
   BountyResultRecord,
   SettlementKind,
   SettlementRecord,
+  SettlementCallbackRecord,
+  SettlementCallbackStatus,
   BountyStatus,
   BountySubmissionRecord,
   BountySubmissionStatus,
@@ -56,6 +58,7 @@ import {
   MIGRATION_V12,
   MIGRATION_V13,
   MIGRATION_V14,
+  MIGRATION_V15,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -688,6 +691,111 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     return (rows as any[]).map(deserializeSettlementRecord);
   };
 
+  const upsertSettlementCallback = (callback: SettlementCallbackRecord): void => {
+    db.prepare(
+      `INSERT INTO settlement_callbacks (
+        callback_id, receipt_id, kind, subject_id, contract_address, payload_mode,
+        payload_hex, payload_hash, status, attempt_count, max_attempts,
+        callback_tx_hash, callback_receipt_json, last_error, next_attempt_at,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(callback_id) DO UPDATE SET
+        receipt_id = excluded.receipt_id,
+        kind = excluded.kind,
+        subject_id = excluded.subject_id,
+        contract_address = excluded.contract_address,
+        payload_mode = excluded.payload_mode,
+        payload_hex = excluded.payload_hex,
+        payload_hash = excluded.payload_hash,
+        status = excluded.status,
+        attempt_count = excluded.attempt_count,
+        max_attempts = excluded.max_attempts,
+        callback_tx_hash = excluded.callback_tx_hash,
+        callback_receipt_json = excluded.callback_receipt_json,
+        last_error = excluded.last_error,
+        next_attempt_at = excluded.next_attempt_at,
+        updated_at = excluded.updated_at`,
+    ).run(
+      callback.callbackId,
+      callback.receiptId,
+      callback.kind,
+      callback.subjectId,
+      callback.contractAddress,
+      callback.payloadMode,
+      callback.payloadHex,
+      callback.payloadHash,
+      callback.status,
+      callback.attemptCount,
+      callback.maxAttempts,
+      callback.callbackTxHash ?? null,
+      callback.callbackReceipt ? JSON.stringify(callback.callbackReceipt) : null,
+      callback.lastError ?? null,
+      callback.nextAttemptAt ?? null,
+      callback.createdAt,
+      callback.updatedAt,
+    );
+  };
+
+  const getSettlementCallbackById = (
+    callbackId: string,
+  ): SettlementCallbackRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM settlement_callbacks WHERE callback_id = ?")
+      .get(callbackId) as any | undefined;
+    return row ? deserializeSettlementCallbackRecord(row) : undefined;
+  };
+
+  const getSettlementCallbackByReceiptId = (
+    receiptId: string,
+  ): SettlementCallbackRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM settlement_callbacks WHERE receipt_id = ?")
+      .get(receiptId) as any | undefined;
+    return row ? deserializeSettlementCallbackRecord(row) : undefined;
+  };
+
+  const listSettlementCallbacks = (
+    limit: number,
+    filters?: {
+      status?: SettlementCallbackStatus;
+      kind?: SettlementKind;
+    },
+  ): SettlementCallbackRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    if (filters?.kind) {
+      clauses.push("kind = ?");
+      params.push(filters.kind);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM settlement_callbacks ${where} ORDER BY updated_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeSettlementCallbackRecord);
+  };
+
+  const listPendingSettlementCallbacks = (
+    limit: number,
+    nowIso?: string,
+  ): SettlementCallbackRecord[] => {
+    const rows = db
+      .prepare(
+        `SELECT * FROM settlement_callbacks
+         WHERE status = 'pending'
+           AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+         ORDER BY updated_at ASC
+         LIMIT ?`,
+      )
+      .all(nowIso ?? new Date().toISOString(), limit) as any[];
+    return rows.map(deserializeSettlementCallbackRecord);
+  };
+
   // ─── Agent State ─────────────────────────────────────────────
 
   const getAgentState = (): AgentState => {
@@ -763,6 +871,11 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getSettlementReceipt,
     getSettlementReceiptById,
     listSettlementReceipts,
+    upsertSettlementCallback,
+    getSettlementCallbackById,
+    getSettlementCallbackByReceiptId,
+    listSettlementCallbacks,
+    listPendingSettlementCallbacks,
     getAgentState,
     setAgentState,
     runTransaction,
@@ -841,6 +954,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 14,
       apply: () => db.exec(MIGRATION_V14),
+    },
+    {
+      version: 15,
+      apply: () => db.exec(MIGRATION_V15),
     },
   ];
 
@@ -1945,6 +2062,14 @@ function deserializeBountyResult(row: any): BountyResultRecord {
   };
 }
 
+function parseJsonSafe<T>(raw: string, fallback: T, _label?: string): T {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 function deserializeSettlementRecord(row: any): SettlementRecord {
   return {
     receiptId: row.receipt_id,
@@ -1967,6 +2092,34 @@ function deserializeSettlementRecord(row: any): SettlementRecord {
           "deserializeSettlementRecord.settlement_receipt_json",
         )
       : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeSettlementCallbackRecord(row: any): SettlementCallbackRecord {
+  return {
+    callbackId: row.callback_id,
+    receiptId: row.receipt_id,
+    kind: row.kind,
+    subjectId: row.subject_id,
+    contractAddress: row.contract_address,
+    payloadMode: row.payload_mode,
+    payloadHex: row.payload_hex,
+    payloadHash: row.payload_hash,
+    status: row.status,
+    attemptCount: Number(row.attempt_count || 0),
+    maxAttempts: Number(row.max_attempts || 0),
+    callbackTxHash: row.callback_tx_hash ?? null,
+    callbackReceipt: row.callback_receipt_json
+      ? parseJsonSafe(
+          row.callback_receipt_json,
+          null as SettlementCallbackRecord["callbackReceipt"],
+          "deserializeSettlementCallbackRecord.callback_receipt_json",
+        )
+      : null,
+    lastError: row.last_error ?? null,
+    nextAttemptAt: row.next_attempt_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

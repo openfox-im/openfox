@@ -59,6 +59,12 @@ const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
       task: "check_social_inbox",
       enabled: true,
     },
+    {
+      name: "retry_settlement_callbacks",
+      schedule: "*/2 * * * *",
+      task: "retry_settlement_callbacks",
+      enabled: true,
+    },
   ],
   defaultIntervalMs: 60_000,
   lowComputeMultiplier: 4,

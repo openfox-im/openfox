@@ -70,6 +70,7 @@ const TASK_DESCRIPTIONS: Record<string, string> = {
   heartbeat_ping: "Persist local liveness state and emit distress when the runtime is unhealthy.",
   check_credits: "Track credit balance changes and wake the agent on survival-tier drops.",
   check_wallet_balance: "Check native wallet balance and wake when spendable funds become available.",
+  retry_settlement_callbacks: "Retry or confirm pending settlement callback transactions for contract-bound results.",
   check_social_inbox: "Poll the social inbox and wake the agent for new inbound messages.",
   check_for_updates: "Check for upstream/runtime updates.",
   health_check: "Run local health checks and wake on degraded status.",

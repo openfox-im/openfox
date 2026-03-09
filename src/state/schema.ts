@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -229,6 +229,32 @@ export const CREATE_TABLES = `
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_subject
     ON settlement_receipts(kind, subject_id);
+
+  CREATE TABLE IF NOT EXISTS settlement_callbacks (
+    callback_id TEXT PRIMARY KEY,
+    receipt_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('bounty','observation','oracle')),
+    subject_id TEXT NOT NULL,
+    contract_address TEXT NOT NULL,
+    payload_mode TEXT NOT NULL CHECK(payload_mode IN ('canonical_receipt','receipt_hash')),
+    payload_hex TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','confirmed','failed')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    callback_tx_hash TEXT,
+    callback_receipt_json TEXT,
+    last_error TEXT,
+    next_attempt_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_callback_receipt
+    ON settlement_callbacks(receipt_id);
+
+  CREATE INDEX IF NOT EXISTS idx_settlement_callback_status
+    ON settlement_callbacks(status, kind, next_attempt_at);
 `;
 
 export const MIGRATION_V3 = `
@@ -917,4 +943,32 @@ export const MIGRATION_V14 = `
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_subject
     ON settlement_receipts(kind, subject_id);
+`;
+
+export const MIGRATION_V15 = `
+  CREATE TABLE IF NOT EXISTS settlement_callbacks (
+    callback_id TEXT PRIMARY KEY,
+    receipt_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('bounty','observation','oracle')),
+    subject_id TEXT NOT NULL,
+    contract_address TEXT NOT NULL,
+    payload_mode TEXT NOT NULL CHECK(payload_mode IN ('canonical_receipt','receipt_hash')),
+    payload_hex TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','confirmed','failed')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    callback_tx_hash TEXT,
+    callback_receipt_json TEXT,
+    last_error TEXT,
+    next_attempt_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_callback_receipt
+    ON settlement_callbacks(receipt_id);
+
+  CREATE INDEX IF NOT EXISTS idx_settlement_callback_status
+    ON settlement_callbacks(status, kind, next_attempt_at);
 `;

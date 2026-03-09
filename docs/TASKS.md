@@ -91,6 +91,16 @@ building OpenFox into a TOS-native agent platform.
   - Status: Complete
   - Goal: Make settlement state visible and inspectable through CLI, status,
     doctor, and roadmap/operator docs.
+- [x] Task 21: Add contract callback adapters for settlement receipts
+  - Status: Complete
+  - Goal: Bind completed bounty, observation, and oracle results to
+    contract-owned state through reusable native callback adapters instead of
+    leaving settlement purely as an anchor log.
+- [x] Task 22: Add scheduler-driven settlement callback retries
+  - Status: Complete
+  - Goal: Use the OpenFox heartbeat scheduler to confirm and retry pending
+    settlement callbacks so contract binding survives temporary RPC or receipt
+    timing failures.
 
 ## Task 1 Breakdown
 
@@ -264,3 +274,19 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add settlement findings to `openfox doctor` and `openfox health`.
 - [x] Update roadmap and README so settlement is part of the visible operator
   surface.
+
+## Task 21 Breakdown
+
+- [x] Add settlement callback configuration for bounty, observation, and oracle.
+- [x] Add persistent settlement callback records and operator-visible status.
+- [x] Dispatch contract callbacks automatically after successful settlement
+  publication.
+- [x] Expose callback queue state through `openfox settlement callbacks`,
+  `openfox status --json`, and diagnostics.
+
+## Task 22 Breakdown
+
+- [x] Add a built-in heartbeat task for pending settlement callback retries.
+- [x] Confirm pending callbacks by polling chain receipts before resubmitting.
+- [x] Back off and cap retry attempts for failed callback sends.
+- [x] Surface pending/misconfigured callback state through `openfox doctor`.

@@ -120,6 +120,7 @@ import {
 } from "./bounty/client.js";
 import { buildOpportunityReport, collectOpportunityItems } from "./opportunity/scout.js";
 import { createNativeSettlementPublisher } from "./settlement/publisher.js";
+import { createNativeSettlementCallbackDispatcher } from "./settlement/callbacks.js";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";
@@ -1235,6 +1236,7 @@ OpenFox settlement
 
 Usage:
   openfox settlement list [--kind <bounty|observation|oracle>] [--limit N] [--json]
+  openfox settlement callbacks [--kind <bounty|observation|oracle>] [--status <pending|confirmed|failed>] [--limit N] [--json]
   openfox settlement get --receipt-id <id> [--json]
   openfox settlement get --kind <bounty|observation|oracle> --subject-id <id> [--json]
 `);
@@ -1272,6 +1274,32 @@ Usage:
       return;
     }
 
+    if (command === "callbacks") {
+      const kind = readOption(args, "--kind") as "bounty" | "observation" | "oracle" | undefined;
+      const status = readOption(args, "--status") as "pending" | "confirmed" | "failed" | undefined;
+      const limit = readNumberOption(args, "--limit", 20);
+      const items = db.listSettlementCallbacks(limit, { kind, status });
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (items.length === 0) {
+        logger.info("No settlement callbacks found.");
+        return;
+      }
+      logger.info("=== OPENFOX SETTLEMENT CALLBACKS ===");
+      for (const item of items) {
+        logger.info(
+          `${item.callbackId}  [${item.kind}]  status=${item.status}  attempts=${item.attemptCount}/${item.maxAttempts}  tx=${item.callbackTxHash || "(none)"}`,
+        );
+        logger.info(`  receipt=${item.receiptId}  contract=${item.contractAddress}`);
+        if (item.lastError) {
+          logger.info(`  error=${item.lastError}`);
+        }
+      }
+      return;
+    }
+
     if (command === "get") {
       const receiptId = readOption(args, "--receipt-id");
       const kind = readOption(args, "--kind") as "bounty" | "observation" | "oracle" | undefined;
@@ -1289,9 +1317,19 @@ Usage:
         );
       }
       if (asJson) {
-        logger.info(JSON.stringify(record, null, 2));
+        logger.info(
+          JSON.stringify(
+            {
+              ...record,
+              callback: db.getSettlementCallbackByReceiptId(record.receiptId) ?? null,
+            },
+            null,
+            2,
+          ),
+        );
         return;
       }
+      const callback = db.getSettlementCallbackByReceiptId(record.receiptId);
       logger.info(`
 === OPENFOX SETTLEMENT RECEIPT ===
 Receipt:     ${record.receiptId}
@@ -1302,6 +1340,8 @@ Artifact:    ${record.artifactUrl || "(none)"}
 Payment tx:  ${record.paymentTxHash || "(none)"}
 Payout tx:   ${record.payoutTxHash || "(none)"}
 Anchor tx:   ${record.settlementTxHash || "(pending)"}
+Callback:    ${callback ? `${callback.status} -> ${callback.contractAddress}` : "(none)"}
+Callback tx: ${callback?.callbackTxHash || "(none)"}
 Created:     ${record.createdAt}
 Updated:     ${record.updatedAt}
 =================================
@@ -1376,6 +1416,10 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
   const skills = db.getSkills(true);
   const children = db.getChildren();
   const settlements = db.listSettlementReceipts(5);
+  const settlementCallbacks = db.listSettlementCallbacks(5);
+  const pendingSettlementCallbacks = db.listSettlementCallbacks(100, {
+    status: "pending",
+  }).length;
   const discovery = config.agentDiscovery;
   const gatewaySummary = discovery?.gatewayClient?.enabled
     ? discovery.gatewayClient.gatewayUrl || "discovery/bootnodes"
@@ -1423,6 +1467,19 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
           publishBounties: config.settlement.publishBounties,
           publishObservations: config.settlement.publishObservations,
           publishOracleResults: config.settlement.publishOracleResults,
+          callbacks: {
+            enabled: config.settlement.callbacks.enabled,
+            retryBatchSize: config.settlement.callbacks.retryBatchSize,
+            retryAfterSeconds: config.settlement.callbacks.retryAfterSeconds,
+            pendingCount: pendingSettlementCallbacks,
+            recentCallbacks: settlementCallbacks.map((item) => ({
+              callbackId: item.callbackId,
+              receiptId: item.receiptId,
+              kind: item.kind,
+              status: item.status,
+              callbackTxHash: item.callbackTxHash,
+            })),
+          },
           receiptCount: settlements.length,
           recentReceipts: settlements.map((item) => ({
             receiptId: item.receiptId,
@@ -1471,7 +1528,7 @@ Discovery:  ${discovery?.enabled ? "enabled" : "disabled"}
 Gateway:    ${gatewaySummary}
 Bounty:     ${config.bounty?.enabled ? `${config.bounty.role}/${config.bounty.defaultKind} @ ${config.bounty.bindHost}:${config.bounty.port}${config.bounty.pathPrefix}` : "disabled"}
 Bounty auto: ${config.bounty?.enabled ? `open=${config.bounty.autoOpenOnStartup || config.bounty.autoOpenWhenIdle ? "on" : "off"} solve=${config.bounty.autoSolveOnStartup || config.bounty.autoSolveEnabled ? "on" : "off"}` : "disabled"}
-Settlement: ${config.settlement?.enabled ? `enabled (${settlements.length} recent receipt${settlements.length === 1 ? "" : "s"})` : "disabled"}
+Settlement: ${config.settlement?.enabled ? `enabled (${settlements.length} recent receipt${settlements.length === 1 ? "" : "s"}, ${pendingSettlementCallbacks} pending callback${pendingSettlementCallbacks === 1 ? "" : "s"})` : "disabled"}
 Scout:      ${config.opportunityScout?.enabled ? "enabled" : "disabled"}
 Creator:    ${config.creatorAddress}
 Sandbox:    ${config.sandboxId}
@@ -1610,6 +1667,17 @@ async function run(): Promise<void> {
           publisherAddress: address,
         })
       : undefined;
+  const settlementCallbacks =
+    config.settlement?.enabled &&
+    config.settlement.callbacks.enabled &&
+    config.rpcUrl
+      ? createNativeSettlementCallbackDispatcher({
+          db,
+          rpcUrl: config.rpcUrl,
+          privateKey,
+          config: config.settlement.callbacks,
+        })
+      : undefined;
 
   if (config.agentDiscovery?.faucetServer?.enabled) {
     try {
@@ -1640,6 +1708,7 @@ async function run(): Promise<void> {
         settlementPublisher: config.settlement?.publishObservations
           ? settlementPublisher
           : undefined,
+        settlementCallbacks,
       });
       logger.info(`Agent Discovery observation provider enabled at ${observationServer.url}`);
     } catch (error) {
@@ -1661,6 +1730,7 @@ async function run(): Promise<void> {
         settlementPublisher: config.settlement?.publishOracleResults
           ? settlementPublisher
           : undefined,
+        settlementCallbacks,
       });
       logger.info(`Agent Discovery oracle provider enabled at ${oracleServer.url}`);
     } catch (error) {
@@ -1991,6 +2061,7 @@ async function run(): Promise<void> {
         settlementPublisher: config.settlement?.publishBounties
           ? settlementPublisher
           : undefined,
+        settlementCallbacks,
       });
       bountyServer = await startBountyHttpServer({
         bountyConfig: config.bounty,

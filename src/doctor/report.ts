@@ -43,6 +43,9 @@ export interface HealthSnapshot {
   settlementEnabled: boolean;
   settlementReady: boolean;
   settlementRecentCount: number;
+  settlementCallbacksEnabled: boolean;
+  settlementPendingCallbacks: number;
+  settlementMisconfiguredKinds: string[];
   opportunityScoutEnabled: boolean;
   managedService: ManagedServiceStatus;
   heartbeatPaused: boolean;
@@ -97,6 +100,9 @@ async function buildConfigSnapshot(
   settlementEnabled: boolean;
   settlementReady: boolean;
   settlementRecentCount: number;
+  settlementCallbacksEnabled: boolean;
+  settlementPendingCallbacks: number;
+  settlementMisconfiguredKinds: string[];
   opportunityScoutEnabled: boolean;
   skillCount: number;
   ineligibleEnabledSkills: string[];
@@ -135,6 +141,20 @@ async function buildConfigSnapshot(
     settlementRecentCount: config.settlement?.enabled
       ? db.listSettlementReceipts(5).length
       : 0,
+    settlementCallbacksEnabled:
+      config.settlement?.enabled === true &&
+      config.settlement.callbacks.enabled === true,
+    settlementPendingCallbacks:
+      config.settlement?.enabled && config.settlement.callbacks.enabled
+        ? db.listSettlementCallbacks(100, { status: "pending" }).length
+        : 0,
+    settlementMisconfiguredKinds:
+      config.settlement?.enabled && config.settlement.callbacks.enabled
+        ? (["bounty", "observation", "oracle"] as const).filter((kind) => {
+            const target = config.settlement?.callbacks[kind];
+            return target?.enabled && !target.contractAddress;
+          })
+        : [],
     opportunityScoutEnabled: config.opportunityScout?.enabled === true,
     skillCount: enabledSkills.length,
     ineligibleEnabledSkills,
@@ -374,6 +394,21 @@ function collectFindings(
     });
   }
 
+  if (snapshot.settlementCallbacksEnabled) {
+    findings.push({
+      id: "settlement-callbacks-enabled",
+      severity: snapshot.settlementMisconfiguredKinds.length ? "error" : "ok",
+      summary: snapshot.settlementMisconfiguredKinds.length
+        ? `Settlement callbacks are enabled but missing contract addresses for: ${snapshot.settlementMisconfiguredKinds.join(", ")}.`
+        : `Settlement callbacks are enabled (${snapshot.settlementPendingCallbacks} pending callback${snapshot.settlementPendingCallbacks === 1 ? "" : "s"}).`,
+      recommendation: snapshot.settlementMisconfiguredKinds.length
+        ? "Set contractAddress for each enabled settlement callback target."
+        : snapshot.settlementPendingCallbacks > 0
+          ? "Run `openfox settlement callbacks --status pending` to inspect pending callback delivery."
+          : undefined,
+    });
+  }
+
   return findings;
 }
 
@@ -403,6 +438,9 @@ export async function buildHealthSnapshot(
       settlementEnabled: false,
       settlementReady: false,
       settlementRecentCount: 0,
+      settlementCallbacksEnabled: false,
+      settlementPendingCallbacks: 0,
+      settlementMisconfiguredKinds: [],
       opportunityScoutEnabled: false,
       managedService,
       heartbeatPaused: false,
@@ -457,6 +495,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,
     `Settlement enabled: ${yesNo(snapshot.settlementEnabled)}${snapshot.settlementEnabled ? ` (${snapshot.settlementRecentCount} recent)` : ""}`,
+    `Settlement callbacks: ${yesNo(snapshot.settlementCallbacksEnabled)}${snapshot.settlementCallbacksEnabled ? ` (${snapshot.settlementPendingCallbacks} pending)` : ""}`,
     `Opportunity scout: ${yesNo(snapshot.opportunityScoutEnabled)}`,
     `Heartbeat paused: ${yesNo(snapshot.heartbeatPaused)}`,
     `Pending wakes: ${snapshot.pendingWakes}`,

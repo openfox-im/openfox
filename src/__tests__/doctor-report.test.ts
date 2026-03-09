@@ -31,6 +31,9 @@ describe("doctor report formatting", () => {
       settlementEnabled: true,
       settlementReady: true,
       settlementRecentCount: 1,
+      settlementCallbacksEnabled: true,
+      settlementPendingCallbacks: 2,
+      settlementMisconfiguredKinds: [],
       managedService: {
         manager: "systemd-user" as const,
         available: true,
@@ -76,6 +79,7 @@ describe("doctor report formatting", () => {
     expect(health).toContain("=== OPENFOX HEALTH ===");
     expect(health).toContain("Bounty enabled: yes (host)");
     expect(health).toContain("Settlement enabled: yes (1 recent)");
+    expect(health).toContain("Settlement callbacks: yes (2 pending)");
     expect(health).toContain("service status report");
     expect(doctor).toContain("=== OPENFOX DOCTOR ===");
     expect(doctor).toContain("Warnings: 2");
@@ -135,12 +139,101 @@ describe("doctor report formatting", () => {
           publishBounties: true,
           publishObservations: true,
           publishOracleResults: true,
+          callbacks: {
+            enabled: false,
+            retryBatchSize: 10,
+            retryAfterSeconds: 120,
+            bounty: {
+              enabled: false,
+              gas: "220000",
+              valueWei: "0",
+              waitForReceipt: true,
+              receiptTimeoutMs: 60000,
+              payloadMode: "canonical_receipt",
+              maxAttempts: 3,
+            },
+            observation: {
+              enabled: false,
+              gas: "220000",
+              valueWei: "0",
+              waitForReceipt: true,
+              receiptTimeoutMs: 60000,
+              payloadMode: "canonical_receipt",
+              maxAttempts: 3,
+            },
+            oracle: {
+              enabled: false,
+              gas: "220000",
+              valueWei: "0",
+              waitForReceipt: true,
+              receiptTimeoutMs: 60000,
+              payloadMode: "canonical_receipt",
+              maxAttempts: 3,
+            },
+          },
         },
       }),
     );
 
     expect(
       snapshot.findings.some((finding) => finding.id === "settlement-enabled" && finding.severity === "error"),
+    ).toBe(true);
+  });
+
+  it("flags settlement callbacks missing a contract target", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        rpcUrl: "http://127.0.0.1:8545",
+        settlement: {
+          enabled: true,
+          gas: "160000",
+          waitForReceipt: true,
+          receiptTimeoutMs: 60000,
+          publishBounties: true,
+          publishObservations: true,
+          publishOracleResults: true,
+          callbacks: {
+            enabled: true,
+            retryBatchSize: 10,
+            retryAfterSeconds: 120,
+            bounty: {
+              enabled: true,
+              gas: "220000",
+              valueWei: "0",
+              waitForReceipt: true,
+              receiptTimeoutMs: 60000,
+              payloadMode: "canonical_receipt",
+              maxAttempts: 3,
+            },
+            observation: {
+              enabled: false,
+              gas: "220000",
+              valueWei: "0",
+              waitForReceipt: true,
+              receiptTimeoutMs: 60000,
+              payloadMode: "canonical_receipt",
+              maxAttempts: 3,
+            },
+            oracle: {
+              enabled: false,
+              gas: "220000",
+              valueWei: "0",
+              waitForReceipt: true,
+              receiptTimeoutMs: 60000,
+              payloadMode: "canonical_receipt",
+              maxAttempts: 3,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "settlement-callbacks-enabled" &&
+          finding.severity === "error",
+      ),
     ).toBe(true);
   });
 });

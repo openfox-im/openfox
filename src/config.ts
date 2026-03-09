@@ -529,6 +529,29 @@ export function loadConfig(): OpenFoxConfig | null {
       ((raw.settlement as JsonRecord).sinkAddress as string).trim()
         ? (((raw.settlement as JsonRecord).sinkAddress as string).trim() as HexAddress)
         : DEFAULT_SETTLEMENT_CONFIG.sinkAddress,
+    callbacks: {
+      ...DEFAULT_SETTLEMENT_CONFIG.callbacks,
+      ...(((raw?.settlement as JsonRecord | undefined)?.callbacks as JsonRecord | undefined) ??
+        {}),
+      bounty: {
+        ...DEFAULT_SETTLEMENT_CONFIG.callbacks.bounty,
+        ...((((raw?.settlement as JsonRecord | undefined)?.callbacks as
+          | JsonRecord
+          | undefined)?.bounty as JsonRecord | undefined) ?? {}),
+      },
+      observation: {
+        ...DEFAULT_SETTLEMENT_CONFIG.callbacks.observation,
+        ...((((raw?.settlement as JsonRecord | undefined)?.callbacks as
+          | JsonRecord
+          | undefined)?.observation as JsonRecord | undefined) ?? {}),
+      },
+      oracle: {
+        ...DEFAULT_SETTLEMENT_CONFIG.callbacks.oracle,
+        ...((((raw?.settlement as JsonRecord | undefined)?.callbacks as
+          | JsonRecord
+          | undefined)?.oracle as JsonRecord | undefined) ?? {}),
+      },
+    },
   };
 
   const walletFunding: WalletFundingConfig = {

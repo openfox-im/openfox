@@ -33,6 +33,7 @@ import {
   validateRequestExpiry,
 } from "./security.js";
 import type { SettlementPublisher } from "../settlement/publisher.js";
+import type { SettlementCallbackDispatcher } from "../settlement/callbacks.js";
 
 const logger = createLogger("agent-discovery.oracle");
 
@@ -49,6 +50,7 @@ export interface StartAgentDiscoveryOracleServerParams {
   inference: InferenceClient;
   oracleConfig: AgentDiscoveryOracleServerConfig;
   settlementPublisher?: SettlementPublisher;
+  settlementCallbacks?: SettlementCallbackDispatcher;
 }
 
 interface StoredOracleJob {
@@ -262,7 +264,15 @@ async function resolveOracleRequest(params: {
 export async function startAgentDiscoveryOracleServer(
   params: StartAgentDiscoveryOracleServerParams,
 ): Promise<AgentDiscoveryOracleServer> {
-  const { oracleConfig, config, db, address, inference, settlementPublisher } = params;
+  const {
+    oracleConfig,
+    config,
+    db,
+    address,
+    inference,
+    settlementPublisher,
+    settlementCallbacks,
+  } = params;
   const path = oracleConfig.path.startsWith("/") ? oracleConfig.path : `/${oracleConfig.path}`;
   const healthzPath = `${path}/healthz`;
   const resultPathPrefix = "/oracle/result/";
@@ -426,6 +436,9 @@ export async function startAgentDiscoveryOracleServer(
         response.receipt_id = settlement.receiptId;
         response.receipt_hash = settlement.receiptHash;
         response.settlement_tx_hash = settlement.settlementTxHash ?? undefined;
+        if (settlementCallbacks) {
+          await settlementCallbacks.dispatch(settlement);
+        }
       }
 
       db.setKV(
