@@ -74,6 +74,15 @@ building OpenFox into a TOS-native agent platform.
   - Status: Complete
   - Goal: Add the first production-style guardrails around payouts and solver
     submissions so the marketplace slice is not wide open by default.
+- [x] Task 17: Launch the first real paid observation service
+  - Status: Complete
+  - Goal: Turn the existing `observation.once` provider into a real paid
+    service with stable request/result semantics, payment idempotency, and job
+    retrieval instead of a one-off test payload flow.
+- [ ] Task 18: Launch the first paid oracle resolution service
+  - Status: Pending
+  - Goal: Add a narrow paid oracle-style service on top of the same TOS-native
+    runtime base without importing a full decentralized oracle protocol.
 
 ## Task 1 Breakdown
 
@@ -208,3 +217,25 @@ building OpenFox into a TOS-native agent platform.
 - [x] Enforce trusted proof URL checks for social proof tasks.
 - [x] Enforce solver cooldown windows.
 - [x] Enforce max auto-pay per solver per 24h.
+
+## Task 17 Breakdown
+
+- [x] Reuse the existing observation provider instead of inventing a second
+  paid-service stack.
+- [x] Add `POST /observe` as a stable paid observation request surface.
+- [x] Add `GET /jobs/:id` for persisted observation result retrieval.
+- [x] Bind duplicate requests to one stored job/result instead of charging
+  again.
+- [x] Persist a payment-bound observation result receipt with `job_id`,
+  `result_url`, and `payment_tx_hash`.
+- [x] Update runtime docs and roadmap state to reflect the first real paid
+  service slice.
+
+## Task 18 Breakdown
+
+- [ ] Add a narrow `POST /oracle/resolve` surface.
+- [ ] Add a minimal `GET /oracle/result/:id` lookup surface.
+- [ ] Reuse the existing task marketplace and local-model judging path where
+  possible.
+- [ ] Bind paid requests to stored oracle result receipts.
+- [ ] Keep the first oracle service bounded and TOS-native.

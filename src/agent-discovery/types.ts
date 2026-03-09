@@ -165,6 +165,10 @@ export interface ObservationInvocationRequest {
 
 export interface ObservationInvocationResponse {
   status: "ok";
+  job_id?: string;
+  result_url?: string;
+  payment_tx_hash?: string;
+  idempotent?: boolean;
   observed_at: number;
   target_url: string;
   http_status: number;

@@ -138,6 +138,8 @@ It supports:
 - capability discovery over GTOS Agent Discovery
 - sponsored capabilities such as `sponsor.topup.testnet`
 - paid capabilities such as `observation.once`
+- a built-in paid observation service with `POST /observe`
+- persisted result lookup with `GET /jobs/:id`
 - gateway-backed provider endpoints for agents behind NAT
 
 The Gateway v1 path is:

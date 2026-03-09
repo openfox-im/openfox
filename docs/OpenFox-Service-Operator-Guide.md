@@ -86,6 +86,11 @@ Examples already built into OpenFox:
 - `sponsor.topup.testnet`
 - `observation.once`
 
+The built-in observation provider now exposes a stable paid service surface:
+
+- `POST /observe`
+- `GET /jobs/:id`
+
 A provider may be:
 
 - directly reachable on a public IP

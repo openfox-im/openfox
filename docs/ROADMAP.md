@@ -187,7 +187,7 @@ Delivered surface:
 
 ### Phase 2: Launch Real Paid Services
 
-Status: not complete
+Status: in progress
 
 Goal:
 
@@ -235,6 +235,14 @@ Acceptance criteria:
 
 - the user pays once in `TOS`
 - the user receives a real business result instead of a test JSON payload
+
+Delivered surface so far:
+
+- a real paid observation provider built into OpenFox
+- `POST /observe` for paid one-shot observations
+- `GET /jobs/:id` for persisted observation result lookup
+- payment-bound observation receipts with `job_id`, `result_url`, and `payment_tx_hash`
+- duplicate request replay handled idempotently without charging twice
 
 ### Phase 3: On-Chain Task and Settlement Integration
 

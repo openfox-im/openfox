@@ -14,6 +14,7 @@ import {
   verifyTOSPayment,
   writeTOSPaymentRequired,
   type TOSPaymentRequirement,
+  type VerifiedTOSPayment,
 } from "../tos/x402.js";
 import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
 import {
@@ -52,6 +53,16 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Length", Buffer.byteLength(payload));
   res.end(payload);
+}
+
+interface StoredObservationJob {
+  jobId: string;
+  requestKey: string;
+  request: ObservationInvocationRequest;
+  response: ObservationInvocationResponse;
+  requesterIdentity: string;
+  capability: string;
+  createdAt: string;
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
@@ -114,7 +125,7 @@ async function requirePayment(params: {
   config: OpenFoxConfig;
   providerAddress: string;
   amountWei: string;
-}): Promise<boolean> {
+}): Promise<VerifiedTOSPayment | null> {
   const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
     throw new Error("Chain RPC is required to run the observation server");
@@ -133,11 +144,50 @@ async function requirePayment(params: {
   const envelope = readTOSPaymentEnvelope(params.req);
   if (!envelope) {
     writeTOSPaymentRequired(params.res, requirement);
-    return false;
+    return null;
   }
   const verified = verifyTOSPayment(requirement, envelope);
   await submitTOSPayment(rpcUrl, verified);
-  return true;
+  return verified;
+}
+
+function buildObservationJobId(request: ObservationInvocationRequest): string {
+  return createHash("sha256")
+    .update(
+      `${request.requester.identity.value.toLowerCase()}|${request.capability}|${normalizeNonce(request.request_nonce)}`,
+    )
+    .digest("hex");
+}
+
+function buildObservationRequestKey(request: ObservationInvocationRequest): string {
+  return [
+    "agent_discovery:observation:request",
+    request.requester.identity.value.toLowerCase(),
+    request.capability,
+    normalizeNonce(request.request_nonce),
+  ].join(":");
+}
+
+function getObservationJobKey(jobId: string): string {
+  return `agent_discovery:observation:job:${jobId}`;
+}
+
+function buildObservationResultPath(jobId: string): string {
+  return `/jobs/${jobId}`;
+}
+
+function loadStoredObservationJob(
+  db: OpenFoxDatabase,
+  jobId: string,
+): StoredObservationJob | null {
+  const raw = db.getKV(getObservationJobKey(jobId));
+  if (!raw) return null;
+  return JSON.parse(raw) as StoredObservationJob;
+}
+
+function storeObservationJob(db: OpenFoxDatabase, job: StoredObservationJob): void {
+  db.setKV(getObservationJobKey(job.jobId), JSON.stringify(job));
+  db.setKV(job.requestKey, job.jobId);
 }
 
 async function fetchObservation(
@@ -183,6 +233,8 @@ export async function startAgentDiscoveryObservationServer(
   const { observationConfig, config, db, address } = params;
   const path = observationConfig.path.startsWith("/") ? observationConfig.path : `/${observationConfig.path}`;
   const healthzPath = `${path}/healthz`;
+  const resultPathPrefix = "/jobs/";
+  const requestPaths = new Set([path, "/observe"]);
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -196,7 +248,21 @@ export async function startAgentDiscoveryObservationServer(
         });
         return;
       }
-      if (url.pathname === path && req.method === "HEAD") {
+      if (req.method === "GET" && url.pathname.startsWith(resultPathPrefix)) {
+        const jobId = url.pathname.slice(resultPathPrefix.length).trim();
+        if (!jobId) {
+          json(res, 400, { error: "missing job id" });
+          return;
+        }
+        const job = loadStoredObservationJob(db, jobId);
+        if (!job) {
+          json(res, 404, { error: "job not found" });
+          return;
+        }
+        json(res, 200, job.response);
+        return;
+      }
+      if (requestPaths.has(url.pathname) && req.method === "HEAD") {
         const paid = await requirePayment({
           req,
           res,
@@ -210,7 +276,7 @@ export async function startAgentDiscoveryObservationServer(
         }
         return;
       }
-      if (req.method !== "POST" || url.pathname !== path) {
+      if (req.method !== "POST" || !requestPaths.has(url.pathname)) {
         json(res, 404, { error: "not found" });
         return;
       }
@@ -218,6 +284,27 @@ export async function startAgentDiscoveryObservationServer(
       const body = (await readJsonBody(req)) as ObservationInvocationRequest;
       const { requestNonce, targetUrl } = validateRequest(body, observationConfig);
       const requesterIdentity = body.requester.identity.value.toLowerCase();
+      const requestKey = buildObservationRequestKey(body);
+      const existingJobId = db.getKV(requestKey);
+      if (existingJobId) {
+        const existingJob = loadStoredObservationJob(db, existingJobId);
+        if (!existingJob) {
+          json(res, 409, { status: "rejected", reason: "observation job state is inconsistent" });
+          return;
+        }
+        if (
+          existingJob.request.target_url !== body.target_url ||
+          existingJob.request.reason !== body.reason
+        ) {
+          json(res, 409, {
+            status: "rejected",
+            reason: "request nonce is already bound to a different observation payload",
+          });
+          return;
+        }
+        json(res, 200, { ...existingJob.response, idempotent: true });
+        return;
+      }
       ensureRequestNotReplayed({
         db,
         scope: "observation",
@@ -246,11 +333,16 @@ export async function startAgentDiscoveryObservationServer(
         expiresAt: body.request_expires_at,
       });
 
+      const jobId = buildObservationJobId(body);
+      const resultPath = buildObservationResultPath(jobId);
       const result = await fetchObservation(
         targetUrl,
         observationConfig.requestTimeoutMs,
         observationConfig.maxResponseBytes,
       );
+      result.job_id = jobId;
+      result.result_url = resultPath;
+      result.payment_tx_hash = paid.txHash;
       db.setKV(
         "agent_discovery:observation:last_served",
         JSON.stringify({
@@ -258,8 +350,18 @@ export async function startAgentDiscoveryObservationServer(
           requesterIdentity,
           targetUrl: result.target_url,
           requestNonce,
+          jobId,
         }),
       );
+      storeObservationJob(db, {
+        jobId,
+        requestKey,
+        request: body,
+        response: result,
+        requesterIdentity,
+        capability: body.capability,
+        createdAt: new Date().toISOString(),
+      });
       json(res, 200, result);
     } catch (error) {
       logger.warn(

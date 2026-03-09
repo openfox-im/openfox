@@ -103,7 +103,7 @@ describe("agent discovery observation server", () => {
     }
   });
 
-  it("serves a paid observation and rejects duplicate nonces before charging again", async () => {
+  it("serves a paid observation, persists a job result, and replays duplicate nonces idempotently", async () => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-observe-"));
     process.env.HOME = tempHome;
     process.env.TOS_RPC_URL = "http://127.0.0.1:8545";
@@ -166,6 +166,8 @@ describe("agent discovery observation server", () => {
     }) as typeof fetch;
 
     try {
+      const canonical = new URL(server.url);
+      const observeUrl = `${canonical.protocol}//${canonical.host}/observe`;
       const body = {
         capability: "observation.once",
         requester: {
@@ -182,25 +184,36 @@ describe("agent discovery observation server", () => {
       };
 
       const first = await x402Fetch(
-        server.url,
+        observeUrl,
         requester.account,
         "POST",
         JSON.stringify(body),
         { Accept: "application/json" },
       );
       expect(first.success).toBe(true);
-      expect((first.response as { status: string }).status).toBe("ok");
+      const firstBody = first.response as { status: string; job_id: string; result_url: string };
+      expect(firstBody.status).toBe("ok");
+      expect(firstBody.job_id).toMatch(/^[0-9a-f]{64}$/);
+      expect(firstBody.result_url).toBe(`/jobs/${firstBody.job_id}`);
       expect(submittedPayments).toBe(1);
 
+      const stored = await fetch(`http://127.0.0.1:${new URL(server.url).port}${firstBody.result_url}`);
+      expect(stored.status).toBe(200);
+      const storedBody = (await stored.json()) as { job_id: string; status: string };
+      expect(storedBody.job_id).toBe(firstBody.job_id);
+      expect(storedBody.status).toBe("ok");
+
       const second = await x402Fetch(
-        server.url,
+        observeUrl,
         requester.account,
         "POST",
         JSON.stringify(body),
         { Accept: "application/json" },
       );
-      expect(second.success).toBe(false);
-      expect(second.status).toBe(400);
+      expect(second.success).toBe(true);
+      const secondBody = second.response as { job_id: string; idempotent?: boolean };
+      expect(secondBody.job_id).toBe(firstBody.job_id);
+      expect(secondBody.idempotent).toBe(true);
       expect(submittedPayments).toBe(1);
     } finally {
       await server.close();
