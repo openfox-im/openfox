@@ -62,6 +62,16 @@ describe("bounty automation", () => {
         '{"question":"Capital of Japan?","reference_answer":"Tokyo","submission_ttl_seconds":1800}',
       ),
     ]);
+    hostDb.upsertSkill({
+      name: "question-bounty-host",
+      description: "host skill",
+      autoActivate: false,
+      instructions: "Prefer short factual questions and exact canonical answers.",
+      source: "bundled",
+      path: "/tmp/question-bounty-host/SKILL.md",
+      enabled: true,
+      installedAt: "2026-03-09T00:00:00.000Z",
+    });
     const engine = createBountyEngine({
       identity: hostIdentity,
       db: hostDb,
@@ -89,6 +99,9 @@ describe("bounty automation", () => {
     });
     expect(duplicate).toBeNull();
     expect(hostDb.listBounties().length).toBe(1);
+    expect(inference.calls[0]?.messages[0]?.content).toContain(
+      "Prefer short factual questions and exact canonical answers.",
+    );
   });
 
   it("solver discovers a remote host via direct base URL and submits one answer", async () => {
@@ -134,6 +147,16 @@ describe("bounty automation", () => {
 
     try {
       const solverInference = new MockInferenceClient([noToolResponse("Paris")]);
+      solverDb.upsertSkill({
+        name: "question-bounty-solver",
+        description: "solver skill",
+        autoActivate: false,
+        instructions: "Return only the shortest canonical answer.",
+        source: "bundled",
+        path: "/tmp/question-bounty-solver/SKILL.md",
+        enabled: true,
+        installedAt: "2026-03-09T00:00:00.000Z",
+      });
       const result = await runSolverBountyPass({
         identity: solverIdentity,
         config: createTestConfig({
@@ -154,6 +177,9 @@ describe("bounty automation", () => {
       expect(result?.bountyId).toBe(bounty.bountyId);
       expect(result?.answer).toBe("Paris");
       expect(hostDb.getBountyResult(bounty.bountyId)?.decision).toBe("accepted");
+      expect(solverInference.calls[0]?.messages[0]?.content).toContain(
+        "Return only the shortest canonical answer.",
+      );
 
       const secondPass = await runSolverBountyPass({
         identity: solverIdentity,

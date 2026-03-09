@@ -120,6 +120,18 @@ import {
 const logger = createLogger("main");
 const VERSION = "0.2.1";
 
+function resolveBountySkillName(config: {
+  role: "host" | "solver";
+  skill: string;
+}): string {
+  if (config.role === "solver") {
+    return config.skill === "question-bounty-host"
+      ? "question-bounty-solver"
+      : config.skill || "question-bounty-solver";
+  }
+  return config.skill || "question-bounty-host";
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -486,6 +498,8 @@ async function runHeartbeatTaskNow(
     apiKey,
     sandboxId: config.sandboxId,
   });
+  const skillsDir = config.skillsDir || "~/.openfox/skills";
+  let skills: Skill[] = [];
 
   let social: SocialClientInterface | undefined;
   if (config.socialRelayUrl) {
@@ -1118,17 +1132,21 @@ Usage:
       if (!bountyId || !remoteBaseUrl) {
         throw new Error("Usage: openfox bounty solve <bounty-id> --url <base-url>");
       }
-      logger.info(
-        JSON.stringify(
-          await solveRemoteQuestionBounty({
-            baseUrl: remoteBaseUrl,
-            bountyId,
-            solverAddress: config.walletAddress,
-            solverAgentId: config.agentId || null,
-            inference,
-          }),
-          null,
-          2,
+        logger.info(
+          JSON.stringify(
+            await solveRemoteQuestionBounty({
+              baseUrl: remoteBaseUrl,
+              bountyId,
+              solverAddress: config.walletAddress,
+              solverAgentId: config.agentId || null,
+              inference,
+              skillInstructions:
+                db.getSkillByName(
+                  resolveBountySkillName(config.bounty),
+                )?.instructions,
+            }),
+            null,
+            2,
         ),
       );
       return;
@@ -1314,6 +1332,8 @@ async function run(): Promise<void> {
     apiKey,
     sandboxId: config.sandboxId,
   });
+  const skillsDir = config.skillsDir || "~/.openfox/skills";
+  let skills: Skill[] = [];
 
   let faucetServer:
     | Awaited<ReturnType<typeof startAgentDiscoveryFaucetServer>>
@@ -1650,6 +1670,13 @@ async function run(): Promise<void> {
     logger.info(`[${new Date().toISOString()}] Ollama backend: ${ollamaBaseUrl}`);
   }
 
+  try {
+    skills = loadSkills(skillsDir, db);
+    logger.info(`[${new Date().toISOString()}] Loaded ${skills.length} skills.`);
+  } catch (err: any) {
+    logger.warn(`[${new Date().toISOString()}] Skills loading failed: ${err.message}`);
+  }
+
   if (config.bounty?.enabled && config.bounty.role === "host") {
     try {
       const bountyEngine = createBountyEngine({
@@ -1657,6 +1684,9 @@ async function run(): Promise<void> {
         db,
         inference,
         bountyConfig: config.bounty,
+        skillInstructions:
+          db.getSkillByName(resolveBountySkillName(config.bounty))
+            ?.instructions,
         payoutSender: config.rpcUrl
           ? createNativeBountyPayoutSender({
               rpcUrl: config.rpcUrl,
@@ -1719,16 +1749,6 @@ async function run(): Promise<void> {
   const heartbeatConfigPath = resolvePath(config.heartbeatConfigPath);
   const heartbeatConfig = loadHeartbeatConfig(heartbeatConfigPath);
   syncHeartbeatToDb(heartbeatConfig, db);
-
-  // Load skills
-  const skillsDir = config.skillsDir || "~/.openfox/skills";
-  let skills: Skill[] = [];
-  try {
-    skills = loadSkills(skillsDir, db);
-    logger.info(`[${new Date().toISOString()}] Loaded ${skills.length} skills.`);
-  } catch (err: any) {
-    logger.warn(`[${new Date().toISOString()}] Skills loading failed: ${err.message}`);
-  }
 
   // Initialize state repo (git)
   try {

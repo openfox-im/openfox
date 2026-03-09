@@ -70,6 +70,7 @@ export async function solveRemoteQuestionBounty(params: {
   solverAddress: Address;
   solverAgentId?: string | null;
   inference: InferenceClient;
+  skillInstructions?: string;
 }): Promise<{
   answer: string;
   submissionResult: unknown;
@@ -81,6 +82,7 @@ export async function solveRemoteQuestionBounty(params: {
         role: "system",
         content: buildQuestionBountySolverPrompt({
           question: details.bounty.question,
+          skillInstructions: params.skillInstructions,
         }),
       },
     ],

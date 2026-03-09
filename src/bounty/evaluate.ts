@@ -10,6 +10,7 @@ export async function evaluateQuestionBountySubmission(params: {
   inference: InferenceClient;
   bounty: BountyRecord;
   submission: BountySubmissionRecord;
+  skillInstructions?: string;
 }): Promise<BountyJudgeResult> {
   const response = await params.inference.chat(
     [
@@ -19,6 +20,7 @@ export async function evaluateQuestionBountySubmission(params: {
           question: params.bounty.question,
           referenceAnswer: params.bounty.referenceAnswer,
           candidateAnswer: params.submission.answer,
+          skillInstructions: params.skillInstructions,
         }),
       },
     ],

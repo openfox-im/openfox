@@ -9,12 +9,16 @@ export interface QuestionBountyDraft {
 export function buildQuestionBountyDraftPrompt(params: {
   openingPrompt?: string;
   defaultSubmissionTtlSeconds: number;
+  skillInstructions?: string;
 }): string {
   return [
     "You are creating one bounded question bounty for OpenFox.",
     "Generate exactly one question that a small local model can judge deterministically.",
     "Use a short question and a short canonical answer.",
     "Avoid subjective or multi-step reasoning questions.",
+    params.skillInstructions?.trim()
+      ? `Skill instructions:\n${params.skillInstructions.trim()}`
+      : undefined,
     "",
     "Return only a JSON object with this exact shape:",
     '{"question":"short question","reference_answer":"short canonical answer","submission_ttl_seconds":3600}',
@@ -65,11 +69,15 @@ export function buildQuestionBountyJudgePrompt(params: {
   question: string;
   referenceAnswer: string;
   candidateAnswer: string;
+  skillInstructions?: string;
 }): string {
   return [
     "You are the host-side judge for a bounded question bounty.",
     "Decide whether the candidate answer should receive the reward.",
     "Be strict and deterministic.",
+    params.skillInstructions?.trim()
+      ? `Skill instructions:\n${params.skillInstructions.trim()}`
+      : undefined,
     "",
     "Return only a JSON object with this exact shape:",
     '{"decision":"accepted|rejected","confidence":0.0,"reason":"short explanation"}',

@@ -31,6 +31,23 @@ function completionKey(bountyId: string): string {
   return `bounty:completion:${bountyId}`;
 }
 
+function resolveBountySkillName(config: BountyConfig): string {
+  if (config.role === "solver") {
+    return config.skill === "question-bounty-host"
+      ? "question-bounty-solver"
+      : config.skill || "question-bounty-solver";
+  }
+  return config.skill || "question-bounty-host";
+}
+
+function resolveSkillInstructions(
+  db: OpenFoxDatabase,
+  skillName: string | undefined,
+): string | undefined {
+  if (!skillName) return undefined;
+  return db.getSkillByName(skillName)?.instructions;
+}
+
 function isHostWorkPending(
   db: OpenFoxDatabase,
   hostAddress: Address,
@@ -72,6 +89,10 @@ export async function ensureAutoQuestionBountyOpen(params: {
           openingPrompt: params.bountyConfig.openingPrompt,
           defaultSubmissionTtlSeconds:
             params.bountyConfig.defaultSubmissionTtlSeconds,
+          skillInstructions: resolveSkillInstructions(
+            params.db,
+            resolveBountySkillName(params.bountyConfig),
+          ),
         }),
       },
     ],
@@ -172,6 +193,12 @@ export async function runSolverBountyPass(params: {
       solverAddress: params.identity.address,
       solverAgentId: params.config.agentId || params.identity.sandboxId || null,
       inference: params.inference,
+      skillInstructions: resolveSkillInstructions(
+        params.db,
+        params.config.bounty
+          ? resolveBountySkillName(params.config.bounty)
+          : "question-bounty-solver",
+      ),
     });
     params.db.setKV(
       completionKey(target.bounty.bountyId),

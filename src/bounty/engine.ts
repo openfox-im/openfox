@@ -35,6 +35,7 @@ export function createBountyEngine(params: {
   db: OpenFoxDatabase;
   inference: InferenceClient;
   bountyConfig: BountyConfig;
+  skillInstructions?: string;
   payoutSender?: BountyPayoutSender;
   now?: () => Date;
 }): BountyEngine {
@@ -116,6 +117,7 @@ export function createBountyEngine(params: {
       inference: params.inference,
       bounty,
       submission,
+      skillInstructions: params.skillInstructions,
     });
 
     const accepted = judge.decision === "accepted";
