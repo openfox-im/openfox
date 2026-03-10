@@ -291,6 +291,7 @@ Useful next steps after setup:
 openfox wallet status
 openfox templates list
 openfox templates export third-party-quickstart --output ./my-openfox
+openfox templates export public-fleet-operator --output ./fleet
 openfox onboard --fund-local
 openfox onboard --fund-testnet
 openfox wallet bootstrap-signer --type ed25519 --generate
@@ -597,6 +598,7 @@ Bundled starter templates are available through:
 openfox templates list
 openfox templates show local-marketplace
 openfox templates export local-marketplace --output ./examples/local-marketplace
+openfox templates export public-fleet-operator --output ./examples/public-fleet
 ```
 
 ---

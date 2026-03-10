@@ -32,6 +32,7 @@ pnpm openfox templates export local-marketplace --output ./examples/local-market
 - `third-party-quickstart`
 - `local-marketplace`
 - `public-provider`
+- `public-fleet-operator`
 - `task-sponsor`
 
 ## Recommended usage
@@ -39,4 +40,5 @@ pnpm openfox templates export local-marketplace --output ./examples/local-market
 - start with `third-party-quickstart` if you are new
 - use `local-marketplace` for one-machine host/solver/scout testing
 - use `public-provider` for provider + gateway deployment
+- use `public-fleet-operator` for multi-node operator APIs and dashboard exports
 - use `task-sponsor` when the main job is publishing tasks and rewards

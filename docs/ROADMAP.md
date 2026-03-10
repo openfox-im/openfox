@@ -668,7 +668,30 @@ The more reasonable strategy for now is:
 
 ## 6. Recommended Next Step
 
-The current roadmap phases are complete.
+### Phase 10: Public Fleet Operator Packaging
+
+Status: completed
+
+Goal:
+
+- package the existing multi-node operator API, fleet, and dashboard surfaces
+  into one reusable bundle for public deployments
+
+Delivered surface:
+
+- `public-fleet-operator` bundled template
+- reusable `fleet.yml` manifest skeleton
+- dashboard export helper script
+- operator notes for status, doctor, repair, and dashboard review
+
+Acceptance criteria:
+
+- operators can export one ready-made bundle with `openfox templates export public-fleet-operator`
+- the bundle contains a valid fleet manifest skeleton
+- the bundle contains a repeatable dashboard export flow
+- the bundle is covered by template tests and linked from the main docs
+
+The current core roadmap phases are complete.
 
 The next work should not reopen the completed core phases. It should focus on:
 
@@ -678,6 +701,7 @@ The next work should not reopen the completed core phases. It should focus on:
 
 The latest completed slice under this next stage is:
 
+- `openfox templates export public-fleet-operator --output ...`
 - `openfox dashboard show --manifest ...`
 - `openfox dashboard export --manifest ... --format json|html`
 - reusable fleet dashboard snapshots and HTML exports for public operator fleets

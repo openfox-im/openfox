@@ -248,6 +248,19 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Let third-party builders talk to signer-provider and
     paymaster-provider services through `tosdk` instead of depending on
     OpenFox runtime request code.
+- [x] Task 53: Add a public fleet operator template and dashboard bundle
+  - Status: Complete
+  - Goal: Turn the existing fleet/operator/dashboard surfaces into a reusable
+    exportable template for public multi-node deployments instead of leaving
+    them as docs-only operator knowledge.
+
+## Task 53 Breakdown
+
+- [x] Add a `public-fleet-operator` bundled template.
+- [x] Add a reusable `fleet.yml` manifest skeleton with public role placeholders.
+- [x] Add dashboard export helper scripts and operator notes.
+- [x] Cover template export with tests.
+- [x] Update template docs and roadmap references.
 
 ## Task 1 Breakdown
 
