@@ -153,8 +153,8 @@ It supports:
 - contract callback adapters and heartbeat-driven retry for contract-bound settlement flows
 - contract-native market bindings for bounty, observation, and oracle creation flows
 - `openfox market list|get|callbacks` for operator-visible binding and callback state
-- an authenticated operator API for multi-node status, health, doctor, service, and gateway inspection
-- `openfox fleet status|health|doctor` for one-shot fleet-wide auditing across public OpenFox nodes
+- an authenticated operator API for multi-node status, health, doctor, service, gateway, storage, artifact, signer, and paymaster inspection
+- `openfox fleet status|health|doctor|storage|artifacts|signer|paymaster` for one-shot fleet-wide auditing across public OpenFox nodes
 - a paid signer-provider surface for bounded delegated execution with:
   - `openfox signer discover`
   - `openfox signer quote`
@@ -371,6 +371,8 @@ openfox service status
 openfox service status --json
 openfox fleet status --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
+openfox fleet storage --manifest ./fleet.yml
+openfox fleet signer --manifest ./fleet.yml
 openfox gateway status
 openfox gateway status --json
 openfox health
@@ -434,6 +436,7 @@ And inspect the fleet from another machine:
 ```bash
 openfox fleet status --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
+openfox fleet paymaster --manifest ./fleet.yml
 ```
 
 ## Agent Gateway Example

@@ -26,6 +26,29 @@ async function startJsonServer(body: unknown, status = 200): Promise<string> {
   return `http://127.0.0.1:${address.port}/operator`;
 }
 
+async function startEndpointServer(
+  endpoint: string,
+  body: unknown,
+  status = 200,
+): Promise<string> {
+  const server = http.createServer((req, res) => {
+    if (req.url !== endpoint) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "not found", path: req.url }));
+      return;
+    }
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(JSON.stringify(body));
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("failed to bind server");
+  }
+  return `http://127.0.0.1:${address.port}/operator`;
+}
+
 function createManifest(contents: string, ext = "json"): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-fleet-"));
   tempDirs.push(dir);
@@ -98,5 +121,32 @@ describe("operator fleet", () => {
     expect(report).toContain("=== OPENFOX FLEET ===");
     expect(report).toContain("alpha [gateway]: ok");
     expect(report).toContain("beta [provider]: failed");
+  });
+
+  it("supports component-specific fleet endpoints and includes summaries in the report", async () => {
+    const baseUrl = await startEndpointServer("/operator/storage/status", {
+      kind: "storage",
+      enabled: true,
+      summary: "3 active leases, 1 due renewal, 0 under-replicated bundles, ready=yes",
+    });
+    const manifestPath = createManifest(
+      JSON.stringify({
+        version: 1,
+        nodes: [{ name: "storage-1", role: "storage", baseUrl }],
+      }),
+    );
+
+    const snapshot = await buildFleetSnapshot({
+      manifestPath,
+      endpoint: "storage",
+    });
+    expect(snapshot.total).toBe(1);
+    expect(snapshot.ok).toBe(1);
+    expect(snapshot.nodes[0]?.ok).toBe(true);
+    expect((snapshot.nodes[0]?.payload as { kind?: string })?.kind).toBe("storage");
+
+    const report = buildFleetReport(snapshot);
+    expect(report).toContain("storage-1 [storage]: ok");
+    expect(report).toContain("3 active leases, 1 due renewal");
   });
 });

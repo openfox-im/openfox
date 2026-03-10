@@ -24,13 +24,45 @@ export interface FleetNodeResult {
   error?: string;
 }
 
+export type FleetEndpoint =
+  | "status"
+  | "health"
+  | "doctor"
+  | "service"
+  | "gateway"
+  | "storage"
+  | "artifacts"
+  | "signer"
+  | "paymaster";
+
 export interface FleetSnapshot {
   manifestPath: string;
-  endpoint: "status" | "health" | "doctor";
+  endpoint: FleetEndpoint;
   total: number;
   ok: number;
   failed: number;
   nodes: FleetNodeResult[];
+}
+
+function getEndpointPath(endpoint: FleetEndpoint): string {
+  switch (endpoint) {
+    case "status":
+    case "health":
+    case "doctor":
+      return endpoint;
+    case "service":
+      return "service/status";
+    case "gateway":
+      return "gateway/status";
+    case "storage":
+      return "storage/status";
+    case "artifacts":
+      return "artifacts/status";
+    case "signer":
+      return "signer/status";
+    case "paymaster":
+      return "paymaster/status";
+  }
 }
 
 function readManifest(filePath: string): unknown {
@@ -85,9 +117,9 @@ export function loadFleetManifest(filePath: string): FleetManifest {
 
 async function fetchNodeEndpoint(
   node: FleetNodeManifest,
-  endpoint: FleetSnapshot["endpoint"],
+  endpoint: FleetEndpoint,
 ): Promise<FleetNodeResult> {
-  const url = `${node.baseUrl}/${endpoint}`;
+  const url = `${node.baseUrl}/${getEndpointPath(endpoint)}`;
   try {
     const response = await fetch(url, {
       headers: node.authToken
@@ -125,7 +157,7 @@ async function fetchNodeEndpoint(
 
 export async function buildFleetSnapshot(params: {
   manifestPath: string;
-  endpoint: FleetSnapshot["endpoint"];
+  endpoint: FleetEndpoint;
 }): Promise<FleetSnapshot> {
   const manifestPath = path.resolve(params.manifestPath);
   const manifest = loadFleetManifest(manifestPath);
@@ -158,9 +190,16 @@ export function buildFleetReport(snapshot: FleetSnapshot): string {
       : node.statusCode
         ? ` (HTTP ${node.statusCode})`
         : "";
-    lines.push(
-      `${node.name}${node.role ? ` [${node.role}]` : ""}: ${status} -> ${node.baseUrl}${suffix}`,
-    );
+    const payloadSummary =
+      typeof node.payload === "object" &&
+      node.payload !== null &&
+      typeof (node.payload as { summary?: unknown }).summary === "string"
+        ? ((node.payload as { summary: string }).summary)
+        : null;
+    lines.push(`${node.name}${node.role ? ` [${node.role}]` : ""}: ${status} -> ${node.baseUrl}${suffix}`);
+    if (payloadSummary) {
+      lines.push(`  ${payloadSummary}`);
+    }
   }
   return lines.join("\n");
 }

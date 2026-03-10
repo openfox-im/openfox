@@ -10,6 +10,12 @@ import { buildHealthSnapshot } from "../doctor/report.js";
 import {
   buildRuntimeStatusSnapshot,
 } from "./status.js";
+import {
+  buildArtifactsOperatorStatusSnapshot,
+  buildPaymasterOperatorStatusSnapshot,
+  buildSignerOperatorStatusSnapshot,
+  buildStorageOperatorStatusSnapshot,
+} from "./components.js";
 
 const logger = createLogger("operator.api");
 
@@ -75,6 +81,10 @@ export async function startOperatorApiServer(
   const doctorPath = `${pathPrefix}/doctor`;
   const servicePath = `${pathPrefix}/service/status`;
   const gatewayPath = `${pathPrefix}/gateway/status`;
+  const storagePath = `${pathPrefix}/storage/status`;
+  const artifactsPath = `${pathPrefix}/artifacts/status`;
+  const signerPath = `${pathPrefix}/signer/status`;
+  const paymasterPath = `${pathPrefix}/paymaster/status`;
   const healthzPath = `${pathPrefix}/healthz`;
 
   const server = http.createServer(async (req, res) => {
@@ -95,7 +105,7 @@ export async function startOperatorApiServer(
       }
 
       if (req.method === "GET" && url.pathname === healthPath) {
-        json(res, 200, await buildHealthSnapshot());
+        json(res, 200, await buildHealthSnapshot(params.config, params.db));
         return;
       }
 
@@ -104,7 +114,7 @@ export async function startOperatorApiServer(
           json(res, 404, { error: "doctor endpoint disabled" });
           return;
         }
-        json(res, 200, await buildHealthSnapshot());
+        json(res, 200, await buildHealthSnapshot(params.config, params.db));
         return;
       }
 
@@ -131,6 +141,26 @@ export async function startOperatorApiServer(
           return;
         }
         json(res, 200, await buildGatewayStatusSnapshot(params.config, params.db.raw));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === storagePath) {
+        json(res, 200, await buildStorageOperatorStatusSnapshot(params.config, params.db));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === artifactsPath) {
+        json(res, 200, await buildArtifactsOperatorStatusSnapshot(params.config, params.db));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === signerPath) {
+        json(res, 200, await buildSignerOperatorStatusSnapshot(params.config, params.db));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === paymasterPath) {
+        json(res, 200, await buildPaymasterOperatorStatusSnapshot(params.config, params.db));
         return;
       }
 

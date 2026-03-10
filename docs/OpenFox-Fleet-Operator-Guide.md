@@ -39,6 +39,10 @@ Recommended practice:
 - `GET /operator/doctor`
 - `GET /operator/service/status`
 - `GET /operator/gateway/status`
+- `GET /operator/storage/status`
+- `GET /operator/artifacts/status`
+- `GET /operator/signer/status`
+- `GET /operator/paymaster/status`
 
 Authenticated requests accept either:
 
@@ -81,6 +85,10 @@ Both JSON and YAML manifests are supported.
 openfox fleet status --manifest ./fleet.yml
 openfox fleet health --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
+openfox fleet storage --manifest ./fleet.yml
+openfox fleet artifacts --manifest ./fleet.yml
+openfox fleet signer --manifest ./fleet.yml
+openfox fleet paymaster --manifest ./fleet.yml
 ```
 
 Use these to answer questions such as:
@@ -89,6 +97,10 @@ Use these to answer questions such as:
 - which nodes fail health checks
 - which public deployments have misconfigured operator auth
 - which gateway/service roles are currently exposed
+- which storage nodes have due renewals or under-replicated bundles
+- which artifact nodes are storing, verifying, and anchoring bundles
+- which signer fleets have pending delegated executions
+- which paymaster fleets are funded, pending, or running with limited signer parity
 
 ## 5. Recommended Use
 

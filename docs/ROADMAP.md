@@ -656,6 +656,7 @@ The more reasonable strategy for now is:
 - the following mainline turns programmable delegated execution into a paid network service through signer-provider agents
 - the current mainline now includes native sponsored execution and paymaster-provider agents so execution funding becomes as programmable as execution authority
 - the current mainline now includes authenticated multi-node operator APIs and fleet-level status/health/doctor auditing for public OpenFox deployments
+- the current mainline now includes component-specific fleet audits for storage, artifact, signer-provider, and paymaster-provider nodes
 
 ## 6. Recommended Next Step
 

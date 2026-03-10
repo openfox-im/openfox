@@ -179,7 +179,11 @@ import {
   buildRuntimeStatusReport,
   buildRuntimeStatusSnapshot,
 } from "./operator/status.js";
-import { buildFleetReport, buildFleetSnapshot } from "./operator/fleet.js";
+import {
+  buildFleetReport,
+  buildFleetSnapshot,
+  type FleetEndpoint,
+} from "./operator/fleet.js";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";
@@ -1256,6 +1260,12 @@ Usage:
   openfox fleet status --manifest <path> [--json]
   openfox fleet health --manifest <path> [--json]
   openfox fleet doctor --manifest <path> [--json]
+  openfox fleet service --manifest <path> [--json]
+  openfox fleet gateway --manifest <path> [--json]
+  openfox fleet storage --manifest <path> [--json]
+  openfox fleet artifacts --manifest <path> [--json]
+  openfox fleet signer --manifest <path> [--json]
+  openfox fleet paymaster --manifest <path> [--json]
 `);
     if (!manifestPath && !helpRequested) {
       throw new Error("A fleet manifest is required. Use --manifest <path>.");
@@ -1264,8 +1274,16 @@ Usage:
   }
 
   const endpoint =
-    command === "status" || command === "health" || command === "doctor"
-      ? command
+    command === "status" ||
+    command === "health" ||
+    command === "doctor" ||
+    command === "service" ||
+    command === "gateway" ||
+    command === "storage" ||
+    command === "artifacts" ||
+    command === "signer" ||
+    command === "paymaster"
+      ? (command as FleetEndpoint)
       : null;
   if (!endpoint) {
     throw new Error(`Unknown fleet command: ${command}`);

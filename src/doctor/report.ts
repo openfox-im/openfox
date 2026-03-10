@@ -891,6 +891,7 @@ function collectFindings(
 
 export async function buildHealthSnapshot(
   explicitConfig?: OpenFoxConfig | null,
+  explicitDb?: OpenFoxDatabase,
 ): Promise<HealthSnapshot> {
   const configPath = getConfigPath();
   const walletPath = getWalletPath();
@@ -974,7 +975,7 @@ export async function buildHealthSnapshot(
     return { ...partial, findings: collectFindings(partial) };
   }
 
-  const db = createDatabase(resolvePath(config.dbPath));
+  const db = explicitDb ?? createDatabase(resolvePath(config.dbPath));
   try {
     const details = await buildConfigSnapshot(config, db);
     let walletSignerType: string | undefined;
@@ -1001,7 +1002,9 @@ export async function buildHealthSnapshot(
     };
     return { ...partial, findings: collectFindings(partial) };
   } finally {
-    db.close();
+    if (!explicitDb) {
+      db.close();
+    }
   }
 }
 

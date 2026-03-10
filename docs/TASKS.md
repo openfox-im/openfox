@@ -213,6 +213,11 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Make public storage, artifact, signer, and paymaster deployments
     easier to run and audit across multiple OpenFox nodes through a stable
     authenticated operator API and a fleet-level CLI surface.
+- [x] Task 46: Add component-specific fleet audits for storage, artifacts, signer, and paymaster nodes
+  - Status: Complete
+  - Goal: Move beyond generic fleet reachability and expose per-component
+    operator snapshots so public provider fleets can be audited by role, due
+    work, and policy health instead of only by top-level runtime status.
 
 ## Task 1 Breakdown
 
