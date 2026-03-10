@@ -636,9 +636,8 @@ Suggested priority order:
 - completed:
   - added provider reputation reporting across storage, artifacts, signer, and paymaster operators
   - added storage lease-health reporting across CLI, operator API, fleet audits, status, and doctor
-- still next:
-- extract more reusable SDK surfaces for third-party storage and artifact clients
-- add tighter integration between signer receipts and storage/artifact audit trails
+  - extracted reusable `tosdk` storage and artifact provider client surfaces for third-party builders
+  - linked signer and paymaster receipts back into storage lease, artifact verification, and anchoring trails
 
 ## 5. What Not to Do Yet
 
@@ -669,9 +668,10 @@ The more reasonable strategy for now is:
 
 ## 6. Recommended Next Step
 
-There are only two next steps that matter most:
+The current roadmap phases are complete.
 
-1. extract more reusable SDK surfaces for third-party storage and artifact clients so public operators and external builders can reuse the same bundle, audit, lease, and anchor primitives without pulling in full OpenFox runtime internals
-2. tighten the integration between signer/paymaster receipts and storage/artifact audit trails so maintenance, anchoring, and evidence operations can be traced end-to-end across execution and artifact state
+The next work should not reopen the completed core phases. It should focus on:
 
-Only after these two steps are complete should we expand into broader marketplace, reputation, and ecosystem-facing phases.
+1. broader public-network deployment hardening for storage, artifact, signer, and paymaster fleets
+2. richer operator dashboards and ecosystem-facing SDK examples on top of the now-stable runtime, marketplace, settlement, and artifact layers
+3. new work surfaces and product loops built on the completed foundations rather than more runtime rewrites

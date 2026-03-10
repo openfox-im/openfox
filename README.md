@@ -150,6 +150,7 @@ It supports:
 - canonical storage receipts, storage audits, storage renewals, and lightweight storage anchors for immutable bundle leases
 - scheduler-driven storage lease audit, renewal, and replication upkeep
 - canonical artifact verification receipts and lightweight artifact anchors for public news and oracle bundles
+- execution trails that bind signer and paymaster receipts back into storage lease, artifact verification, and anchoring records
 - contract callback adapters and heartbeat-driven retry for contract-bound settlement flows
 - contract-native market bindings for bounty, observation, and oracle creation flows
 - `openfox market list|get|callbacks` for operator-visible binding and callback state
@@ -237,6 +238,7 @@ pnpm openfox market list
 pnpm openfox storage list
 pnpm openfox storage renew --help
 pnpm openfox artifacts list
+pnpm openfox trails list --json
 pnpm openfox onboard --fund-local
 ```
 
@@ -254,6 +256,7 @@ openfox market list
 openfox storage list
 openfox storage renew --help
 openfox artifacts list
+openfox trails list --json
 ```
 
 If you are running directly from the source checkout and have not installed the binary globally yet, use:
@@ -291,6 +294,7 @@ openfox wallet bootstrap-signer --type ed25519 --generate
 openfox payments list
 openfox settlement list
 openfox storage list
+openfox trails list --json
 ```
 
 ---

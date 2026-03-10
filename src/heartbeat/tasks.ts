@@ -21,6 +21,7 @@ import { getSurvivalTier } from "../runtime/credits.js";
 import { createLogger } from "../observability/logger.js";
 import { getMetrics } from "../observability/metrics.js";
 import { AlertEngine, createDefaultAlertRules } from "../observability/alerts.js";
+import { propagateExecutionTrailsForSubject } from "../audit/execution-trails.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import { createMarketContractDispatcher } from "../market/contracts.js";
@@ -310,6 +311,15 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       }
       const audit = await auditLocalStorageLease({ lease });
       taskCtx.db.upsertStorageAudit(audit);
+      propagateExecutionTrailsForSubject({
+        db: taskCtx.db,
+        fromSubjectKind: "storage_lease",
+        fromSubjectId: lease.leaseId,
+        toSubjectKind: "storage_audit",
+        toSubjectId: audit.auditId,
+        metadata: { via: "storage_lease", lease_id: lease.leaseId },
+        createdAt: audit.updatedAt,
+      });
       processed += 1;
       if (audit.status === "failed") failed += 1;
     }

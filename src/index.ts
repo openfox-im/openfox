@@ -353,6 +353,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "trails") {
+    await handleTrailsCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "signer") {
     await handleSignerCommand(args.slice(1));
     process.exit(0);
@@ -2761,6 +2766,78 @@ Usage:
     }
 
     throw new Error(`Unknown artifacts command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleTrailsCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox trails
+
+Usage:
+  openfox trails list [--subject-kind <storage_lease|storage_renewal|storage_audit|storage_anchor|artifact|artifact_verification|artifact_anchor>] [--subject-id <id>] [--execution-kind <signer_execution|paymaster_authorization>] [--limit N] [--json]
+  openfox trails get --trail-id <id> [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    if (command === "get") {
+      const trailId = readOption(args, "--trail-id");
+      if (!trailId) throw new Error("Missing --trail-id <id>.");
+      const item = db.getExecutionTrail(trailId);
+      if (!item) throw new Error(`Execution trail not found: ${trailId}`);
+      logger.info(JSON.stringify(item, null, 2));
+      return;
+    }
+
+    if (command !== "list") {
+      throw new Error(`Unknown trails command: ${command}`);
+    }
+
+    const subjectKind = readOption(args, "--subject-kind") as
+      | "storage_lease"
+      | "storage_renewal"
+      | "storage_audit"
+      | "storage_anchor"
+      | "artifact"
+      | "artifact_verification"
+      | "artifact_anchor"
+      | undefined;
+    const executionKind = readOption(args, "--execution-kind") as
+      | "signer_execution"
+      | "paymaster_authorization"
+      | undefined;
+    const subjectId = readOption(args, "--subject-id");
+    const items = db.listExecutionTrails(readNumberOption(args, "--limit", 50), {
+      subjectKind,
+      subjectId: subjectId || undefined,
+      executionKind,
+    });
+    if (asJson) {
+      logger.info(JSON.stringify({ items }, null, 2));
+      return;
+    }
+    logger.info(
+      [
+        "=== OPENFOX EXECUTION TRAILS ===",
+        `Trails: ${items.length}`,
+        ...items.map(
+          (item) =>
+            `${item.trailId}  ${item.subjectKind}:${item.subjectId}  ${item.executionKind}:${item.executionRecordId}  mode=${item.linkMode}`,
+        ),
+        "================================",
+      ].join("\n"),
+    );
   } finally {
     db.close();
   }

@@ -229,12 +229,12 @@ building OpenFox into a TOS-native agent platform.
     provider reputation summaries plus lease-level health state for storage,
     artifacts, signer, and paymaster roles through CLI, operator APIs, fleet
     audits, status, and doctor.
-- [ ] Task 49: Extract more reusable SDK surfaces for third-party storage and artifact clients
-  - Status: Pending
+- [x] Task 49: Extract more reusable SDK surfaces for third-party storage and artifact clients
+  - Status: Complete
   - Goal: Move more storage, artifact, audit, and anchor helpers into `tosdk`
     so third-party clients do not need to depend on OpenFox runtime internals.
-- [ ] Task 50: Bind signer receipts to storage and artifact audit trails
-  - Status: Pending
+- [x] Task 50: Bind signer receipts to storage and artifact audit trails
+  - Status: Complete
   - Goal: Link delegated/sponsored execution receipts back into storage lease,
     artifact verification, and anchoring records so public operations have one
     auditable trail across execution, maintenance, and evidence.

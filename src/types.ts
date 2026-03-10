@@ -1004,6 +1004,37 @@ export interface ArtifactAnchorRecord {
   updatedAt: string;
 }
 
+export type ExecutionTrailSubjectKind =
+  | "storage_lease"
+  | "storage_renewal"
+  | "storage_audit"
+  | "storage_anchor"
+  | "artifact"
+  | "artifact_verification"
+  | "artifact_anchor";
+
+export type ExecutionTrailExecutionKind =
+  | "signer_execution"
+  | "paymaster_authorization";
+
+export type ExecutionTrailLinkMode = "direct" | "derived";
+
+export interface ExecutionTrailRecord {
+  trailId: string;
+  subjectKind: ExecutionTrailSubjectKind;
+  subjectId: string;
+  executionKind: ExecutionTrailExecutionKind;
+  executionRecordId: string;
+  executionTxHash?: Hex | null;
+  executionReceiptHash?: Hex | null;
+  linkMode: ExecutionTrailLinkMode;
+  sourceSubjectKind?: ExecutionTrailSubjectKind | null;
+  sourceSubjectId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SettlementKind = NativeSettlementKind;
 export type MarketBindingKind = NativeMarketBindingKind;
 
@@ -2291,6 +2322,28 @@ export interface OpenFoxDatabase {
   getArtifactAnchor(anchorId: string): ArtifactAnchorRecord | undefined;
   getArtifactAnchorByArtifactId(artifactId: string): ArtifactAnchorRecord | undefined;
   listArtifactAnchors(limit: number): ArtifactAnchorRecord[];
+  upsertExecutionTrail(record: ExecutionTrailRecord): void;
+  getExecutionTrail(trailId: string): ExecutionTrailRecord | undefined;
+  listExecutionTrails(
+    limit: number,
+    filters?: {
+      subjectKind?: ExecutionTrailSubjectKind;
+      subjectId?: string;
+      executionKind?: ExecutionTrailExecutionKind;
+    },
+  ): ExecutionTrailRecord[];
+  listExecutionTrailsForSubject(
+    subjectKind: ExecutionTrailSubjectKind,
+    subjectId: string,
+  ): ExecutionTrailRecord[];
+  findSignerExecutionBySubmittedTxHash(txHash: Hex): SignerExecutionRecord | undefined;
+  findPaymasterAuthorizationBySubmittedTxHash(
+    txHash: Hex,
+  ): PaymasterAuthorizationRecord | undefined;
+  findSignerExecutionByReceiptHash(receiptHash: Hex): SignerExecutionRecord | undefined;
+  findPaymasterAuthorizationByReceiptHash(
+    receiptHash: Hex,
+  ): PaymasterAuthorizationRecord | undefined;
 
   // Key-value atomic delete
   deleteKVReturning(key: string): string | undefined;

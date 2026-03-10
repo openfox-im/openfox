@@ -29,6 +29,7 @@ import {
   recordRequestNonce,
   validateRequestExpiry,
 } from "../agent-discovery/security.js";
+import { propagateExecutionTrailsForSubject } from "../audit/execution-trails.js";
 import { createLogger } from "../observability/logger.js";
 import { createNativeStorageAnchorPublisher } from "./publisher.js";
 import { finalizeBundle, readBundleFromPath, type StorageBundle } from "./bundle.js";
@@ -546,6 +547,15 @@ export async function startStorageProviderServer(params: {
           updatedAt: new Date().toISOString(),
         };
         params.db.upsertStorageAudit(audit);
+        propagateExecutionTrailsForSubject({
+          db: params.db,
+          fromSubjectKind: "storage_lease",
+          fromSubjectId: leaseId,
+          toSubjectKind: "storage_audit",
+          toSubjectId: audit.auditId,
+          metadata: { via: "storage_lease", lease_id: leaseId },
+          createdAt: audit.updatedAt,
+        });
         json(res, 200, auditToResponse(audit));
         return;
       }

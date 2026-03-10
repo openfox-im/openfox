@@ -6,6 +6,10 @@ import {
   type ArtifactAnchorSummary,
   type Hex,
 } from "tosdk";
+import {
+  bindExecutionTrailsByTransaction,
+  propagateExecutionTrailsForSubject,
+} from "../audit/execution-trails.js";
 import { sendTOSNativeTransfer } from "../tos/client.js";
 import type {
   ArtifactAnchorConfig,
@@ -103,6 +107,23 @@ export function createNativeArtifactAnchorPublisher(params: {
         updatedAt: now().toISOString(),
       };
       params.db.upsertArtifactAnchor(published);
+      bindExecutionTrailsByTransaction({
+        db: params.db,
+        subjectKind: "artifact_anchor",
+        subjectId: published.anchorId,
+        txHash: published.anchorTxHash ?? undefined,
+        metadata: { artifact_id: published.artifactId },
+        createdAt: published.updatedAt,
+      });
+      propagateExecutionTrailsForSubject({
+        db: params.db,
+        fromSubjectKind: "artifact_anchor",
+        fromSubjectId: published.anchorId,
+        toSubjectKind: "artifact",
+        toSubjectId: published.artifactId,
+        metadata: { via: "artifact_anchor", anchor_id: published.anchorId },
+        createdAt: published.updatedAt,
+      });
       return published;
     },
   };

@@ -18,6 +18,7 @@ import {
   getStorageHead,
   storePreparedBundleWithProvider,
 } from "../storage/client.js";
+import { propagateExecutionTrailsForSubject } from "../audit/execution-trails.js";
 import type {
   ArtifactAnchorRecord,
   ArtifactPipelineConfig,
@@ -772,6 +773,28 @@ export function createArtifactManager(params: {
       updatedAt: now().toISOString(),
     };
     params.db.upsertArtifactVerification(verification);
+    propagateExecutionTrailsForSubject({
+      db: params.db,
+      fromSubjectKind: "storage_lease",
+      fromSubjectId: artifact.leaseId,
+      toSubjectKind: "artifact_verification",
+      toSubjectId: verification.verificationId,
+      metadata: {
+        via: "storage_lease",
+        artifact_id: artifact.artifactId,
+        lease_id: artifact.leaseId,
+      },
+      createdAt: verification.updatedAt,
+    });
+    propagateExecutionTrailsForSubject({
+      db: params.db,
+      fromSubjectKind: "artifact",
+      fromSubjectId: artifact.artifactId,
+      toSubjectKind: "artifact_verification",
+      toSubjectId: verification.verificationId,
+      metadata: { via: "artifact", artifact_id: artifact.artifactId },
+      createdAt: verification.updatedAt,
+    });
     params.db.upsertArtifact({
       ...artifact,
       status: status === "verified" ? "verified" : "failed",

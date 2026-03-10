@@ -6,6 +6,10 @@ import {
   type Hex,
   type StorageAnchorSummary,
 } from "tosdk";
+import {
+  bindExecutionTrailsByTransaction,
+  propagateExecutionTrailsForSubject,
+} from "../audit/execution-trails.js";
 import { sendTOSNativeTransfer } from "../tos/client.js";
 import type {
   OpenFoxDatabase,
@@ -93,6 +97,23 @@ export function createNativeStorageAnchorPublisher(params: {
         updatedAt: now().toISOString(),
       };
       params.db.upsertStorageAnchor(published);
+      bindExecutionTrailsByTransaction({
+        db: params.db,
+        subjectKind: "storage_anchor",
+        subjectId: published.anchorId,
+        txHash: published.anchorTxHash ?? undefined,
+        metadata: { lease_id: published.leaseId },
+        createdAt: published.updatedAt,
+      });
+      propagateExecutionTrailsForSubject({
+        db: params.db,
+        fromSubjectKind: "storage_anchor",
+        fromSubjectId: published.anchorId,
+        toSubjectKind: "storage_lease",
+        toSubjectId: published.leaseId,
+        metadata: { via: "storage_anchor", anchor_id: published.anchorId },
+        createdAt: published.updatedAt,
+      });
       return published;
     },
   };

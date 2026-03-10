@@ -1,5 +1,6 @@
 import { createNativeArtifactAnchorPublisher } from "../artifacts/publisher.js";
 import { createArtifactManager } from "../artifacts/manager.js";
+import { propagateExecutionTrailsForSubject } from "../audit/execution-trails.js";
 import { getWallet } from "../identity/wallet.js";
 import {
   auditLocalStorageLease,
@@ -171,6 +172,15 @@ export async function runStorageMaintenance(params: {
     try {
       const audit = await auditLocalStorageLease({ lease });
       params.db.upsertStorageAudit(audit);
+      propagateExecutionTrailsForSubject({
+        db: params.db,
+        fromSubjectKind: "storage_lease",
+        fromSubjectId: lease.leaseId,
+        toSubjectKind: "storage_audit",
+        toSubjectId: audit.auditId,
+        metadata: { via: "storage_lease", lease_id: lease.leaseId },
+        createdAt: audit.updatedAt,
+      });
       audited += 1;
     } catch {
       auditFailures += 1;

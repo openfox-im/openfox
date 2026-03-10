@@ -9,6 +9,7 @@ import Database from "better-sqlite3";
 import type BetterSqlite3 from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import type { Hex } from "tosdk";
 
 type DatabaseType = BetterSqlite3.Database;
 import type {
@@ -33,6 +34,9 @@ import type {
   ArtifactSearchFilters,
   ArtifactVerificationRecord,
   ArtifactBundleKind,
+  ExecutionTrailExecutionKind,
+  ExecutionTrailRecord,
+  ExecutionTrailSubjectKind,
   MarketBindingKind,
   MarketBindingRecord,
   MarketContractCallbackRecord,
@@ -95,6 +99,7 @@ import {
   MIGRATION_V22,
   MIGRATION_V23,
   MIGRATION_V24,
+  MIGRATION_V26,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -2129,6 +2134,123 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     return rows.map(deserializeArtifactAnchorRecord);
   };
 
+  const upsertExecutionTrail = (record: ExecutionTrailRecord): void => {
+    db.prepare(
+      `INSERT INTO execution_trails (
+        trail_id, subject_kind, subject_id, execution_kind, execution_record_id,
+        execution_tx_hash, execution_receipt_hash, link_mode, source_subject_kind,
+        source_subject_id, metadata_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(trail_id) DO UPDATE SET
+        subject_kind = excluded.subject_kind,
+        subject_id = excluded.subject_id,
+        execution_kind = excluded.execution_kind,
+        execution_record_id = excluded.execution_record_id,
+        execution_tx_hash = excluded.execution_tx_hash,
+        execution_receipt_hash = excluded.execution_receipt_hash,
+        link_mode = excluded.link_mode,
+        source_subject_kind = excluded.source_subject_kind,
+        source_subject_id = excluded.source_subject_id,
+        metadata_json = excluded.metadata_json,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.trailId,
+      record.subjectKind,
+      record.subjectId,
+      record.executionKind,
+      record.executionRecordId,
+      record.executionTxHash ?? null,
+      record.executionReceiptHash ?? null,
+      record.linkMode,
+      record.sourceSubjectKind ?? null,
+      record.sourceSubjectId ?? null,
+      record.metadata ? JSON.stringify(record.metadata) : null,
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getExecutionTrail = (trailId: string): ExecutionTrailRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM execution_trails WHERE trail_id = ?")
+      .get(trailId) as any | undefined;
+    return row ? deserializeExecutionTrailRecord(row) : undefined;
+  };
+
+  const listExecutionTrails = (
+    limit: number,
+    filters?: {
+      subjectKind?: ExecutionTrailSubjectKind;
+      subjectId?: string;
+      executionKind?: ExecutionTrailExecutionKind;
+    },
+  ): ExecutionTrailRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.subjectKind) {
+      clauses.push("subject_kind = ?");
+      params.push(filters.subjectKind);
+    }
+    if (filters?.subjectId) {
+      clauses.push("subject_id = ?");
+      params.push(filters.subjectId);
+    }
+    if (filters?.executionKind) {
+      clauses.push("execution_kind = ?");
+      params.push(filters.executionKind);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(`SELECT * FROM execution_trails ${where} ORDER BY updated_at DESC, created_at DESC LIMIT ?`)
+      .all(...params, limit) as any[];
+    return rows.map(deserializeExecutionTrailRecord);
+  };
+
+  const listExecutionTrailsForSubject = (
+    subjectKind: ExecutionTrailSubjectKind,
+    subjectId: string,
+  ): ExecutionTrailRecord[] =>
+    listExecutionTrails(100, {
+      subjectKind,
+      subjectId,
+    });
+
+  const findSignerExecutionBySubmittedTxHash = (
+    txHash: Hex,
+  ): SignerExecutionRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM signer_executions WHERE submitted_tx_hash = ?")
+      .get(txHash) as any | undefined;
+    return row ? deserializeSignerExecutionRecord(row) : undefined;
+  };
+
+  const findPaymasterAuthorizationBySubmittedTxHash = (
+    txHash: Hex,
+  ): PaymasterAuthorizationRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM paymaster_authorizations WHERE submitted_tx_hash = ?")
+      .get(txHash) as any | undefined;
+    return row ? deserializePaymasterAuthorizationRecord(row) : undefined;
+  };
+
+  const findSignerExecutionByReceiptHash = (
+    receiptHash: Hex,
+  ): SignerExecutionRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM signer_executions WHERE receipt_hash = ?")
+      .get(receiptHash) as any | undefined;
+    return row ? deserializeSignerExecutionRecord(row) : undefined;
+  };
+
+  const findPaymasterAuthorizationByReceiptHash = (
+    receiptHash: Hex,
+  ): PaymasterAuthorizationRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM paymaster_authorizations WHERE receipt_hash = ?")
+      .get(receiptHash) as any | undefined;
+    return row ? deserializePaymasterAuthorizationRecord(row) : undefined;
+  };
+
   // ─── Agent State ─────────────────────────────────────────────
 
   const getAgentState = (): AgentState => {
@@ -2266,6 +2388,14 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getArtifactAnchor,
     getArtifactAnchorByArtifactId,
     listArtifactAnchors,
+    upsertExecutionTrail,
+    getExecutionTrail,
+    listExecutionTrails,
+    listExecutionTrailsForSubject,
+    findSignerExecutionBySubmittedTxHash,
+    findPaymasterAuthorizationBySubmittedTxHash,
+    findSignerExecutionByReceiptHash,
+    findPaymasterAuthorizationByReceiptHash,
     getAgentState,
     setAgentState,
     runTransaction,
@@ -2477,6 +2607,10 @@ function applyMigrations(db: DatabaseType): void {
           );
         }
       },
+    },
+    {
+      version: 26,
+      apply: () => db.exec(MIGRATION_V26),
     },
   ];
 
@@ -4075,6 +4209,30 @@ function deserializeArtifactAnchorRecord(row: any): ArtifactAnchorRecord {
           row.anchor_receipt_json,
           null as ArtifactAnchorRecord["anchorReceipt"],
           "deserializeArtifactAnchorRecord.anchor_receipt_json",
+        )
+      : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeExecutionTrailRecord(row: any): ExecutionTrailRecord {
+  return {
+    trailId: row.trail_id,
+    subjectKind: row.subject_kind,
+    subjectId: row.subject_id,
+    executionKind: row.execution_kind,
+    executionRecordId: row.execution_record_id,
+    executionTxHash: row.execution_tx_hash ?? null,
+    executionReceiptHash: row.execution_receipt_hash ?? null,
+    linkMode: row.link_mode,
+    sourceSubjectKind: row.source_subject_kind ?? null,
+    sourceSubjectId: row.source_subject_id ?? null,
+    metadata: row.metadata_json
+      ? parseJsonSafe(
+          row.metadata_json,
+          null as ExecutionTrailRecord["metadata"],
+          "deserializeExecutionTrailRecord.metadata_json",
         )
       : null,
     createdAt: row.created_at,

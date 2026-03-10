@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 26;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -637,6 +637,43 @@ export const CREATE_TABLES = `
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_anchors_artifact
     ON artifact_anchors(artifact_id);
+
+  CREATE TABLE IF NOT EXISTS execution_trails (
+    trail_id TEXT PRIMARY KEY,
+    subject_kind TEXT NOT NULL CHECK(subject_kind IN ('storage_lease','storage_renewal','storage_audit','storage_anchor','artifact','artifact_verification','artifact_anchor')),
+    subject_id TEXT NOT NULL,
+    execution_kind TEXT NOT NULL CHECK(execution_kind IN ('signer_execution','paymaster_authorization')),
+    execution_record_id TEXT NOT NULL,
+    execution_tx_hash TEXT,
+    execution_receipt_hash TEXT,
+    link_mode TEXT NOT NULL CHECK(link_mode IN ('direct','derived')),
+    source_subject_kind TEXT,
+    source_subject_id TEXT,
+    metadata_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_trails_subject_execution
+    ON execution_trails(subject_kind, subject_id, execution_kind, execution_record_id);
+
+  CREATE INDEX IF NOT EXISTS idx_execution_trails_subject
+    ON execution_trails(subject_kind, subject_id, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_execution_trails_execution
+    ON execution_trails(execution_kind, execution_record_id, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_signer_executions_tx_hash
+    ON signer_executions(submitted_tx_hash);
+
+  CREATE INDEX IF NOT EXISTS idx_signer_executions_receipt_hash
+    ON signer_executions(receipt_hash);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_authorizations_tx_hash
+    ON paymaster_authorizations(submitted_tx_hash);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_authorizations_receipt_hash
+    ON paymaster_authorizations(receipt_hash);
 `;
 
 export const MIGRATION_V17 = `
@@ -1324,6 +1361,45 @@ export const MIGRATION_V24 = `
 
   ALTER TABLE paymaster_authorizations
     ADD COLUMN execution_nonce TEXT NOT NULL DEFAULT '0';
+`;
+
+export const MIGRATION_V26 = `
+  CREATE TABLE IF NOT EXISTS execution_trails (
+    trail_id TEXT PRIMARY KEY,
+    subject_kind TEXT NOT NULL CHECK(subject_kind IN ('storage_lease','storage_renewal','storage_audit','storage_anchor','artifact','artifact_verification','artifact_anchor')),
+    subject_id TEXT NOT NULL,
+    execution_kind TEXT NOT NULL CHECK(execution_kind IN ('signer_execution','paymaster_authorization')),
+    execution_record_id TEXT NOT NULL,
+    execution_tx_hash TEXT,
+    execution_receipt_hash TEXT,
+    link_mode TEXT NOT NULL CHECK(link_mode IN ('direct','derived')),
+    source_subject_kind TEXT,
+    source_subject_id TEXT,
+    metadata_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_trails_subject_execution
+    ON execution_trails(subject_kind, subject_id, execution_kind, execution_record_id);
+
+  CREATE INDEX IF NOT EXISTS idx_execution_trails_subject
+    ON execution_trails(subject_kind, subject_id, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_execution_trails_execution
+    ON execution_trails(execution_kind, execution_record_id, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_signer_executions_tx_hash
+    ON signer_executions(submitted_tx_hash);
+
+  CREATE INDEX IF NOT EXISTS idx_signer_executions_receipt_hash
+    ON signer_executions(receipt_hash);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_authorizations_tx_hash
+    ON paymaster_authorizations(submitted_tx_hash);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_authorizations_receipt_hash
+    ON paymaster_authorizations(receipt_hash);
 `;
 
 export const MIGRATION_V3 = `
