@@ -286,7 +286,7 @@ openfox templates list
 openfox templates export third-party-quickstart --output ./my-openfox
 openfox onboard --fund-local
 openfox onboard --fund-testnet
-openfox wallet bootstrap-signer --type ed25519
+openfox wallet bootstrap-signer --type ed25519 --generate
 openfox payments list
 openfox settlement list
 openfox storage list
@@ -334,7 +334,7 @@ OpenFox now exposes a productized native wallet surface:
 openfox wallet status
 openfox wallet fund local
 openfox wallet fund testnet
-openfox wallet bootstrap-signer --type secp256r1
+openfox wallet bootstrap-signer --type secp256r1 --public-key 0x... --private-key 0x...
 ```
 
 What each command is for:
@@ -346,13 +346,15 @@ What each command is for:
 - `openfox wallet fund testnet`
   - request one-click funding from a configured faucet URL or a discovered `sponsor.topup.testnet` provider
 - `openfox wallet bootstrap-signer --type <ed25519|secp256r1|bls12-381|elgamal>`
-  - generate native signer material, save it locally, and submit signer metadata bootstrap on-chain
+  - publish signer metadata for a wallet address that already matches the signer-derived native address
+  - use `--generate` to create signer material, or pass `--public-key` and `--private-key` explicitly
 
 Important boundary:
 
 - `secp256k1` is the default and fully supported native transaction path in OpenFox today
 - non-`secp256k1` signer bootstrap is an advanced/operator path
-- if you switch an account to a non-`secp256k1` signer, you should do so intentionally and understand that OpenFox runtime transaction sending is still optimized for the default signer path
+- non-`secp256k1` bootstrap only works when the configured wallet address already equals the signer-derived native address
+- OpenFox runtime transaction sending is still optimized for the default local `secp256k1` wallet path
 
 ## Operator Commands
 

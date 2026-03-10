@@ -185,6 +185,11 @@ Delivered surface:
 - `openfox wallet bootstrap-signer --type <ed25519|secp256r1|bls12-381|elgamal>`
 - improved native wallet error guidance for RPC, balance, nonce, and signer metadata issues
 
+Important boundary:
+
+- non-`secp256k1` signer bootstrap only works when the configured wallet address already matches the signer-derived native address
+- OpenFox local runtime transaction flows remain optimized for the built-in local `secp256k1` wallet path
+
 ### Phase 2: Launch Real Paid Services
 
 Status: completed

@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { publicKeyToNativeAddress } from "tosdk";
 import { createTestConfig } from "./mocks.js";
 
 describe("wallet operator", () => {
@@ -152,15 +153,46 @@ describe("wallet operator", () => {
   });
 
   it.each([
-    { signerType: "ed25519", expectedPath: path.join(".openfox", "signers", "ed25519.json") },
-    { signerType: "secp256r1", expectedPath: path.join(".openfox", "signers", "secp256r1.json") },
-    { signerType: "bls12-381", expectedPath: path.join(".openfox", "signers", "bls12-381.json") },
-    { signerType: "elgamal", expectedPath: path.join(".openfox", "signers", "elgamal.json") },
-  ])("bootstraps signer metadata with generated $signerType material", async ({ signerType, expectedPath }) => {
+    "ed25519",
+    "secp256r1",
+    "bls12-381",
+    "elgamal",
+  ])("rejects bootstrap for generated %s material when the wallet address does not match", async (signerType) => {
     const { getWallet } = await import("../identity/wallet.js");
     const { bootstrapWalletSigner } = await import("../wallet/operator.js");
 
     await getWallet();
+    const config = createTestConfig({
+      rpcUrl: "http://127.0.0.1:8545",
+    });
+    await expect(
+      bootstrapWalletSigner({
+        config,
+        signerType: signerType as "ed25519" | "secp256r1" | "bls12-381" | "elgamal",
+        generate: true,
+        waitForReceipt: false,
+      }),
+    ).rejects.toThrow(/already matches the signer-derived address/i);
+  });
+
+  it.each([
+    { signerType: "ed25519", expectedPath: path.join(".openfox", "signers", "ed25519.json") },
+    { signerType: "secp256r1", expectedPath: path.join(".openfox", "signers", "secp256r1.json") },
+    { signerType: "bls12-381", expectedPath: path.join(".openfox", "signers", "bls12-381.json") },
+    { signerType: "elgamal", expectedPath: path.join(".openfox", "signers", "elgamal.json") },
+  ])("bootstraps signer metadata for matching $signerType wallet addresses", async ({ signerType, expectedPath }) => {
+    const { getWallet } = await import("../identity/wallet.js");
+    const { bootstrapWalletSigner, generateSignerMaterial } = await import("../wallet/operator.js");
+
+    await getWallet();
+    const material = generateSignerMaterial({
+      signerType: signerType as "ed25519" | "secp256r1" | "bls12-381" | "elgamal",
+    });
+    const derivedAddress = publicKeyToNativeAddress({
+      publicKey: material.signerValue,
+      signerType,
+    });
+
     global.fetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -178,17 +210,19 @@ describe("wallet operator", () => {
 
     const config = createTestConfig({
       rpcUrl: "http://127.0.0.1:8545",
+      walletAddress: derivedAddress,
     });
     const result = await bootstrapWalletSigner({
       config,
       signerType: signerType as "ed25519" | "secp256r1" | "bls12-381" | "elgamal",
-      generate: true,
+      signerValue: material.signerValue,
+      signerPrivateKey: material.privateKey,
       waitForReceipt: false,
     });
 
     expect(result.signerType).toBe(signerType);
-    expect(result.signerValue).toMatch(/^0x[0-9a-f]+$/);
+    expect(result.signerValue).toBe(material.signerValue);
     expect(result.txHash).toBe("0xbootstrap");
-    expect(result.keyPath).toContain(expectedPath);
+    expect(material.keyPath).toContain(expectedPath);
   });
 });

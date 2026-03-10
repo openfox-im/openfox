@@ -2,6 +2,13 @@ import fs from "fs";
 import path from "path";
 import { generateKeyPairSync } from "crypto";
 import {
+  createWalletClient,
+  http as httpTransport,
+  publicKeyToNativeAddress,
+  signHash,
+  hashTransaction,
+  type Address,
+  type LocalAccount,
   bls12381PrivateKeyToAccount,
   elgamalPrivateKeyToAccount,
   generatePrivateKey,
@@ -107,6 +114,40 @@ function base64UrlToHex(value: string): HexAddress {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = `${normalized}${"=".repeat((4 - (normalized.length % 4 || 4)) % 4)}`;
   return `0x${Buffer.from(padded, "base64").toString("hex")}` as HexAddress;
+}
+
+function createEd25519Account(params: {
+  address: TOSAddress;
+  publicKey: HexAddress;
+  privateKey: HexAddress;
+}): LocalAccount<"custom", Address> {
+  return {
+    address: params.address,
+    publicKey: params.publicKey,
+    signerType: "ed25519",
+    source: "custom",
+    type: "local",
+    async sign() {
+      throw new Error("raw ed25519 hash signing is not exposed through this OpenFox helper.");
+    },
+    async signMessage() {
+      throw new Error("ed25519 signMessage is not exposed through this OpenFox helper.");
+    },
+    async signAuthorization(transaction) {
+      return signHash({
+        hash: hashTransaction(transaction),
+        privateKey: params.privateKey,
+        signerType: "ed25519",
+        to: "object",
+      });
+    },
+    async signTransaction() {
+      throw new Error("ed25519 signTransaction is not exposed through this OpenFox helper.");
+    },
+    async signTypedData() {
+      throw new Error("ed25519 signTypedData is not exposed through this OpenFox helper.");
+    },
+  };
 }
 
 function buildRequestExpiry(): number {
@@ -444,6 +485,7 @@ export async function bootstrapWalletSigner(params: {
   config: OpenFoxConfig;
   signerType: BootstrapSignerType;
   signerValue?: HexAddress;
+  signerPrivateKey?: HexAddress;
   generate?: boolean;
   outputPath?: string;
   overwrite?: boolean;
@@ -453,13 +495,15 @@ export async function bootstrapWalletSigner(params: {
   if (!rpcUrl) {
     throw new Error("Signer bootstrap requires rpcUrl.");
   }
-  const privateKey = loadWalletPrivateKey();
-  if (!privateKey) {
+  const walletPrivateKey = loadWalletPrivateKey();
+  if (!walletPrivateKey) {
     throw new Error("OpenFox wallet is missing.");
   }
+  const { address } = await buildIdentity(params.config);
 
   const signerType = normalizeBootstrapSignerType(params.signerType);
   let signerValue = params.signerValue;
+  let signerPrivateKey = params.signerPrivateKey;
   let keyPath: string | undefined;
   if (!signerValue && params.generate !== false) {
     const generated = generateSignerMaterial({
@@ -468,23 +512,56 @@ export async function bootstrapWalletSigner(params: {
       overwrite: params.overwrite,
     });
     signerValue = generated.signerValue;
+    signerPrivateKey = generated.privateKey;
     keyPath = generated.keyPath;
   }
   if (!signerValue) {
     throw new Error("Provide --public-key or use --generate for signer bootstrap.");
   }
 
-  const result = await setTOSSignerMetadata({
-    rpcUrl,
-    privateKey,
+  if (!signerPrivateKey) {
+    throw new Error(
+      "Non-secp signer bootstrap requires signer private key material. Use --generate or provide --private-key.",
+    );
+  }
+
+  const derivedAddress = normalizeAddress(
+    publicKeyToNativeAddress({
+      publicKey: signerValue,
+      signerType,
+    }),
+  );
+  if (derivedAddress !== address) {
+    throw new Error(
+      `Signer public key derives to ${derivedAddress}, but the configured wallet address is ${address}. Non-secp signer bootstrap only works when the wallet address already matches the signer-derived address.`,
+    );
+  }
+
+  const account =
+    signerType === "ed25519"
+      ? createEd25519Account({
+          address,
+          publicKey: signerValue,
+          privateKey: signerPrivateKey,
+        })
+      : signerType === "secp256r1"
+        ? secp256r1PrivateKeyToAccount(signerPrivateKey)
+        : signerType === "bls12-381"
+          ? bls12381PrivateKeyToAccount(signerPrivateKey)
+          : elgamalPrivateKeyToAccount(signerPrivateKey);
+
+  const client = createWalletClient({
+    account,
+    transport: httpTransport(rpcUrl),
+  });
+  const txHash = await client.setSignerMetadata({
     signerType,
     signerValue,
-    waitForReceipt: params.waitForReceipt,
   });
   return {
     signerType,
     signerValue,
-    txHash: result.txHash,
+    txHash: txHash as HexAddress,
     keyPath,
   };
 }

@@ -34,12 +34,13 @@ Usage:
   openfox wallet status [--json]
   openfox wallet fund local [--amount 5] [--amount-wei <wei>] [--from 0x...] [--password ...] [--wait]
   openfox wallet fund testnet [--amount 0.01] [--amount-wei <wei>] [--faucet-url <url>] [--reason "..."] [--wait]
-  openfox wallet bootstrap-signer --type <ed25519|secp256r1|bls12-381|elgamal> [--generate] [--public-key 0x...] [--output <path>] [--overwrite] [--wait]
+  openfox wallet bootstrap-signer --type <ed25519|secp256r1|bls12-381|elgamal> [--generate] [--public-key 0x...] [--private-key 0x...] [--output <path>] [--overwrite] [--wait]
 
 Notes:
   - local funding uses a local node-managed account via personal_sendTransaction
   - testnet funding first tries a configured faucet URL, then falls back to Agent Discovery
-  - non-secp signer bootstrap is an advanced path; OpenFox local wallet flows still use the built-in secp256k1 wallet, while delegated and sponsored execution can follow on-chain signer metadata
+  - non-secp signer bootstrap only works when the configured wallet address already matches the signer-derived native address
+  - OpenFox local wallet flows still use the built-in secp256k1 wallet; non-secp signer bootstrap is for delegated and sponsored execution paths
 `;
 }
 
@@ -138,6 +139,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
         config,
         signerType: signerType as "ed25519" | "secp256r1" | "bls12-381" | "elgamal",
         signerValue: readFlag(args, "--public-key") as `0x${string}` | undefined,
+        signerPrivateKey: readFlag(args, "--private-key") as `0x${string}` | undefined,
         generate: hasFlag(args, "--generate") || !readFlag(args, "--public-key"),
         outputPath: readFlag(args, "--output")
           ? resolvePath(readFlag(args, "--output")!)
@@ -152,7 +154,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
           `Signer value: ${result.signerValue}`,
           `Tx: ${result.txHash}`,
           ...(result.keyPath ? [`Key file: ${result.keyPath}`] : []),
-          "Warning: OpenFox local wallet flows still use the built-in secp256k1 wallet. Use this advanced flow only if you understand the signer switch and delegated execution semantics.",
+          "Warning: non-secp signer bootstrap only works when the configured wallet address already matches the signer-derived native address. OpenFox local wallet flows still use the built-in secp256k1 wallet.",
         ].join("\n"),
       );
       return;
