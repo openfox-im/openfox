@@ -188,23 +188,23 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Make signer-provider state visible through status/health/doctor/docs
     so programmable delegated execution becomes part of the same operator story
     as storage, artifacts, settlement, and paid services.
-- [ ] Task 41: Define the paymaster-provider protocol and sponsor-policy profile
-  - Status: Planned
+- [x] Task 41: Define the paymaster-provider protocol and sponsor-policy profile
+  - Status: Complete
   - Goal: Turn native sponsored execution into a stable OpenFox/TOS protocol
     surface for bounded execution funding, without falling back to faucet or
     top-up workarounds.
-- [ ] Task 42: Add native sponsored transaction support across GTOS, tolang, and tosdk
-  - Status: Planned
+- [x] Task 42: Add native sponsored transaction support across GTOS, tolang, and tosdk
+  - Status: Complete
   - Goal: Add first-class sponsor-aware transaction semantics, validation, and
     client encoding so sponsor-side gas funding becomes native protocol
     behavior.
-- [ ] Task 43: Add a paymaster-provider service mode and requester UX to OpenFox
-  - Status: Planned
+- [x] Task 43: Add a paymaster-provider service mode and requester UX to OpenFox
+  - Status: Complete
   - Goal: Let one OpenFox node publish sponsorship capability and let another
     node discover it, obtain one sponsorship authorization, and execute a
     sponsored call through the native TOS path.
-- [ ] Task 44: Add paymaster-provider operator visibility, diagnostics, and docs
-  - Status: Planned
+- [x] Task 44: Add paymaster-provider operator visibility, diagnostics, and docs
+  - Status: Complete
   - Goal: Make sponsored execution state visible through status/health/doctor,
     service UX, and operator guides so paymaster-provider becomes part of the
     same runtime story as signer-provider and paid services.
@@ -578,14 +578,14 @@ building OpenFox into a TOS-native agent platform.
 
 ## Task 41 Breakdown
 
-- [ ] Define canonical `paymaster.quote`, `paymaster.authorize`, `paymaster.status`, and `paymaster.receipt` request/response objects.
-- [ ] Define a canonical `PaymasterPolicyRef` shape with `sponsor_address`, `policy_hash`, wallet/target constraints, gas caps, and expiry metadata.
-- [ ] Define `sponsor_signer_type` as a first-class protocol field instead of leaving sponsor authorization implicitly bound to `secp256k1`.
-- [ ] Define a canonical paymaster-provider `trust_tier` model aligned with signer-provider:
+- [x] Define canonical `paymaster.quote`, `paymaster.authorize`, `paymaster.status`, and `paymaster.receipt` request/response objects.
+- [x] Define a canonical `PaymasterPolicyRef` shape with `sponsor_address`, `policy_hash`, wallet/target constraints, gas caps, and expiry metadata.
+- [x] Define `sponsor_signer_type` as a first-class protocol field instead of leaving sponsor authorization implicitly bound to `secp256k1`.
+- [x] Define a canonical paymaster-provider `trust_tier` model aligned with signer-provider:
   - `self_hosted`
   - `org_trusted`
   - `public_low_trust`
-- [ ] Define the first supported sponsor-policy profile for bounded native sponsored execution:
+- [x] Define the first supported sponsor-policy profile for bounded native sponsored execution:
   - allowed requester wallets
   - allowed target addresses
   - allowed function selectors
@@ -594,45 +594,45 @@ building OpenFox into a TOS-native agent platform.
   - max value
   - expiry
   - replay protection expectations
-- [ ] Define signer-type parity as a hard protocol requirement:
+- [x] Define signer-type parity as a hard protocol requirement:
   - `SponsoredSignerTxType` must support the same `SignerType` set as ordinary `SignerTxType`
   - this applies to both requester/execution signatures and sponsor/paymaster signatures
-- [ ] Define payment idempotency and payment-to-authorization binding rules for paymaster-provider flows.
-- [ ] Define how paymaster-provider capability publication maps into Agent Discovery and optional Agent Gateway routes.
-- [ ] Keep the protocol explicitly native sponsored execution, not a disguised top-up or faucet path.
+- [x] Define payment idempotency and payment-to-authorization binding rules for paymaster-provider flows.
+- [x] Define how paymaster-provider capability publication maps into Agent Discovery and optional Agent Gateway routes.
+- [x] Keep the protocol explicitly native sponsored execution, not a disguised top-up or faucet path.
 
 ## Task 42 Breakdown
 
-- [ ] Add a native sponsored transaction type or equivalent sponsor-aware transaction semantics in `gtos`.
-- [ ] Add sponsor identity, sponsor witness, sponsor nonce, sponsor expiry, and sponsor policy-hash fields to the native transaction model.
-- [ ] Add `sponsor_signer_type` to the native transaction model and hashing/signing path.
-- [ ] Update mempool and state-transition rules so sponsor-side balance and sponsor-side authorization replace requester-side gas funding.
-- [ ] Add first-class sponsor validation hooks in `gtos` and `tolang`.
-- [ ] Make `SponsoredSignerTxType` support the same `SignerType` matrix as ordinary `SignerTxType`, rather than leaving sponsor-side signing locked to `secp256k1`.
-- [ ] Route both requester-side and sponsor-side verification through signer-type-aware verification code paths instead of hard-coded ECDSA-only helpers.
-- [ ] Add `tosdk` encoding, hashing, signing, and client support for native sponsored transactions.
-- [ ] Add targeted tests for sponsored validation, replay protection, rejection outside policy, and sponsor-funded execution paths.
+- [x] Add a native sponsored transaction type or equivalent sponsor-aware transaction semantics in `gtos`.
+- [x] Add sponsor identity, sponsor witness, sponsor nonce, sponsor expiry, and sponsor policy-hash fields to the native transaction model.
+- [x] Add `sponsor_signer_type` to the native transaction model and hashing/signing path.
+- [x] Update mempool and state-transition rules so sponsor-side balance and sponsor-side authorization replace requester-side gas funding.
+- [x] Add first-class sponsor validation hooks in `gtos` and `tolang`.
+- [x] Make `SponsoredSignerTxType` support the same `SignerType` matrix as ordinary `SignerTxType`, rather than leaving sponsor-side signing locked to `secp256k1`.
+- [x] Route both requester-side and sponsor-side verification through signer-type-aware verification code paths instead of hard-coded ECDSA-only helpers.
+- [x] Add `tosdk` encoding, hashing, signing, and client support for native sponsored transactions.
+- [x] Add targeted tests for sponsored validation, replay protection, rejection outside policy, and sponsor-funded execution paths.
 
 ## Task 43 Breakdown
 
-- [ ] Add paymaster-provider config and local database tables for sponsorship quotes, authorizations, and receipts.
-- [ ] Add a paymaster-provider HTTP service with bounded `quote`, `authorize`, `status`, and `receipt` flows.
-- [ ] Reuse the paid-provider pattern so paymaster-provider requests can charge via `x402` when appropriate.
-- [ ] Add a requester-side paymaster-provider client that can request a quote and obtain one bounded sponsorship authorization.
-- [ ] Add `openfox paymaster ...` CLI surfaces for provider discovery, quote, authorize, and receipt lookup.
-- [ ] Surface requester-side and sponsor-side signer types in paymaster authorization objects and CLI output so operators can confirm signer-type parity in practice.
-- [ ] Support composition across:
+- [x] Add paymaster-provider config and local database tables for sponsorship quotes, authorizations, and receipts.
+- [x] Add a paymaster-provider HTTP service with bounded `quote`, `authorize`, `status`, and `receipt` flows.
+- [x] Reuse the paid-provider pattern so paymaster-provider requests can charge via `x402` when appropriate.
+- [x] Add a requester-side paymaster-provider client that can request a quote and obtain one bounded sponsorship authorization.
+- [x] Add `openfox paymaster ...` CLI surfaces for provider discovery, quote, authorize, and receipt lookup.
+- [x] Surface requester-side and sponsor-side signer types in paymaster authorization objects and CLI output so operators can confirm signer-type parity in practice.
+- [x] Support composition across:
   - local wallet + paymaster-provider
   - signer-provider + paymaster-provider
   - combined signer-provider + paymaster-provider
-- [ ] Keep discovery-first invocation and optional gateway compatibility for paymaster-provider routes.
+- [x] Keep discovery-first invocation and optional gateway compatibility for paymaster-provider routes.
 
 ## Task 44 Breakdown
 
-- [ ] Surface paymaster-provider routes, authorizations, receipts, and recent sponsorship state in `openfox status`.
-- [ ] Add paymaster-provider findings to `openfox health` and `openfox doctor`, especially for missing sponsor policy, expired sponsorship windows, or insufficient sponsor funding.
-- [ ] Surface signer-type mismatch findings when sponsored execution falls back to narrower signer support than ordinary `SignerTxType`.
-- [ ] Expose paymaster-provider service/operator state through the existing managed-service and service-status UX.
-- [ ] Document the operator flow for requester, sponsor principal, and paymaster-provider roles.
-- [ ] Add a multi-node example showing signer-provider plus paymaster-provider composition.
-- [ ] Link paymaster-provider docs back into the roadmap and operator-facing guides so sponsored execution becomes part of the main runtime narrative.
+- [x] Surface paymaster-provider routes, authorizations, receipts, and recent sponsorship state in `openfox status`.
+- [x] Add paymaster-provider findings to `openfox health` and `openfox doctor`, especially for missing sponsor policy, expired sponsorship windows, or insufficient sponsor funding.
+- [x] Surface signer-type mismatch findings when sponsored execution falls back to narrower signer support than ordinary `SignerTxType`.
+- [x] Expose paymaster-provider service/operator state through the existing managed-service and service-status UX.
+- [x] Document the operator flow for requester, sponsor principal, and paymaster-provider roles.
+- [x] Add a multi-node example showing signer-provider plus paymaster-provider composition.
+- [x] Link paymaster-provider docs back into the roadmap and operator-facing guides so sponsored execution becomes part of the main runtime narrative.

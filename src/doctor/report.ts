@@ -5,6 +5,7 @@ import { buildSkillStatusReport } from "../skills/loader.js";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 import { getWalletPath, walletExists } from "../identity/wallet.js";
 import { buildWalletStatusSnapshot } from "../wallet/operator.js";
+import { TOSRpcClient } from "../tos/client.js";
 import {
   buildGatewayStatusReport,
   buildServiceStatusReport,
@@ -43,6 +44,15 @@ export interface HealthSnapshot {
   signerPendingExecutions: number;
   signerPolicyConfigured: boolean;
   signerPolicyExpired: boolean;
+  paymasterProviderEnabled: boolean;
+  paymasterProviderReady: boolean;
+  paymasterRecentQuotes: number;
+  paymasterRecentAuthorizations: number;
+  paymasterPendingAuthorizations: number;
+  paymasterPolicyConfigured: boolean;
+  paymasterPolicyExpired: boolean;
+  paymasterSponsorFunded: boolean | null;
+  paymasterSignerParityAligned: boolean;
   bountyEnabled: boolean;
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
@@ -115,6 +125,7 @@ function isProviderEnabled(config: OpenFoxConfig): boolean {
       config.agentDiscovery?.observationServer?.enabled ||
       config.agentDiscovery?.oracleServer?.enabled ||
       config.signerProvider?.enabled ||
+      config.paymasterProvider?.enabled ||
       config.storage?.enabled ||
       (config.agentDiscovery?.gatewayClient?.enabled &&
         (config.agentDiscovery.gatewayClient.routes?.length ?? 0) > 0),
@@ -137,6 +148,15 @@ async function buildConfigSnapshot(
   signerPendingExecutions: number;
   signerPolicyConfigured: boolean;
   signerPolicyExpired: boolean;
+  paymasterProviderEnabled: boolean;
+  paymasterProviderReady: boolean;
+  paymasterRecentQuotes: number;
+  paymasterRecentAuthorizations: number;
+  paymasterPendingAuthorizations: number;
+  paymasterPolicyConfigured: boolean;
+  paymasterPolicyExpired: boolean;
+  paymasterSponsorFunded: boolean | null;
+  paymasterSignerParityAligned: boolean;
   bountyEnabled: boolean;
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
@@ -217,6 +237,22 @@ async function buildConfigSnapshot(
         }).length,
       )
     : 0;
+  const sponsorAddress =
+    config.paymasterProvider?.enabled && config.paymasterProvider.policy.sponsorAddress
+      ? config.paymasterProvider.policy.sponsorAddress
+      : config.paymasterProvider?.enabled
+        ? config.walletAddress
+        : undefined;
+  let paymasterSponsorFunded: boolean | null = null;
+  if (config.paymasterProvider?.enabled && config.rpcUrl && sponsorAddress) {
+    try {
+      const rpc = new TOSRpcClient({ rpcUrl: config.rpcUrl });
+      const sponsorBalance = await rpc.getBalance(sponsorAddress as `0x${string}`);
+      paymasterSponsorFunded = sponsorBalance > 0n;
+    } catch {
+      paymasterSponsorFunded = null;
+    }
+  }
 
   return {
     inferenceConfigured: hasConfiguredInference(config),
@@ -246,6 +282,30 @@ async function buildConfigSnapshot(
         config.signerProvider.policy.expiresAt &&
         new Date(config.signerProvider.policy.expiresAt).getTime() <= Date.now(),
     ),
+    paymasterProviderEnabled: config.paymasterProvider?.enabled === true,
+    paymasterProviderReady: Boolean(!config.paymasterProvider?.enabled || config.rpcUrl),
+    paymasterRecentQuotes: config.paymasterProvider?.enabled
+      ? db.listPaymasterQuotes(20).length
+      : 0,
+    paymasterRecentAuthorizations: config.paymasterProvider?.enabled
+      ? db.listPaymasterAuthorizations(20).length
+      : 0,
+    paymasterPendingAuthorizations: config.paymasterProvider?.enabled
+      ? db.listPaymasterAuthorizations(100, { status: "authorized" }).length +
+        db.listPaymasterAuthorizations(100, { status: "submitted" }).length
+      : 0,
+    paymasterPolicyConfigured: Boolean(
+      !config.paymasterProvider?.enabled ||
+        (config.paymasterProvider.policy.policyId &&
+          (config.paymasterProvider.policy.allowedTargets?.length ?? 0) > 0),
+    ),
+    paymasterPolicyExpired: Boolean(
+      config.paymasterProvider?.enabled &&
+        config.paymasterProvider.policy.expiresAt &&
+        new Date(config.paymasterProvider.policy.expiresAt).getTime() <= Date.now(),
+    ),
+    paymasterSponsorFunded,
+    paymasterSignerParityAligned: config.paymasterProvider?.enabled ? false : true,
     bountyEnabled: config.bounty?.enabled === true,
     bountyRole: config.bounty?.enabled ? config.bounty.role : undefined,
     bountyAutoEnabled: Boolean(
@@ -570,6 +630,52 @@ function collectFindings(
     });
   }
 
+  if (snapshot.paymasterProviderEnabled) {
+    findings.push({
+      id: "paymaster-provider-enabled",
+      severity:
+        !snapshot.paymasterProviderReady ||
+        !snapshot.paymasterPolicyConfigured ||
+        snapshot.paymasterPolicyExpired ||
+        snapshot.paymasterSponsorFunded === false
+          ? "error"
+          : "ok",
+      summary:
+        !snapshot.paymasterProviderReady
+          ? "Paymaster-provider is enabled but no chain RPC is configured."
+          : !snapshot.paymasterPolicyConfigured
+            ? "Paymaster-provider is enabled but the policy is missing allowed targets or policy_id."
+            : snapshot.paymasterPolicyExpired
+              ? "Paymaster-provider is enabled but the configured policy has expired."
+              : snapshot.paymasterSponsorFunded === false
+                ? "Paymaster-provider is enabled but the sponsor address appears unfunded."
+                : `Paymaster-provider is enabled (${snapshot.paymasterRecentQuotes} recent quote${snapshot.paymasterRecentQuotes === 1 ? "" : "s"}, ${snapshot.paymasterRecentAuthorizations} recent authorization${snapshot.paymasterRecentAuthorizations === 1 ? "" : "s"}).`
+      ,
+      recommendation:
+        !snapshot.paymasterProviderReady
+          ? "Set `rpcUrl` so OpenFox can authorize and submit sponsored transactions on-chain."
+          : !snapshot.paymasterPolicyConfigured
+            ? "Set `paymasterProvider.policy.policyId` and at least one `allowedTargets` entry."
+            : snapshot.paymasterPolicyExpired
+              ? "Extend `paymasterProvider.policy.expiresAt` or remove the expiry."
+              : snapshot.paymasterSponsorFunded === false
+                ? "Fund `paymasterProvider.policy.sponsorAddress` (or the local wallet when unset) with native TOS."
+                : snapshot.paymasterPendingAuthorizations > 0
+                  ? "Run `openfox paymaster list --status authorized` to inspect pending sponsored executions."
+                  : undefined,
+    });
+    if (!snapshot.paymasterSignerParityAligned) {
+      findings.push({
+        id: "paymaster-signer-parity",
+        severity: "warn",
+        summary:
+          "Paymaster-provider is enabled but sponsored execution currently uses a narrower signer surface than ordinary native execution.",
+        recommendation:
+          "Treat sponsored execution as secp256k1-only for now and avoid assuming full signer-type parity until the sponsored transaction matrix is widened end-to-end.",
+      });
+    }
+  }
+
   if (snapshot.bountyEnabled) {
     findings.push({
       id: "bounty-enabled",
@@ -785,6 +891,15 @@ export async function buildHealthSnapshot(
       signerPendingExecutions: 0,
       signerPolicyConfigured: false,
       signerPolicyExpired: false,
+      paymasterProviderEnabled: false,
+      paymasterProviderReady: false,
+      paymasterRecentQuotes: 0,
+      paymasterRecentAuthorizations: 0,
+      paymasterPendingAuthorizations: 0,
+      paymasterPolicyConfigured: false,
+      paymasterPolicyExpired: false,
+      paymasterSponsorFunded: null,
+      paymasterSignerParityAligned: true,
       bountyEnabled: false,
       bountyRole: undefined,
       bountyAutoEnabled: false,
@@ -874,6 +989,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Discovery enabled: ${yesNo(snapshot.discoveryEnabled)}`,
     `Provider enabled: ${yesNo(snapshot.providerEnabled)}`,
     `Signer provider enabled: ${yesNo(snapshot.signerProviderEnabled)}${snapshot.signerProviderEnabled ? ` (${snapshot.signerRecentQuotes} quotes, ${snapshot.signerRecentExecutions} executions, ${snapshot.signerPendingExecutions} pending)` : ""}`,
+    `Paymaster provider enabled: ${yesNo(snapshot.paymasterProviderEnabled)}${snapshot.paymasterProviderEnabled ? ` (${snapshot.paymasterRecentQuotes} quotes, ${snapshot.paymasterRecentAuthorizations} authorizations, ${snapshot.paymasterPendingAuthorizations} pending, sponsor funded=${snapshot.paymasterSponsorFunded === null ? "unknown" : yesNo(snapshot.paymasterSponsorFunded)}, signer parity=${snapshot.paymasterSignerParityAligned ? "aligned" : "secp256k1-only"})` : ""}`,
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,

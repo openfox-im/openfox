@@ -159,6 +159,12 @@ It supports:
   - `openfox signer submit`
   - `openfox signer status`
   - `openfox signer receipt`
+- a paid paymaster-provider surface for bounded sponsored execution with:
+  - `openfox paymaster discover`
+  - `openfox paymaster quote`
+  - `openfox paymaster authorize`
+  - `openfox paymaster status`
+  - `openfox paymaster receipt`
 - gateway-backed provider endpoints for agents behind NAT
 
 The Gateway v1 path is:
@@ -370,6 +376,7 @@ openfox onboard --install-daemon
 openfox logs --tail 200
 openfox bounty --help
 openfox signer --help
+openfox paymaster --help
 openfox storage --help
 ```
 
@@ -471,17 +478,23 @@ Current support includes:
 - TOS address derivation
 - TOS balance queries
 - TOS nonce queries
+- TOS sponsor nonce queries
 - native TOS transfer signing
 - native TOS transfer sending
+- native sponsored execution encoding and hashing
 - TOS `x402` exact payment selection and payment flow
 - durable server-side `x402` payment ledger and retry semantics for paid services
 - bounded delegated execution through signer-provider discovery, quotes, submission, and receipts
+- bounded sponsored execution through paymaster-provider discovery, quotes, authorization, status, and receipts
 
 CLI examples:
 
 ```bash
 openfox-cli tos-status
 openfox-cli tos-send 0x... 0.01
+openfox paymaster discover --json
+openfox paymaster quote --target 0x... --value-wei 0 --data 0x12345678
+openfox paymaster authorize --quote-id <quote-id>
 ```
 
 From the source checkout, you can also run:
@@ -510,6 +523,7 @@ Start here if you want to integrate OpenFox without reading the internals:
 - [Operator Examples](./docs/OpenFox-Operator-Examples.md)
 - [SDK and Runtime Surfaces](./docs/OpenFox-SDK-Surfaces.md)
 - [Signer-Provider Operator Guide](./docs/OpenFox-Signer-Provider-Operator-Guide.md)
+- [Paymaster-Provider Operator Guide](./docs/OpenFox-Paymaster-Provider-Operator-Guide.md)
 
 Bundled starter templates are available through:
 

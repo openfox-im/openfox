@@ -129,6 +129,35 @@ describe("service operator", () => {
           allowSystemAction: false,
         },
       },
+      paymasterProvider: {
+        enabled: true,
+        bindHost: "127.0.0.1",
+        port: 4899,
+        pathPrefix: "/paymaster",
+        capabilityPrefix: "paymaster",
+        publishToDiscovery: true,
+        quoteValiditySeconds: 300,
+        authorizationValiditySeconds: 600,
+        quotePriceWei: "0",
+        authorizePriceWei: "1000",
+        requestTimeoutMs: 15000,
+        maxDataBytes: 2048,
+        defaultGas: "21000",
+        policy: {
+          trustTier: "self_hosted",
+          policyId: "paymaster-policy",
+          sponsorAddress:
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          delegateIdentity: "delegate:paymaster",
+          allowedWallets: [],
+          allowedTargets: [
+            "0x8888888888888888888888888888888888888888888888888888888888888888",
+          ],
+          allowedFunctionSelectors: [],
+          maxValueWei: "1000",
+          allowSystemAction: false,
+        },
+      },
       storage: {
         enabled: true,
         bindHost: "127.0.0.1",
@@ -182,6 +211,7 @@ describe("service operator", () => {
     const snapshot = buildServiceStatusSnapshot(config, db.raw);
     expect(snapshot.roles).toEqual(["requester", "provider", "gateway"]);
     expect(snapshot.providerSurfaces.signer?.capabilityPrefix).toBe("signer");
+    expect(snapshot.providerSurfaces.paymaster?.capabilityPrefix).toBe("paymaster");
     expect(snapshot.providerSurfaces.storage?.capabilityPrefix).toBe("storage.ipfs");
     expect(snapshot.providerSurfaces.artifacts?.captureCapability).toBe("public_news.capture");
     expect(snapshot.gatewayCache?.providerSessionCacheEntries).toBe(1);
@@ -192,6 +222,7 @@ describe("service operator", () => {
     expect(report).toContain("Roles: requester, provider, gateway");
     expect(report).toContain("x402 server:");
     expect(report).toContain("signer:");
+    expect(report).toContain("paymaster:");
     expect(report).toContain("capability_prefix=storage.ipfs");
     expect(report).toContain("artifacts:");
     expect(report).toContain("provider session cache entries: 1");

@@ -61,6 +61,14 @@ export interface ServiceStatusSnapshot {
           trustTier: string;
         }
       | null;
+    paymaster:
+      | {
+          url: string;
+          capabilityPrefix: string;
+          sponsorAddress: string;
+          trustTier: string;
+        }
+      | null;
     storage:
       | {
           url: string;
@@ -184,6 +192,7 @@ function detectServiceRoles(config: OpenFoxConfig): string[] {
     config.agentDiscovery?.observationServer?.enabled ||
     config.agentDiscovery?.oracleServer?.enabled ||
     config.signerProvider?.enabled ||
+    config.paymasterProvider?.enabled ||
     config.storage?.enabled ||
     config.artifacts?.enabled ||
     (config.agentDiscovery?.gatewayClient?.enabled &&
@@ -248,6 +257,29 @@ function inferProviderRoutes(config: OpenFoxConfig): Array<{
       capability: `${signer.capabilityPrefix}.submit`,
       mode: "paid",
       targetUrl: buildLocalHttpUrl(signer.bindHost, signer.port, `${signer.pathPrefix}/submit`),
+    });
+  }
+  const paymaster = config.paymasterProvider;
+  if (paymaster?.enabled && paymaster.port > 0) {
+    routes.push({
+      path: `${paymaster.pathPrefix.replace(/\/$/, "")}/quote`,
+      capability: `${paymaster.capabilityPrefix}.quote`,
+      mode: "sponsored",
+      targetUrl: buildLocalHttpUrl(
+        paymaster.bindHost,
+        paymaster.port,
+        `${paymaster.pathPrefix}/quote`,
+      ),
+    });
+    routes.push({
+      path: `${paymaster.pathPrefix.replace(/\/$/, "")}/authorize`,
+      capability: `${paymaster.capabilityPrefix}.authorize`,
+      mode: "paid",
+      targetUrl: buildLocalHttpUrl(
+        paymaster.bindHost,
+        paymaster.port,
+        `${paymaster.pathPrefix}/authorize`,
+      ),
     });
   }
   const storage = config.storage;
@@ -412,6 +444,11 @@ export function buildServiceStatusReport(
       `  - signer: ${snapshot.providerSurfaces.signer.url}  capability_prefix=${snapshot.providerSurfaces.signer.capabilityPrefix}  wallet=${snapshot.providerSurfaces.signer.walletAddress}  trust_tier=${snapshot.providerSurfaces.signer.trustTier}`,
     );
   }
+  if (snapshot.providerSurfaces.paymaster) {
+    lines.push(
+      `  - paymaster: ${snapshot.providerSurfaces.paymaster.url}  capability_prefix=${snapshot.providerSurfaces.paymaster.capabilityPrefix}  sponsor=${snapshot.providerSurfaces.paymaster.sponsorAddress}  trust_tier=${snapshot.providerSurfaces.paymaster.trustTier}`,
+    );
+  }
   if (snapshot.providerSurfaces.storage) {
     lines.push(
       `  - storage: ${snapshot.providerSurfaces.storage.url}  capability_prefix=${snapshot.providerSurfaces.storage.capabilityPrefix}  anonymous_get=${yesNo(snapshot.providerSurfaces.storage.allowAnonymousGet)}  auto_audit=${yesNo(snapshot.providerSurfaces.storage.autoAudit)}  auto_renew=${yesNo(snapshot.providerSurfaces.storage.autoRenew)}  replication_target=${snapshot.providerSurfaces.storage.replicationTarget}`,
@@ -432,6 +469,7 @@ export function buildServiceStatusReport(
     !snapshot.providerSurfaces.observation &&
     !snapshot.providerSurfaces.oracle &&
     !snapshot.providerSurfaces.signer &&
+    !snapshot.providerSurfaces.paymaster &&
     !snapshot.providerSurfaces.storage &&
     !snapshot.providerSurfaces.artifacts &&
     snapshot.providerSurfaces.routes.length === 0
@@ -490,6 +528,7 @@ export function buildServiceStatusSnapshot(
   const observation = config.agentDiscovery?.observationServer;
   const oracle = config.agentDiscovery?.oracleServer;
   const signer = config.signerProvider;
+  const paymaster = config.paymasterProvider;
   const storage = config.storage;
   const artifacts = config.artifacts;
 
@@ -540,6 +579,15 @@ export function buildServiceStatusSnapshot(
               capabilityPrefix: signer.capabilityPrefix,
               walletAddress: signer.policy.walletAddress || config.walletAddress,
               trustTier: signer.policy.trustTier,
+            }
+          : null,
+      paymaster:
+        paymaster?.enabled && paymaster.port > 0
+          ? {
+              url: buildLocalHttpUrl(paymaster.bindHost, paymaster.port, paymaster.pathPrefix),
+              capabilityPrefix: paymaster.capabilityPrefix,
+              sponsorAddress: paymaster.policy.sponsorAddress || config.walletAddress,
+              trustTier: paymaster.policy.trustTier,
             }
           : null,
       storage:
@@ -840,6 +888,11 @@ export async function buildServiceHealthSnapshot(
   const storage = config.storage;
   if (storage?.enabled && storage.port > 0) {
     const base = buildLocalHttpUrl(storage.bindHost, storage.port, storage.pathPrefix);
+    checks.push(await probeHttpJson(`${base}/healthz`));
+  }
+  const paymaster = config.paymasterProvider;
+  if (paymaster?.enabled && paymaster.port > 0) {
+    const base = buildLocalHttpUrl(paymaster.bindHost, paymaster.port, paymaster.pathPrefix);
     checks.push(await probeHttpJson(`${base}/healthz`));
   }
   const artifacts = config.artifacts;

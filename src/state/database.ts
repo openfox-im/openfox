@@ -58,6 +58,10 @@ import type {
   SignerExecutionStatus,
   SignerQuoteRecord,
   SignerQuoteStatus,
+  PaymasterAuthorizationRecord,
+  PaymasterAuthorizationStatus,
+  PaymasterQuoteRecord,
+  PaymasterQuoteStatus,
 } from "../types.js";
 import { DEFAULT_BOUNTY_POLICY } from "../types.js";
 import {
@@ -89,6 +93,8 @@ import {
   MIGRATION_V19,
   MIGRATION_V20,
   MIGRATION_V22,
+  MIGRATION_V23,
+  MIGRATION_V24,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -1333,6 +1339,246 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     return rows.map(deserializeSignerExecutionRecord);
   };
 
+  const upsertPaymasterQuote = (record: PaymasterQuoteRecord): void => {
+    db.prepare(
+      `INSERT INTO paymaster_quotes (
+        quote_id, chain_id, provider_address, sponsor_address, wallet_address, requester_address,
+        target_address, value_wei, data_hex, gas, policy_id, policy_hash, scope_hash,
+        delegate_identity, trust_tier, amount_wei, sponsor_nonce, sponsor_expiry,
+        status, expires_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(quote_id) DO UPDATE SET
+        chain_id = excluded.chain_id,
+        provider_address = excluded.provider_address,
+        sponsor_address = excluded.sponsor_address,
+        wallet_address = excluded.wallet_address,
+        requester_address = excluded.requester_address,
+        target_address = excluded.target_address,
+        value_wei = excluded.value_wei,
+        data_hex = excluded.data_hex,
+        gas = excluded.gas,
+        policy_id = excluded.policy_id,
+        policy_hash = excluded.policy_hash,
+        scope_hash = excluded.scope_hash,
+        delegate_identity = excluded.delegate_identity,
+        trust_tier = excluded.trust_tier,
+        amount_wei = excluded.amount_wei,
+        sponsor_nonce = excluded.sponsor_nonce,
+        sponsor_expiry = excluded.sponsor_expiry,
+        status = excluded.status,
+        expires_at = excluded.expires_at,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.quoteId,
+      record.chainId,
+      record.providerAddress,
+      record.sponsorAddress,
+      record.walletAddress,
+      record.requesterAddress,
+      record.targetAddress,
+      record.valueWei,
+      record.dataHex,
+      record.gas,
+      record.policyId,
+      record.policyHash,
+      record.scopeHash,
+      record.delegateIdentity ?? null,
+      record.trustTier,
+      record.amountWei,
+      record.sponsorNonce,
+      record.sponsorExpiry,
+      record.status,
+      record.expiresAt,
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getPaymasterQuote = (quoteId: string): PaymasterQuoteRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM paymaster_quotes WHERE quote_id = ?")
+      .get(quoteId) as any | undefined;
+    return row ? deserializePaymasterQuoteRecord(row) : undefined;
+  };
+
+  const listPaymasterQuotes = (
+    limit: number,
+    filters?: {
+      status?: PaymasterQuoteStatus;
+      requesterAddress?: string;
+      walletAddress?: string;
+      sponsorAddress?: string;
+    },
+  ): PaymasterQuoteRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    if (filters?.requesterAddress) {
+      clauses.push("requester_address = ?");
+      params.push(filters.requesterAddress);
+    }
+    if (filters?.walletAddress) {
+      clauses.push("wallet_address = ?");
+      params.push(filters.walletAddress);
+    }
+    if (filters?.sponsorAddress) {
+      clauses.push("sponsor_address = ?");
+      params.push(filters.sponsorAddress);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM paymaster_quotes ${where} ORDER BY updated_at DESC, created_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializePaymasterQuoteRecord);
+  };
+
+  const upsertPaymasterAuthorization = (
+    record: PaymasterAuthorizationRecord,
+  ): void => {
+    db.prepare(
+      `INSERT INTO paymaster_authorizations (
+        authorization_id, quote_id, chain_id, request_key, request_hash, provider_address, sponsor_address,
+        wallet_address, requester_address, target_address, value_wei, data_hex, gas,
+        policy_id, policy_hash, scope_hash, delegate_identity, trust_tier,
+        request_nonce, request_expires_at, execution_nonce, sponsor_nonce, sponsor_expiry, reason, payment_id,
+        execution_signature_json, sponsor_signature_json, submitted_tx_hash, submitted_receipt_json,
+        receipt_hash, status, last_error, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(authorization_id) DO UPDATE SET
+        quote_id = excluded.quote_id,
+        chain_id = excluded.chain_id,
+        request_key = excluded.request_key,
+        request_hash = excluded.request_hash,
+        provider_address = excluded.provider_address,
+        sponsor_address = excluded.sponsor_address,
+        wallet_address = excluded.wallet_address,
+        requester_address = excluded.requester_address,
+        target_address = excluded.target_address,
+        value_wei = excluded.value_wei,
+        data_hex = excluded.data_hex,
+        gas = excluded.gas,
+        policy_id = excluded.policy_id,
+        policy_hash = excluded.policy_hash,
+        scope_hash = excluded.scope_hash,
+        delegate_identity = excluded.delegate_identity,
+        trust_tier = excluded.trust_tier,
+        request_nonce = excluded.request_nonce,
+        request_expires_at = excluded.request_expires_at,
+        execution_nonce = excluded.execution_nonce,
+        sponsor_nonce = excluded.sponsor_nonce,
+        sponsor_expiry = excluded.sponsor_expiry,
+        reason = excluded.reason,
+        payment_id = excluded.payment_id,
+        execution_signature_json = excluded.execution_signature_json,
+        sponsor_signature_json = excluded.sponsor_signature_json,
+        submitted_tx_hash = excluded.submitted_tx_hash,
+        submitted_receipt_json = excluded.submitted_receipt_json,
+        receipt_hash = excluded.receipt_hash,
+        status = excluded.status,
+        last_error = excluded.last_error,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.authorizationId,
+      record.quoteId,
+      record.chainId,
+      record.requestKey,
+      record.requestHash,
+      record.providerAddress,
+      record.sponsorAddress,
+      record.walletAddress,
+      record.requesterAddress,
+      record.targetAddress,
+      record.valueWei,
+      record.dataHex,
+      record.gas,
+      record.policyId,
+      record.policyHash,
+      record.scopeHash,
+      record.delegateIdentity ?? null,
+      record.trustTier,
+      record.requestNonce,
+      record.requestExpiresAt,
+      record.executionNonce,
+      record.sponsorNonce,
+      record.sponsorExpiry,
+      record.reason ?? null,
+      record.paymentId ?? null,
+      record.executionSignature ? stringifyJsonSafe(record.executionSignature) : null,
+      record.sponsorSignature ? stringifyJsonSafe(record.sponsorSignature) : null,
+      record.submittedTxHash ?? null,
+      record.submittedReceipt ? JSON.stringify(record.submittedReceipt) : null,
+      record.receiptHash ?? null,
+      record.status,
+      record.lastError ?? null,
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getPaymasterAuthorization = (
+    authorizationId: string,
+  ): PaymasterAuthorizationRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM paymaster_authorizations WHERE authorization_id = ?")
+      .get(authorizationId) as any | undefined;
+    return row ? deserializePaymasterAuthorizationRecord(row) : undefined;
+  };
+
+  const getLatestPaymasterAuthorizationByRequestKey = (
+    requestKey: string,
+  ): PaymasterAuthorizationRecord | undefined => {
+    const row = db
+      .prepare(
+        `SELECT * FROM paymaster_authorizations
+         WHERE request_key = ?
+         ORDER BY updated_at DESC, created_at DESC
+         LIMIT 1`,
+      )
+      .get(requestKey) as any | undefined;
+    return row ? deserializePaymasterAuthorizationRecord(row) : undefined;
+  };
+
+  const listPaymasterAuthorizations = (
+    limit: number,
+    filters?: {
+      status?: PaymasterAuthorizationStatus;
+      requesterAddress?: string;
+      walletAddress?: string;
+      sponsorAddress?: string;
+    },
+  ): PaymasterAuthorizationRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    if (filters?.requesterAddress) {
+      clauses.push("requester_address = ?");
+      params.push(filters.requesterAddress);
+    }
+    if (filters?.walletAddress) {
+      clauses.push("wallet_address = ?");
+      params.push(filters.walletAddress);
+    }
+    if (filters?.sponsorAddress) {
+      clauses.push("sponsor_address = ?");
+      params.push(filters.sponsorAddress);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM paymaster_authorizations ${where} ORDER BY updated_at DESC, created_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializePaymasterAuthorizationRecord);
+  };
+
   const upsertStorageQuote = (record: StorageQuoteRecord): void => {
     db.prepare(
       `INSERT INTO storage_quotes (
@@ -1976,6 +2222,13 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getSignerExecution,
     getLatestSignerExecutionByRequestKey,
     listSignerExecutions,
+    upsertPaymasterQuote,
+    getPaymasterQuote,
+    listPaymasterQuotes,
+    upsertPaymasterAuthorization,
+    getPaymasterAuthorization,
+    getLatestPaymasterAuthorizationByRequestKey,
+    listPaymasterAuthorizations,
     upsertStorageQuote,
     getStorageQuote,
     listStorageQuotes,
@@ -2147,6 +2400,35 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 22,
       apply: () => db.exec(MIGRATION_V22),
+    },
+    {
+      version: 23,
+      apply: () => db.exec(MIGRATION_V23),
+    },
+    {
+      version: 24,
+      apply: () => {
+        const paymasterQuoteColumns = db
+          .prepare("PRAGMA table_info(paymaster_quotes)")
+          .all() as Array<{ name: string }>;
+        if (!paymasterQuoteColumns.some((column) => column.name === "chain_id")) {
+          db.exec("ALTER TABLE paymaster_quotes ADD COLUMN chain_id TEXT NOT NULL DEFAULT '0';");
+        }
+
+        const paymasterAuthorizationColumns = db
+          .prepare("PRAGMA table_info(paymaster_authorizations)")
+          .all() as Array<{ name: string }>;
+        if (!paymasterAuthorizationColumns.some((column) => column.name === "chain_id")) {
+          db.exec(
+            "ALTER TABLE paymaster_authorizations ADD COLUMN chain_id TEXT NOT NULL DEFAULT '0';",
+          );
+        }
+        if (!paymasterAuthorizationColumns.some((column) => column.name === "execution_nonce")) {
+          db.exec(
+            "ALTER TABLE paymaster_authorizations ADD COLUMN execution_nonce TEXT NOT NULL DEFAULT '0';",
+          );
+        }
+      },
     },
   ];
 
@@ -3259,6 +3541,12 @@ function parseJsonSafe<T>(raw: string, fallback: T, _label?: string): T {
   }
 }
 
+function stringifyJsonSafe(value: unknown): string {
+  return JSON.stringify(value, (_, candidate) =>
+    typeof candidate === "bigint" ? candidate.toString() : candidate,
+  );
+}
+
 function deserializeSettlementRecord(row: any): SettlementRecord {
   return {
     receiptId: row.receipt_id,
@@ -3456,6 +3744,92 @@ function deserializeSignerExecutionRecord(row: any): SignerExecutionRecord {
           row.submitted_receipt_json,
           null as SignerExecutionRecord["submittedReceipt"],
           "deserializeSignerExecutionRecord.submitted_receipt_json",
+        )
+      : null,
+    receiptHash: row.receipt_hash ?? null,
+    status: row.status,
+    lastError: row.last_error ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializePaymasterQuoteRecord(row: any): PaymasterQuoteRecord {
+  return {
+    quoteId: row.quote_id,
+    chainId: row.chain_id ?? "0",
+    providerAddress: row.provider_address,
+    sponsorAddress: row.sponsor_address,
+    walletAddress: row.wallet_address,
+    requesterAddress: row.requester_address,
+    targetAddress: row.target_address,
+    valueWei: row.value_wei,
+    dataHex: row.data_hex,
+    gas: row.gas,
+    policyId: row.policy_id,
+    policyHash: row.policy_hash,
+    scopeHash: row.scope_hash,
+    delegateIdentity: row.delegate_identity ?? null,
+    trustTier: row.trust_tier,
+    amountWei: row.amount_wei,
+    sponsorNonce: row.sponsor_nonce,
+    sponsorExpiry: Number(row.sponsor_expiry || 0),
+    status: row.status,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializePaymasterAuthorizationRecord(
+  row: any,
+): PaymasterAuthorizationRecord {
+  return {
+    authorizationId: row.authorization_id,
+    quoteId: row.quote_id,
+    chainId: row.chain_id ?? "0",
+    requestKey: row.request_key,
+    requestHash: row.request_hash,
+    providerAddress: row.provider_address,
+    sponsorAddress: row.sponsor_address,
+    walletAddress: row.wallet_address,
+    requesterAddress: row.requester_address,
+    targetAddress: row.target_address,
+    valueWei: row.value_wei,
+    dataHex: row.data_hex,
+    gas: row.gas,
+    policyId: row.policy_id,
+    policyHash: row.policy_hash,
+    scopeHash: row.scope_hash,
+    delegateIdentity: row.delegate_identity ?? null,
+    trustTier: row.trust_tier,
+    requestNonce: row.request_nonce,
+    requestExpiresAt: Number(row.request_expires_at || 0),
+    executionNonce: row.execution_nonce ?? "0",
+    sponsorNonce: row.sponsor_nonce,
+    sponsorExpiry: Number(row.sponsor_expiry || 0),
+    reason: row.reason ?? null,
+    paymentId: row.payment_id ?? null,
+    executionSignature: row.execution_signature_json
+      ? parseJsonSafe(
+          row.execution_signature_json,
+          null as PaymasterAuthorizationRecord["executionSignature"],
+          "deserializePaymasterAuthorizationRecord.execution_signature_json",
+        )
+      : null,
+    sponsorSignature: row.sponsor_signature_json
+      ? parseJsonSafe(
+          row.sponsor_signature_json,
+          null as PaymasterAuthorizationRecord["sponsorSignature"],
+          "deserializePaymasterAuthorizationRecord.sponsor_signature_json",
+        )
+      : null,
+    submittedTxHash: row.submitted_tx_hash ?? null,
+    submittedReceipt: row.submitted_receipt_json
+      ? parseJsonSafe(
+          row.submitted_receipt_json,
+          null as PaymasterAuthorizationRecord["submittedReceipt"],
+          "deserializePaymasterAuthorizationRecord.submitted_receipt_json",
         )
       : null,
     receiptHash: row.receipt_hash ?? null,

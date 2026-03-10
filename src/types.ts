@@ -13,6 +13,7 @@ import type {
   MarketBindingKind as NativeMarketBindingKind,
   MarketBindingReceipt,
   PrivateKeyAccount,
+  Signature,
   SettlementKind as NativeSettlementKind,
   SettlementReceipt,
   StorageAnchorSummary,
@@ -438,6 +439,7 @@ export interface OpenFoxConfig {
   marketContracts?: MarketContractConfig;
   x402Server?: X402ServerConfig;
   signerProvider?: SignerProviderConfig;
+  paymasterProvider?: PaymasterProviderConfig;
   storage?: StorageMarketConfig;
   artifacts?: ArtifactPipelineConfig;
 }
@@ -667,6 +669,109 @@ export interface SignerExecutionRecord {
   submittedReceipt?: Record<string, unknown> | null;
   receiptHash?: Hex | null;
   status: SignerExecutionStatus;
+  lastError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PaymasterProviderTrustTier = SignerProviderTrustTier;
+
+export interface PaymasterProviderPolicyConfig {
+  trustTier: PaymasterProviderTrustTier;
+  sponsorAddress?: Address;
+  policyId: string;
+  delegateIdentity?: string;
+  allowedWallets: Address[];
+  allowedTargets: Address[];
+  allowedFunctionSelectors: Hex[];
+  maxValueWei: string;
+  expiresAt?: string;
+  allowSystemAction?: boolean;
+}
+
+export interface PaymasterProviderConfig {
+  enabled: boolean;
+  bindHost: string;
+  port: number;
+  pathPrefix: string;
+  capabilityPrefix: string;
+  publishToDiscovery: boolean;
+  quoteValiditySeconds: number;
+  authorizationValiditySeconds: number;
+  quotePriceWei: string;
+  authorizePriceWei: string;
+  requestTimeoutMs: number;
+  maxDataBytes: number;
+  defaultGas: string;
+  policy: PaymasterProviderPolicyConfig;
+}
+
+export type PaymasterQuoteStatus = "quoted" | "used" | "expired";
+export type PaymasterAuthorizationStatus =
+  | "authorized"
+  | "submitted"
+  | "confirmed"
+  | "failed"
+  | "rejected"
+  | "expired";
+
+export interface PaymasterQuoteRecord {
+  quoteId: string;
+  chainId: string;
+  providerAddress: Address;
+  sponsorAddress: Address;
+  walletAddress: Address;
+  requesterAddress: Address;
+  targetAddress: Address;
+  valueWei: string;
+  dataHex: Hex;
+  gas: string;
+  policyId: string;
+  policyHash: Hex;
+  scopeHash: Hex;
+  delegateIdentity?: string | null;
+  trustTier: PaymasterProviderTrustTier;
+  amountWei: string;
+  sponsorNonce: string;
+  sponsorExpiry: number;
+  status: PaymasterQuoteStatus;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymasterAuthorizationRecord {
+  authorizationId: string;
+  quoteId: string;
+  chainId: string;
+  requestKey: string;
+  requestHash: Hex;
+  providerAddress: Address;
+  sponsorAddress: Address;
+  walletAddress: Address;
+  requesterAddress: Address;
+  targetAddress: Address;
+  valueWei: string;
+  dataHex: Hex;
+  gas: string;
+  policyId: string;
+  policyHash: Hex;
+  scopeHash: Hex;
+  delegateIdentity?: string | null;
+  trustTier: PaymasterProviderTrustTier;
+  requestNonce: string;
+  requestExpiresAt: number;
+  executionNonce: string;
+  sponsorNonce: string;
+  sponsorExpiry: number;
+  reason?: string | null;
+  paymentId?: Hex | null;
+  executionSignature?: Signature | null;
+  sponsorSignature?: Signature | null;
+  submittedTxHash?: Hex | null;
+  submittedReceipt?: Record<string, unknown> | null;
+  receiptHash?: Hex | null;
+  status: PaymasterAuthorizationStatus;
   lastError?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1026,6 +1131,7 @@ export type X402PaymentServiceKind =
   | "observation"
   | "oracle"
   | "signer"
+  | "paymaster"
   | "storage"
   | "gateway_request"
   | "gateway_session";
@@ -1210,6 +1316,31 @@ export const DEFAULT_SIGNER_PROVIDER_CONFIG: SignerProviderConfig = {
   },
 };
 
+export const DEFAULT_PAYMASTER_PROVIDER_CONFIG: PaymasterProviderConfig = {
+  enabled: false,
+  bindHost: "127.0.0.1",
+  port: 4899,
+  pathPrefix: "/paymaster",
+  capabilityPrefix: "paymaster",
+  publishToDiscovery: true,
+  quoteValiditySeconds: 300,
+  authorizationValiditySeconds: 300,
+  quotePriceWei: "0",
+  authorizePriceWei: "1000000000000000",
+  requestTimeoutMs: 15000,
+  maxDataBytes: 16384,
+  defaultGas: "180000",
+  policy: {
+    trustTier: "self_hosted",
+    policyId: "default",
+    allowedWallets: [],
+    allowedTargets: [],
+    allowedFunctionSelectors: [],
+    maxValueWei: "0",
+    allowSystemAction: false,
+  },
+};
+
 export const DEFAULT_SETTLEMENT_CONFIG: SettlementConfig = {
   enabled: false,
   sinkAddress: undefined,
@@ -1340,6 +1471,7 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   marketContracts: DEFAULT_MARKET_CONTRACT_CONFIG,
   x402Server: DEFAULT_X402_SERVER_CONFIG,
   signerProvider: DEFAULT_SIGNER_PROVIDER_CONFIG,
+  paymasterProvider: DEFAULT_PAYMASTER_PROVIDER_CONFIG,
   storage: DEFAULT_STORAGE_MARKET_CONFIG,
   artifacts: DEFAULT_ARTIFACT_PIPELINE_CONFIG,
 };
@@ -2056,6 +2188,35 @@ export interface OpenFoxDatabase {
       walletAddress?: Address;
     },
   ): SignerExecutionRecord[];
+
+  // Paymaster provider
+  upsertPaymasterQuote(record: PaymasterQuoteRecord): void;
+  getPaymasterQuote(quoteId: string): PaymasterQuoteRecord | undefined;
+  listPaymasterQuotes(
+    limit: number,
+    filters?: {
+      status?: PaymasterQuoteStatus;
+      requesterAddress?: Address;
+      walletAddress?: Address;
+      sponsorAddress?: Address;
+    },
+  ): PaymasterQuoteRecord[];
+  upsertPaymasterAuthorization(record: PaymasterAuthorizationRecord): void;
+  getPaymasterAuthorization(
+    authorizationId: string,
+  ): PaymasterAuthorizationRecord | undefined;
+  getLatestPaymasterAuthorizationByRequestKey(
+    requestKey: string,
+  ): PaymasterAuthorizationRecord | undefined;
+  listPaymasterAuthorizations(
+    limit: number,
+    filters?: {
+      status?: PaymasterAuthorizationStatus;
+      requesterAddress?: Address;
+      walletAddress?: Address;
+      sponsorAddress?: Address;
+    },
+  ): PaymasterAuthorizationRecord[];
 
   // Storage market
   upsertStorageQuote(record: StorageQuoteRecord): void;

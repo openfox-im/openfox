@@ -32,6 +32,7 @@ export function buildGatewayProviderRoutes(params: {
   observationUrl?: string;
   oracleUrl?: string;
   signerUrl?: string;
+  paymasterUrl?: string;
   storageUrl?: string;
   artifactUrl?: string;
 }): AgentGatewayProviderRoute[] {
@@ -113,6 +114,42 @@ export function buildGatewayProviderRoutes(params: {
         capability: `${signer.capabilityPrefix}.receipt`,
         mode: "sponsored",
         targetUrl: `${params.signerUrl}/receipt`,
+      });
+    }
+  }
+  const paymaster = params.config.paymasterProvider;
+  if (paymaster?.enabled && params.paymasterUrl) {
+    const pathPrefix = paymaster.pathPrefix.replace(/\/+$/, "");
+    if (!routes.some((entry) => entry.capability === `${paymaster.capabilityPrefix}.quote`)) {
+      routes.push({
+        path: `${pathPrefix}/quote`,
+        capability: `${paymaster.capabilityPrefix}.quote`,
+        mode: "sponsored",
+        targetUrl: `${params.paymasterUrl}/quote`,
+      });
+    }
+    if (!routes.some((entry) => entry.capability === `${paymaster.capabilityPrefix}.authorize`)) {
+      routes.push({
+        path: `${pathPrefix}/authorize`,
+        capability: `${paymaster.capabilityPrefix}.authorize`,
+        mode: "paid",
+        targetUrl: `${params.paymasterUrl}/authorize`,
+      });
+    }
+    if (!routes.some((entry) => entry.capability === `${paymaster.capabilityPrefix}.status`)) {
+      routes.push({
+        path: `${pathPrefix}/status`,
+        capability: `${paymaster.capabilityPrefix}.status`,
+        mode: "sponsored",
+        targetUrl: `${params.paymasterUrl}/status`,
+      });
+    }
+    if (!routes.some((entry) => entry.capability === `${paymaster.capabilityPrefix}.receipt`)) {
+      routes.push({
+        path: `${pathPrefix}/receipt`,
+        capability: `${paymaster.capabilityPrefix}.receipt`,
+        mode: "sponsored",
+        targetUrl: `${params.paymasterUrl}/receipt`,
       });
     }
   }

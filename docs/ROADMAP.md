@@ -547,7 +547,7 @@ Delivered surface:
 
 ### Phase 9: Native Sponsored Execution and Paymaster-Provider v0
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -597,6 +597,17 @@ Design reference:
 
 - `OpenFox-Paymaster-Provider-v0.md`
 
+Delivered surface:
+
+- canonical `paymaster.quote`, `paymaster.authorize`, `paymaster.status`, and `paymaster.receipt` objects
+- sponsor-policy hashing and bounded sponsorship validation inside OpenFox
+- native sponsored execution helpers across `gtos` and `tosdk`, including sponsor nonce access and sponsored envelope handling
+- a built-in paymaster-provider HTTP service inside OpenFox
+- `openfox paymaster discover|quote|authorize|status|receipt`
+- discovery publication and optional gateway relay publication for paymaster-provider routes
+- paymaster-provider visibility in `openfox status`, `openfox health`, `openfox doctor`, and service operator UX
+- operator guidance for requester, sponsor principal, and paymaster-provider roles
+
 ## 4. Near-Term Priorities
 
 Suggested priority order:
@@ -610,15 +621,15 @@ Suggested priority order:
 
 ### P1: Do Next
 
-- finalize the native sponsored transaction and paymaster-provider protocol for `TOS/GTOS` and OpenFox
 - keep multi-node deployment and operator automation moving in parallel for the completed storage/artifact pipeline
+- deepen artifact/storage audit and renewal automation around public operator fleets
 
 ### P2: Do Later
 
 - add stronger provider reputation and lease-health reporting
 - extract more reusable SDK surfaces for third-party storage and artifact clients
-- implement the first native sponsored transaction and paymaster-provider path across `gtos`, `tolang`, and OpenFox
 - add tighter integration between signer receipts and storage/artifact audit trails
+- widen signer-type parity for sponsored execution beyond the current practical `secp256k1` path
 
 ## 5. What Not to Do Yet
 
@@ -643,13 +654,13 @@ The more reasonable strategy for now is:
 - the current mainline now includes `agent-native paid storage + immutable artifact bundles + lightweight TOS anchors`
 - the next mainline broadens public artifact capture, indexing, and multi-node deployment on top of that storage layer
 - the following mainline turns programmable delegated execution into a paid network service through signer-provider agents
-- the next mainline after that adds native sponsored execution and paymaster-provider agents so execution funding becomes as programmable as execution authority
+- the current mainline now includes native sponsored execution and paymaster-provider agents so execution funding becomes as programmable as execution authority
 
 ## 6. Recommended Next Step
 
 There are only two next steps that matter most:
 
-1. finalize the signer-provider protocol so programmable wallet delegation becomes part of the same operator/runtime story as storage, artifacts, settlement, and paid services
-2. finalize the native sponsored transaction and paymaster-provider design so `TOS` supports strong sponsored execution directly in the protocol
+1. deepen multi-node storage, artifact, signer, and paymaster operations so public deployments become easier to run and audit
+2. widen sponsored-execution signer parity and reusable SDK surfaces so OpenFox’s funded execution path can support more native signer classes over time
 
 Only after these two steps are complete should we expand into broader marketplace, reputation, and ecosystem-facing phases.

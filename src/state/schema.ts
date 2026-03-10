@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 24;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -302,7 +302,7 @@ export const CREATE_TABLES = `
 
   CREATE TABLE IF NOT EXISTS x402_payments (
     payment_id TEXT PRIMARY KEY,
-    service_kind TEXT NOT NULL CHECK(service_kind IN ('observation','oracle','signer','gateway_request','gateway_session','storage')),
+    service_kind TEXT NOT NULL CHECK(service_kind IN ('observation','oracle','signer','paymaster','gateway_request','gateway_session','storage')),
     request_key TEXT NOT NULL,
     request_hash TEXT NOT NULL,
     payer_address TEXT NOT NULL,
@@ -397,6 +397,80 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_signer_executions_status
     ON signer_executions(status, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS paymaster_quotes (
+    quote_id TEXT PRIMARY KEY,
+    chain_id TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    sponsor_address TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    target_address TEXT NOT NULL,
+    value_wei TEXT NOT NULL,
+    data_hex TEXT NOT NULL,
+    gas TEXT NOT NULL,
+    policy_id TEXT NOT NULL,
+    policy_hash TEXT NOT NULL,
+    scope_hash TEXT NOT NULL,
+    delegate_identity TEXT,
+    trust_tier TEXT NOT NULL CHECK(trust_tier IN ('self_hosted','org_trusted','public_low_trust')),
+    amount_wei TEXT NOT NULL,
+    sponsor_nonce TEXT NOT NULL,
+    sponsor_expiry INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('quoted','used','expired')),
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_quotes_status
+    ON paymaster_quotes(status, expires_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_quotes_requester
+    ON paymaster_quotes(requester_address, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS paymaster_authorizations (
+    authorization_id TEXT PRIMARY KEY,
+    quote_id TEXT NOT NULL,
+    chain_id TEXT NOT NULL,
+    request_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    sponsor_address TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    target_address TEXT NOT NULL,
+    value_wei TEXT NOT NULL,
+    data_hex TEXT NOT NULL,
+    gas TEXT NOT NULL,
+    policy_id TEXT NOT NULL,
+    policy_hash TEXT NOT NULL,
+    scope_hash TEXT NOT NULL,
+    delegate_identity TEXT,
+    trust_tier TEXT NOT NULL CHECK(trust_tier IN ('self_hosted','org_trusted','public_low_trust')),
+    request_nonce TEXT NOT NULL,
+    request_expires_at INTEGER NOT NULL,
+    execution_nonce TEXT NOT NULL,
+    sponsor_nonce TEXT NOT NULL,
+    sponsor_expiry INTEGER NOT NULL,
+    reason TEXT,
+    payment_id TEXT,
+    execution_signature_json TEXT,
+    sponsor_signature_json TEXT,
+    submitted_tx_hash TEXT,
+    submitted_receipt_json TEXT,
+    receipt_hash TEXT,
+    status TEXT NOT NULL CHECK(status IN ('authorized','submitted','confirmed','failed','rejected','expired')),
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_paymaster_authorizations_request_key
+    ON paymaster_authorizations(request_key);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_authorizations_status
+    ON paymaster_authorizations(status, updated_at DESC);
 
   CREATE TABLE IF NOT EXISTS storage_quotes (
     quote_id TEXT PRIMARY KEY,
@@ -1105,6 +1179,143 @@ export const MIGRATION_V22 = `
 
   CREATE INDEX IF NOT EXISTS idx_signer_executions_status
     ON signer_executions(status, updated_at DESC);
+`;
+
+export const MIGRATION_V23 = `
+  CREATE TABLE IF NOT EXISTS x402_payments_v23 (
+    payment_id TEXT PRIMARY KEY,
+    service_kind TEXT NOT NULL CHECK(service_kind IN ('observation','oracle','signer','paymaster','gateway_request','gateway_session','storage')),
+    request_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    payer_address TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    chain_id TEXT NOT NULL,
+    tx_nonce TEXT NOT NULL,
+    tx_hash TEXT NOT NULL UNIQUE,
+    raw_transaction TEXT NOT NULL,
+    amount_wei TEXT NOT NULL,
+    confirmation_policy TEXT NOT NULL CHECK(confirmation_policy IN ('broadcast','receipt')),
+    status TEXT NOT NULL CHECK(status IN ('verified','submitted','confirmed','failed','replaced')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    receipt_json TEXT,
+    last_error TEXT,
+    next_attempt_at TEXT,
+    bound_kind TEXT,
+    bound_subject_id TEXT,
+    artifact_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  INSERT INTO x402_payments_v23 (
+    payment_id, service_kind, request_key, request_hash, payer_address,
+    provider_address, chain_id, tx_nonce, tx_hash, raw_transaction,
+    amount_wei, confirmation_policy, status, attempt_count, max_attempts,
+    receipt_json, last_error, next_attempt_at, bound_kind, bound_subject_id,
+    artifact_url, created_at, updated_at
+  )
+  SELECT
+    payment_id, service_kind, request_key, request_hash, payer_address,
+    provider_address, chain_id, tx_nonce, tx_hash, raw_transaction,
+    amount_wei, confirmation_policy, status, attempt_count, max_attempts,
+    receipt_json, last_error, next_attempt_at, bound_kind, bound_subject_id,
+    artifact_url, created_at, updated_at
+  FROM x402_payments;
+
+  DROP TABLE x402_payments;
+  ALTER TABLE x402_payments_v23 RENAME TO x402_payments;
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_request
+    ON x402_payments(service_kind, request_key, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_status
+    ON x402_payments(status, service_kind, next_attempt_at);
+
+  CREATE INDEX IF NOT EXISTS idx_x402_payment_binding
+    ON x402_payments(bound_kind, bound_subject_id);
+
+  CREATE TABLE IF NOT EXISTS paymaster_quotes (
+    quote_id TEXT PRIMARY KEY,
+    provider_address TEXT NOT NULL,
+    sponsor_address TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    target_address TEXT NOT NULL,
+    value_wei TEXT NOT NULL,
+    data_hex TEXT NOT NULL,
+    gas TEXT NOT NULL,
+    policy_id TEXT NOT NULL,
+    policy_hash TEXT NOT NULL,
+    scope_hash TEXT NOT NULL,
+    delegate_identity TEXT,
+    trust_tier TEXT NOT NULL CHECK(trust_tier IN ('self_hosted','org_trusted','public_low_trust')),
+    amount_wei TEXT NOT NULL,
+    sponsor_nonce TEXT NOT NULL,
+    sponsor_expiry INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('quoted','used','expired')),
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_quotes_status
+    ON paymaster_quotes(status, expires_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_quotes_requester
+    ON paymaster_quotes(requester_address, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS paymaster_authorizations (
+    authorization_id TEXT PRIMARY KEY,
+    quote_id TEXT NOT NULL,
+    request_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    sponsor_address TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    target_address TEXT NOT NULL,
+    value_wei TEXT NOT NULL,
+    data_hex TEXT NOT NULL,
+    gas TEXT NOT NULL,
+    policy_id TEXT NOT NULL,
+    policy_hash TEXT NOT NULL,
+    scope_hash TEXT NOT NULL,
+    delegate_identity TEXT,
+    trust_tier TEXT NOT NULL CHECK(trust_tier IN ('self_hosted','org_trusted','public_low_trust')),
+    request_nonce TEXT NOT NULL,
+    request_expires_at INTEGER NOT NULL,
+    sponsor_nonce TEXT NOT NULL,
+    sponsor_expiry INTEGER NOT NULL,
+    reason TEXT,
+    payment_id TEXT,
+    execution_signature_json TEXT,
+    sponsor_signature_json TEXT,
+    submitted_tx_hash TEXT,
+    submitted_receipt_json TEXT,
+    receipt_hash TEXT,
+    status TEXT NOT NULL CHECK(status IN ('authorized','submitted','confirmed','failed','rejected','expired')),
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_paymaster_authorizations_request_key
+    ON paymaster_authorizations(request_key);
+
+  CREATE INDEX IF NOT EXISTS idx_paymaster_authorizations_status
+    ON paymaster_authorizations(status, updated_at DESC);
+`;
+
+export const MIGRATION_V24 = `
+  ALTER TABLE paymaster_quotes
+    ADD COLUMN chain_id TEXT NOT NULL DEFAULT '0';
+
+  ALTER TABLE paymaster_authorizations
+    ADD COLUMN chain_id TEXT NOT NULL DEFAULT '0';
+
+  ALTER TABLE paymaster_authorizations
+    ADD COLUMN execution_nonce TEXT NOT NULL DEFAULT '0';
 `;
 
 export const MIGRATION_V3 = `

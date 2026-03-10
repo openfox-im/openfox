@@ -34,7 +34,14 @@ import { createSocialClient } from "./social/client.js";
 import { PolicyEngine } from "./agent/policy-engine.js";
 import { SpendTracker } from "./agent/spend-tracker.js";
 import { createDefaultRules } from "./agent/policy-rules/index.js";
-import type { OpenFoxIdentity, AgentState, Skill, SocialClientInterface } from "./types.js";
+import type {
+  OpenFoxIdentity,
+  AgentState,
+  Skill,
+  SocialClientInterface,
+  PaymasterAuthorizationRecord,
+  PaymasterQuoteRecord,
+} from "./types.js";
 import { DEFAULT_TREASURY_POLICY } from "./types.js";
 import { createLogger, setGlobalLogLevel } from "./observability/logger.js";
 import {
@@ -52,7 +59,10 @@ import {
   buildGatewayProviderRoutes,
   buildPublishedAgentDiscoveryConfig,
 } from "./agent-gateway/publish.js";
-import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "./tos/address.js";
+import {
+  deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey,
+  normalizeTOSAddress,
+} from "./tos/address.js";
 import {
   grantTOSCapability as grantCapability,
   registerTOSCapabilityName as registerCapabilityName,
@@ -154,9 +164,17 @@ import {
   fetchSignerQuote,
   submitSignerExecution,
 } from "./signer/client.js";
+import { startPaymasterProviderServer } from "./paymaster/http.js";
+import {
+  authorizePaymasterExecution,
+  fetchPaymasterAuthorizationReceipt,
+  fetchPaymasterAuthorizationStatus,
+  fetchPaymasterQuote,
+} from "./paymaster/client.js";
 import type { SignerProviderTrustTier } from "./types.js";
 import type { VerifiedAgentProvider } from "./agent-discovery/types.js";
 import { hashSignerPolicy } from "./signer/policy.js";
+import { hashPaymasterPolicy } from "./paymaster/policy.js";
 import fs from "fs/promises";
 
 const logger = createLogger("main");
@@ -315,6 +333,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "paymaster") {
+    await handlePaymasterCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "status") {
     await showStatus({ asJson: args.includes("--json") });
     process.exit(0);
@@ -352,6 +375,7 @@ Usage:
   openfox storage ...    Use the OpenFox storage market
   openfox artifacts ...  Build and verify public news and oracle bundles
   openfox signer ...     Use delegated signer-provider execution
+  openfox paymaster ...  Use native sponsored execution through a paymaster-provider
   openfox status         Show the current runtime status
   openfox --version      Show version
   openfox --help         Show this help
@@ -641,6 +665,146 @@ async function resolveSignerProviderBaseUrl(params: {
     providerBaseUrl: endpointUrl.endsWith("/quote")
       ? endpointUrl.slice(0, -"/quote".length)
       : endpointUrl,
+  };
+}
+
+async function resolvePaymasterProviderBaseUrl(params: {
+  config: NonNullable<ReturnType<typeof loadConfig>>;
+  capabilityPrefix: string;
+  providerBaseUrl?: string;
+  db?: ReturnType<typeof createDatabase>;
+  requiredTrustTier?: SignerProviderTrustTier;
+}): Promise<{ providerBaseUrl: string; provider?: VerifiedAgentProvider }> {
+  if (params.providerBaseUrl) {
+    return { providerBaseUrl: params.providerBaseUrl.replace(/\/+$/, "") };
+  }
+  if (!params.config.agentDiscovery?.enabled) {
+    throw new Error(
+      "No --provider was given and Agent Discovery is not enabled for paymaster discovery.",
+    );
+  }
+  const providers = await discoverCapabilityProviders({
+    config: params.config,
+    capability: `${params.capabilityPrefix}.quote`,
+    limit: 5,
+    db: params.db,
+  });
+  const matchingProviders = params.requiredTrustTier
+    ? providers.filter(
+        (provider) =>
+          provider.matchedCapability.policy?.trust_tier ===
+          params.requiredTrustTier,
+      )
+    : providers;
+  if (!matchingProviders.length) {
+    throw new Error(
+      params.requiredTrustTier
+        ? `No paymaster-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered.`
+        : `No paymaster-provider advertising ${params.capabilityPrefix}.quote was discovered.`,
+    );
+  }
+  const provider = matchingProviders[0];
+  const endpointUrl = provider.endpoint.url.replace(/\/+$/, "");
+  return {
+    provider,
+    providerBaseUrl: endpointUrl.endsWith("/quote")
+      ? endpointUrl.slice(0, -"/quote".length)
+      : endpointUrl,
+  };
+}
+
+function toPaymasterQuoteRecord(body: Record<string, unknown>): PaymasterQuoteRecord {
+  const now = new Date().toISOString();
+  return {
+    quoteId: String(body.quote_id),
+    chainId: String(body.chain_id ?? "0"),
+    providerAddress: normalizeTOSAddress(String(body.provider_address)),
+    sponsorAddress: normalizeTOSAddress(String(body.sponsor_address)),
+    walletAddress: normalizeTOSAddress(String(body.wallet_address)),
+    requesterAddress: normalizeTOSAddress(String(body.requester_address)),
+    targetAddress: normalizeTOSAddress(String(body.target_address)),
+    valueWei: String(body.value_wei ?? "0"),
+    dataHex: String(body.data_hex ?? "0x") as `0x${string}`,
+    gas: String(body.gas ?? "0"),
+    policyId: String(body.policy_id ?? ""),
+    policyHash: String(body.policy_hash ?? "0x") as `0x${string}`,
+    scopeHash: String(body.scope_hash ?? "0x") as `0x${string}`,
+    delegateIdentity:
+      typeof body.delegate_identity === "string" ? body.delegate_identity : null,
+    trustTier: String(body.trust_tier ?? "self_hosted") as PaymasterQuoteRecord["trustTier"],
+    amountWei: String(body.amount_wei ?? "0"),
+    sponsorNonce: String(body.sponsor_nonce ?? "0"),
+    sponsorExpiry: Number(body.sponsor_expiry ?? 0),
+    status: String(body.status === "quoted" ? "quoted" : "quoted") as PaymasterQuoteRecord["status"],
+    expiresAt: typeof body.expires_at === "string" ? body.expires_at : now,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function toPaymasterAuthorizationRecord(
+  body: Record<string, unknown>,
+  quote: PaymasterQuoteRecord,
+): PaymasterAuthorizationRecord {
+  const now = new Date().toISOString();
+  return {
+    authorizationId: String(body.authorization_id),
+    quoteId: String(body.quote_id ?? quote.quoteId),
+    chainId: String(body.chain_id ?? quote.chainId),
+    requestKey: String(body.request_key ?? ""),
+    requestHash: String(body.request_hash ?? "0x") as `0x${string}`,
+    providerAddress: normalizeTOSAddress(String(body.provider_address ?? quote.providerAddress)),
+    sponsorAddress: normalizeTOSAddress(String(body.sponsor_address ?? quote.sponsorAddress)),
+    walletAddress: normalizeTOSAddress(String(body.wallet_address ?? quote.walletAddress)),
+    requesterAddress: normalizeTOSAddress(
+      String(body.requester_address ?? quote.requesterAddress),
+    ),
+    targetAddress: normalizeTOSAddress(String(body.target_address ?? quote.targetAddress)),
+    valueWei: String(body.value_wei ?? quote.valueWei),
+    dataHex: String(body.data_hex ?? quote.dataHex) as `0x${string}`,
+    gas: String(body.gas ?? quote.gas),
+    policyId: String(body.policy_id ?? quote.policyId),
+    policyHash: String(body.policy_hash ?? quote.policyHash) as `0x${string}`,
+    scopeHash: String(body.scope_hash ?? quote.scopeHash) as `0x${string}`,
+    delegateIdentity:
+      typeof body.delegate_identity === "string"
+        ? body.delegate_identity
+        : quote.delegateIdentity ?? null,
+    trustTier: String(body.trust_tier ?? quote.trustTier) as PaymasterAuthorizationRecord["trustTier"],
+    requestNonce: String(body.request_nonce ?? ""),
+    requestExpiresAt: Number(body.request_expires_at ?? 0),
+    executionNonce: String(body.execution_nonce ?? "0"),
+    sponsorNonce: String(body.sponsor_nonce ?? quote.sponsorNonce),
+    sponsorExpiry: Number(body.sponsor_expiry ?? quote.sponsorExpiry),
+    reason: typeof body.reason === "string" ? body.reason : null,
+    paymentId:
+      typeof body.payment_id === "string" ? (body.payment_id as `0x${string}`) : null,
+    executionSignature: null,
+    sponsorSignature: null,
+    submittedTxHash:
+      typeof body.tx_hash === "string" ? (body.tx_hash as `0x${string}`) : null,
+    submittedReceipt:
+      body.receipt && typeof body.receipt === "object"
+        ? (body.receipt as Record<string, unknown>)
+        : null,
+    receiptHash:
+      typeof body.receipt_hash === "string" ? (body.receipt_hash as `0x${string}`) : null,
+    status:
+      body.status === "pending"
+        ? "submitted"
+        : body.status === "ok"
+          ? "confirmed"
+          : body.status === "expired"
+            ? "expired"
+            : "rejected",
+    lastError:
+      typeof body.last_error === "string"
+        ? body.last_error
+        : typeof body.reason === "string"
+          ? body.reason
+          : null,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -2617,6 +2781,275 @@ Usage:
   }
 }
 
+async function handlePaymasterCommand(args: string[]): Promise<void> {
+  const command = args[0];
+  if (!command || command === "--help" || command === "help") {
+    logger.info(`
+OpenFox paymaster
+
+Usage:
+  openfox paymaster list [--kind <quote|authorization>] [--status <quoted|used|expired|authorized|submitted|confirmed|failed|rejected>] [--json]
+  openfox paymaster get (--quote <id> | --authorization <id>) [--json]
+  openfox paymaster discover [--capability-prefix <prefix>] [--trust-tier <tier>] [--json]
+  openfox paymaster quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] [--wallet <address>] --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
+  openfox paymaster authorize [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> [--reason <text>] [--json]
+  openfox paymaster status --provider <base-url> --authorization <id> [--json]
+  openfox paymaster receipt --provider <base-url> --authorization <id> [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run `openfox --setup` first.");
+  }
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    const wantsJson = args.includes("--json");
+    if (command === "list") {
+      const kind = (readOption(args, "--kind") || "authorization").trim().toLowerCase();
+      if (kind === "quote") {
+        const status = readOption(args, "--status") as
+          | "quoted"
+          | "used"
+          | "expired"
+          | undefined;
+        const items = db.listPaymasterQuotes(50, status ? { status } : undefined);
+        if (wantsJson) {
+          logger.info(JSON.stringify(items, null, 2));
+          return;
+        }
+        if (!items.length) {
+          logger.info("No paymaster quotes found.");
+          return;
+        }
+        for (const item of items) {
+          logger.info(
+            `${item.quoteId}  [${item.status}] wallet=${item.walletAddress} sponsor=${item.sponsorAddress} target=${item.targetAddress} amount=${item.amountWei}`,
+          );
+        }
+        return;
+      }
+      const status = readOption(args, "--status") as
+        | "authorized"
+        | "submitted"
+        | "confirmed"
+        | "failed"
+        | "rejected"
+        | "expired"
+        | undefined;
+      const items = db.listPaymasterAuthorizations(50, status ? { status } : undefined);
+      if (wantsJson) {
+        logger.info(JSON.stringify(items, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No paymaster authorizations found.");
+        return;
+      }
+      for (const item of items) {
+        logger.info(
+          `${item.authorizationId}  [${item.status}] wallet=${item.walletAddress} sponsor=${item.sponsorAddress} target=${item.targetAddress} tx=${item.submittedTxHash || "(pending)"}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "get") {
+      const quoteId = readOption(args, "--quote");
+      const authorizationId = readOption(args, "--authorization");
+      if (!quoteId && !authorizationId) {
+        throw new Error("Usage: openfox paymaster get (--quote <id> | --authorization <id>) [--json]");
+      }
+      const record = quoteId
+        ? db.getPaymasterQuote(quoteId)
+        : db.getPaymasterAuthorization(authorizationId!);
+      if (!record) {
+        throw new Error(
+          quoteId
+            ? `Paymaster quote not found: ${quoteId}`
+            : `Paymaster authorization not found: ${authorizationId}`,
+        );
+      }
+      logger.info(JSON.stringify(record, null, 2));
+      return;
+    }
+
+    if (command === "discover") {
+      const capabilityPrefix =
+        readOption(args, "--capability-prefix") ||
+        config.paymasterProvider?.capabilityPrefix ||
+        "paymaster";
+      const requiredTrustTier = readSignerTrustTierOption(args);
+      const providers = (await discoverCapabilityProviders({
+        config,
+        capability: `${capabilityPrefix}.quote`,
+        limit: 10,
+        db,
+      })).filter((provider) =>
+        requiredTrustTier
+          ? provider.matchedCapability.policy?.trust_tier === requiredTrustTier
+          : true,
+      );
+      const discovered = providers.map((provider) => ({
+        providerAddress: provider.search.primaryIdentity,
+        nodeId: provider.search.nodeId,
+        capability: provider.matchedCapability.name,
+        mode: provider.matchedCapability.mode,
+        endpoint: provider.endpoint.url,
+        trustTier: provider.matchedCapability.policy?.trust_tier ?? null,
+        sponsorAddress: provider.matchedCapability.policy?.sponsor_address ?? null,
+        trust: provider.search.trust,
+      }));
+      if (wantsJson) {
+        logger.info(JSON.stringify(discovered, null, 2));
+        return;
+      }
+      if (!discovered.length) {
+        logger.info("No paymaster providers discovered.");
+        return;
+      }
+      for (const provider of discovered) {
+        logger.info(
+          `${provider.providerAddress}  capability=${provider.capability}  mode=${provider.mode}  trust_tier=${provider.trustTier || "(unknown)"}  sponsor=${provider.sponsorAddress || "(unset)"}  endpoint=${provider.endpoint}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "quote") {
+      const capabilityPrefix =
+        readOption(args, "--capability-prefix") ||
+        config.paymasterProvider?.capabilityPrefix ||
+        "paymaster";
+      const requiredTrustTier = readSignerTrustTierOption(args);
+      const { providerBaseUrl, provider } = await resolvePaymasterProviderBaseUrl({
+        config,
+        capabilityPrefix,
+        providerBaseUrl: readOption(args, "--provider"),
+        db,
+        requiredTrustTier,
+      });
+      const target = readOption(args, "--target");
+      if (!providerBaseUrl || !target) {
+        throw new Error("Usage: openfox paymaster quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] [--wallet <address>] --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
+      }
+      const result = await fetchPaymasterQuote({
+        providerBaseUrl,
+        requesterAddress: config.walletAddress,
+        walletAddress: (readOption(args, "--wallet") as `0x${string}` | undefined) ?? undefined,
+        target: target as `0x${string}`,
+        valueWei: readOption(args, "--value-wei") || "0",
+        data: (readOption(args, "--data") as `0x${string}` | undefined) ?? undefined,
+        gas: readOption(args, "--gas") || undefined,
+        reason: readOption(args, "--reason") || undefined,
+      });
+      const quoteRecord = toPaymasterQuoteRecord(result);
+      db.upsertPaymasterQuote(quoteRecord);
+      if (
+        requiredTrustTier &&
+        result.trust_tier &&
+        result.trust_tier !== requiredTrustTier
+      ) {
+        throw new Error(
+          `Paymaster provider returned trust_tier=${String(result.trust_tier)} but ${requiredTrustTier} was required.`,
+        );
+      }
+      if (
+        !requiredTrustTier &&
+        (result.trust_tier === "public_low_trust" ||
+          provider?.matchedCapability.policy?.trust_tier === "public_low_trust")
+      ) {
+        logger.warn(
+          "Selected paymaster-provider is public_low_trust. Re-run with --trust-tier self_hosted or --trust-tier org_trusted for a stricter sponsorship boundary.",
+        );
+      }
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "authorize") {
+      const capabilityPrefix =
+        readOption(args, "--capability-prefix") ||
+        config.paymasterProvider?.capabilityPrefix ||
+        "paymaster";
+      const requiredTrustTier = readSignerTrustTierOption(args);
+      const { providerBaseUrl, provider } = await resolvePaymasterProviderBaseUrl({
+        config,
+        capabilityPrefix,
+        providerBaseUrl: readOption(args, "--provider"),
+        db,
+        requiredTrustTier,
+      });
+      const quoteId = readOption(args, "--quote-id");
+      if (!providerBaseUrl || !quoteId) {
+        throw new Error("Usage: openfox paymaster authorize [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> [--reason <text>] [--json]");
+      }
+      if (!config.rpcUrl) {
+        throw new Error("rpcUrl is required for paymaster authorize");
+      }
+      const quote = db.getPaymasterQuote(quoteId);
+      if (!quote) {
+        throw new Error(`Paymaster quote not found locally: ${quoteId}. Run \`openfox paymaster quote\` first.`);
+      }
+      const { account } = await getWallet();
+      const result = await authorizePaymasterExecution({
+        providerBaseUrl,
+        rpcUrl: config.rpcUrl,
+        account,
+        requesterAddress: config.walletAddress,
+        quote,
+        requestNonce: randomUUID().replace(/-/g, ""),
+        requestExpiresAt: Math.floor(Date.now() / 1000) + 300,
+        reason: readOption(args, "--reason") || undefined,
+      });
+      const authorization = toPaymasterAuthorizationRecord(result.body, quote);
+      db.upsertPaymasterAuthorization(authorization);
+      db.upsertPaymasterQuote({
+        ...quote,
+        status: authorization.status === "rejected" ? quote.status : "used",
+        updatedAt: new Date().toISOString(),
+      });
+      if (
+        !requiredTrustTier &&
+        provider?.matchedCapability.policy?.trust_tier === "public_low_trust"
+      ) {
+        logger.warn(
+          "Authorized through a public_low_trust paymaster-provider. Prefer --trust-tier self_hosted or org_trusted for higher-value sponsored execution.",
+        );
+      }
+      logger.info(JSON.stringify(result.body, null, 2));
+      return;
+    }
+
+    if (command === "status") {
+      const providerBaseUrl = readOption(args, "--provider");
+      const authorizationId = readOption(args, "--authorization");
+      if (!providerBaseUrl || !authorizationId) {
+        throw new Error("Usage: openfox paymaster status --provider <base-url> --authorization <id> [--json]");
+      }
+      const result = await fetchPaymasterAuthorizationStatus(providerBaseUrl, authorizationId);
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "receipt") {
+      const providerBaseUrl = readOption(args, "--provider");
+      const authorizationId = readOption(args, "--authorization");
+      if (!providerBaseUrl || !authorizationId) {
+        throw new Error("Usage: openfox paymaster receipt --provider <base-url> --authorization <id> [--json]");
+      }
+      const result = await fetchPaymasterAuthorizationReceipt(providerBaseUrl, authorizationId);
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    throw new Error(`Unknown paymaster command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
 // ─── Status Command ────────────────────────────────────────────
 
 async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
@@ -2665,6 +3098,11 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
   const pendingSignerExecutions =
     db.listSignerExecutions(100, { status: "pending" }).length +
     db.listSignerExecutions(100, { status: "submitted" }).length;
+  const paymasterQuotes = db.listPaymasterQuotes(5);
+  const paymasterAuthorizations = db.listPaymasterAuthorizations(5);
+  const pendingPaymasterAuthorizations =
+    db.listPaymasterAuthorizations(100, { status: "authorized" }).length +
+    db.listPaymasterAuthorizations(100, { status: "submitted" }).length;
   const storageLeases = db.listStorageLeases(5);
   const storageRenewals = db.listStorageRenewals(5);
   const activeStorageLeaseCount = db.listStorageLeases(100, { status: "active" }).length;
@@ -2777,6 +3215,59 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
             paymentId: item.paymentId,
           })),
           pendingExecutions: pendingSignerExecutions,
+        }
+      : null,
+    paymasterProvider: config.paymasterProvider
+      ? {
+          enabled: config.paymasterProvider.enabled,
+          bind: `${config.paymasterProvider.bindHost}:${config.paymasterProvider.port}`,
+          pathPrefix: config.paymasterProvider.pathPrefix,
+          capabilityPrefix: config.paymasterProvider.capabilityPrefix,
+          publishToDiscovery: config.paymasterProvider.publishToDiscovery,
+          quoteValiditySeconds: config.paymasterProvider.quoteValiditySeconds,
+          authorizationValiditySeconds:
+            config.paymasterProvider.authorizationValiditySeconds,
+          quotePriceWei: config.paymasterProvider.quotePriceWei,
+          authorizePriceWei: config.paymasterProvider.authorizePriceWei,
+          requestTimeoutMs: config.paymasterProvider.requestTimeoutMs,
+          maxDataBytes: config.paymasterProvider.maxDataBytes,
+          defaultGas: config.paymasterProvider.defaultGas,
+          policy: {
+            trustTier: config.paymasterProvider.policy.trustTier,
+            sponsorAddress:
+              config.paymasterProvider.policy.sponsorAddress || config.walletAddress,
+            policyId: config.paymasterProvider.policy.policyId,
+            delegateIdentity:
+              config.paymasterProvider.policy.delegateIdentity || null,
+            allowedWallets: config.paymasterProvider.policy.allowedWallets,
+            allowedTargets: config.paymasterProvider.policy.allowedTargets,
+            allowedFunctionSelectors:
+              config.paymasterProvider.policy.allowedFunctionSelectors,
+            maxValueWei: config.paymasterProvider.policy.maxValueWei,
+            expiresAt: config.paymasterProvider.policy.expiresAt || null,
+            allowSystemAction:
+              config.paymasterProvider.policy.allowSystemAction === true,
+          },
+          recentQuotes: paymasterQuotes.map((item) => ({
+            quoteId: item.quoteId,
+            requesterAddress: item.requesterAddress,
+            walletAddress: item.walletAddress,
+            targetAddress: item.targetAddress,
+            status: item.status,
+            amountWei: item.amountWei,
+            expiresAt: item.expiresAt,
+          })),
+          recentAuthorizations: paymasterAuthorizations.map((item) => ({
+            authorizationId: item.authorizationId,
+            quoteId: item.quoteId,
+            status: item.status,
+            requesterAddress: item.requesterAddress,
+            walletAddress: item.walletAddress,
+            targetAddress: item.targetAddress,
+            submittedTxHash: item.submittedTxHash,
+            paymentId: item.paymentId,
+          })),
+          pendingAuthorizations: pendingPaymasterAuthorizations,
         }
       : null,
     storage: config.storage
@@ -2966,6 +3457,7 @@ Storage:    ${config.storage?.enabled ? `enabled (${activeStorageLeaseCount} act
 Artifacts:  ${config.artifacts?.enabled ? `enabled (${artifacts.length} recent, ${anchoredArtifactCount} anchored)` : "disabled"}
 x402:       ${config.x402Server?.enabled ? `enabled (${x402Payments.length} recent payment${x402Payments.length === 1 ? "" : "s"}, ${pendingX402Payments} pending, ${failedX402Payments} failed)` : "disabled"}
 Signer:     ${config.signerProvider?.enabled ? `enabled (${signerQuotes.length} recent quote${signerQuotes.length === 1 ? "" : "s"}, ${signerExecutions.length} recent execution${signerExecutions.length === 1 ? "" : "s"}, ${pendingSignerExecutions} pending)` : "disabled"}
+Paymaster:  ${config.paymasterProvider?.enabled ? `enabled (${paymasterQuotes.length} recent quote${paymasterQuotes.length === 1 ? "" : "s"}, ${paymasterAuthorizations.length} recent authorization${paymasterAuthorizations.length === 1 ? "" : "s"}, ${pendingPaymasterAuthorizations} pending)` : "disabled"}
 Settlement: ${config.settlement?.enabled ? `enabled (${settlements.length} recent receipt${settlements.length === 1 ? "" : "s"}, ${pendingSettlementCallbacks} pending callback${pendingSettlementCallbacks === 1 ? "" : "s"})` : "disabled"}
 Market:     ${config.marketContracts?.enabled ? `enabled (${marketBindings.length} recent binding${marketBindings.length === 1 ? "" : "s"}, ${pendingMarketCallbacks} pending callback${pendingMarketCallbacks === 1 ? "" : "s"})` : "disabled"}
 Scout:      ${config.opportunityScout?.enabled ? "enabled" : "disabled"}
@@ -3089,6 +3581,9 @@ async function run(): Promise<void> {
     | undefined;
   let signerProviderServer:
     | Awaited<ReturnType<typeof startSignerProviderServer>>
+    | undefined;
+  let paymasterProviderServer:
+    | Awaited<ReturnType<typeof startPaymasterProviderServer>>
     | undefined;
   let bountyServer:
     | Awaited<ReturnType<typeof startBountyHttpServer>>
@@ -3282,6 +3777,24 @@ async function run(): Promise<void> {
     }
   }
 
+  if (config.paymasterProvider?.enabled) {
+    try {
+      paymasterProviderServer = await startPaymasterProviderServer({
+        identity,
+        config,
+        db,
+        address,
+        privateKey,
+        paymasterConfig: config.paymasterProvider,
+      });
+      logger.info(`Paymaster provider enabled at ${paymasterProviderServer.url}`);
+    } catch (error) {
+      logger.warn(
+        `Paymaster provider failed to start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   if (config.agentDiscovery?.gatewayServer?.enabled) {
     try {
       if (
@@ -3363,6 +3876,7 @@ async function run(): Promise<void> {
         observationUrl: observationServer?.url,
         oracleUrl: oracleServer?.url,
         signerUrl: signerProviderServer?.url,
+        paymasterUrl: paymasterProviderServer?.url,
         storageUrl: storageServer?.url,
         artifactUrl: artifactServer?.url,
       });
@@ -3512,6 +4026,66 @@ async function run(): Promise<void> {
         ],
       };
     }
+    if (
+      current &&
+      paymasterProviderServer &&
+      config.paymasterProvider?.enabled &&
+      config.paymasterProvider.publishToDiscovery
+    ) {
+      const paymasterPolicyHash = hashPaymasterPolicy({
+        providerAddress: address,
+        policy: config.paymasterProvider.policy,
+      });
+      const paymasterPolicy = {
+        trust_tier: config.paymasterProvider.policy.trustTier,
+        sponsor_address:
+          config.paymasterProvider.policy.sponsorAddress || address,
+        policy_id: config.paymasterProvider.policy.policyId,
+        policy_hash: paymasterPolicyHash,
+        delegate_identity:
+          config.paymasterProvider.policy.delegateIdentity || null,
+        expires_at: config.paymasterProvider.policy.expiresAt || null,
+      };
+      current = {
+        ...current,
+        endpoints: [
+          ...current.endpoints,
+          {
+            kind: "http",
+            url: paymasterProviderServer.url,
+            role: "requester_invocation",
+          },
+        ],
+        capabilities: [
+          ...current.capabilities,
+          {
+            name: `${config.paymasterProvider.capabilityPrefix}.quote`,
+            mode: "sponsored",
+            policy: paymasterPolicy,
+            description: "Request one bounded paymaster-provider sponsorship quote",
+          },
+          {
+            name: `${config.paymasterProvider.capabilityPrefix}.authorize`,
+            mode: "paid",
+            priceModel: "x402-exact",
+            policy: paymasterPolicy,
+            description: "Authorize one bounded sponsored execution through a paymaster-provider",
+          },
+          {
+            name: `${config.paymasterProvider.capabilityPrefix}.status`,
+            mode: "sponsored",
+            policy: paymasterPolicy,
+            description: "Fetch paymaster-provider authorization status",
+          },
+          {
+            name: `${config.paymasterProvider.capabilityPrefix}.receipt`,
+            mode: "sponsored",
+            policy: paymasterPolicy,
+            description: "Fetch paymaster-provider authorization receipt",
+          },
+        ],
+      };
+    }
     if (current && storageServer && config.storage?.enabled && config.storage.publishToDiscovery) {
       current = {
         ...current,
@@ -3635,6 +4209,7 @@ async function run(): Promise<void> {
         observationUrl: observationServer?.url,
         oracleUrl: oracleServer?.url,
         signerUrl: signerProviderServer?.url,
+        paymasterUrl: paymasterProviderServer?.url,
         storageUrl: storageServer?.url,
         artifactUrl: artifactServer?.url,
       });
@@ -3846,6 +4421,7 @@ async function run(): Promise<void> {
       bountyServer?.close(),
       bountyAutomation?.close(),
       signerProviderServer?.close(),
+      paymasterProviderServer?.close(),
       storageServer?.close(),
       artifactServer?.close(),
       gatewayProviderSessions?.close(),

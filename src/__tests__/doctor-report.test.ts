@@ -31,6 +31,15 @@ describe("doctor report formatting", () => {
       signerPendingExecutions: 1,
       signerPolicyConfigured: true,
       signerPolicyExpired: false,
+      paymasterProviderEnabled: true,
+      paymasterProviderReady: true,
+      paymasterRecentQuotes: 3,
+      paymasterRecentAuthorizations: 2,
+      paymasterPendingAuthorizations: 1,
+      paymasterPolicyConfigured: true,
+      paymasterPolicyExpired: false,
+      paymasterSponsorFunded: true,
+      paymasterSignerParityAligned: true,
       bountyEnabled: true,
       bountyRole: "host" as const,
       bountyAutoEnabled: true,
@@ -118,6 +127,11 @@ describe("doctor report formatting", () => {
 
     expect(health).toContain("=== OPENFOX HEALTH ===");
     expect(health).toContain("Signer provider enabled: yes (2 quotes, 1 executions, 1 pending)");
+    expect(
+      health,
+    ).toContain(
+      "Paymaster provider enabled: yes (3 quotes, 2 authorizations, 1 pending, sponsor funded=yes, signer parity=aligned)",
+    );
     expect(health).toContain("Bounty enabled: yes (host)");
     expect(health).toContain(
       "Storage enabled: yes (1 active, 1 renewals, 1 audits, 1 anchors, 0 under-replicated)",
@@ -171,6 +185,91 @@ describe("doctor report formatting", () => {
       snapshot.findings.some(
         (finding) =>
           finding.id === "signer-provider-enabled" && finding.severity === "error",
+      ),
+    ).toBe(true);
+  });
+
+  it("flags paymaster provider mode without rpc or a valid policy", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        rpcUrl: undefined,
+        paymasterProvider: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4899,
+          pathPrefix: "/paymaster",
+          capabilityPrefix: "paymaster",
+          publishToDiscovery: true,
+          quoteValiditySeconds: 300,
+          authorizationValiditySeconds: 600,
+          quotePriceWei: "0",
+          authorizePriceWei: "1000",
+          requestTimeoutMs: 15000,
+          maxDataBytes: 2048,
+          defaultGas: "21000",
+          policy: {
+            trustTier: "self_hosted",
+            policyId: "",
+            sponsorAddress:
+              "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            allowedWallets: [],
+            allowedTargets: [],
+            allowedFunctionSelectors: [],
+            maxValueWei: "1000",
+            expiresAt: new Date(Date.now() - 60_000).toISOString(),
+            allowSystemAction: false,
+          },
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "paymaster-provider-enabled" && finding.severity === "error",
+      ),
+    ).toBe(true);
+  });
+
+  it("warns when sponsored execution signer parity is narrower than native execution", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        rpcUrl: "http://127.0.0.1:8545",
+        paymasterProvider: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4899,
+          pathPrefix: "/paymaster",
+          capabilityPrefix: "paymaster",
+          publishToDiscovery: true,
+          quoteValiditySeconds: 300,
+          authorizationValiditySeconds: 600,
+          quotePriceWei: "0",
+          authorizePriceWei: "1000",
+          requestTimeoutMs: 15000,
+          maxDataBytes: 2048,
+          defaultGas: "21000",
+          policy: {
+            trustTier: "self_hosted",
+            policyId: "policy-test",
+            sponsorAddress:
+              "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            allowedWallets: [],
+            allowedTargets: [
+              "0x8888888888888888888888888888888888888888888888888888888888888888",
+            ],
+            allowedFunctionSelectors: [],
+            maxValueWei: "1000",
+            allowSystemAction: false,
+          },
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "paymaster-signer-parity" && finding.severity === "warn",
       ),
     ).toBe(true);
   });
