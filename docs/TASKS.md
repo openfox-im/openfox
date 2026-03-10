@@ -509,12 +509,17 @@ building OpenFox into a TOS-native agent platform.
 
 - [ ] Define canonical `signer.quote`, `signer.submit`, `signer.status`, and `signer.receipt` request/response objects.
 - [ ] Define a canonical `SignerPolicyRef` shape with `wallet_address`, `policy_hash`, `delegate_identity`, `scope_hash`, and expiry metadata.
+- [ ] Define a canonical signer-provider `trust_tier` model:
+  - `self_hosted`
+  - `org_trusted`
+  - `public_low_trust`
 - [ ] Define the first supported wallet-policy profile for bounded delegated execution:
   - allowed target addresses
   - allowed function selectors
   - value caps
   - expiry
   - replay protection expectations
+- [ ] Map each `trust_tier` to default policy constraints so provider choice becomes an explicit risk profile instead of an informal trust judgment.
 - [ ] Define payment idempotency and payment-to-execution binding rules for signer-provider flows.
 - [ ] Define how signer-provider capability publication maps into Agent Discovery and optional Agent Gateway routes.
 - [ ] Document the funding boundary clearly:
@@ -538,6 +543,7 @@ building OpenFox into a TOS-native agent platform.
 - [ ] Add a remote delegated-execution path beside the current local wallet path instead of replacing it.
 - [ ] Support discovery-first invocation so a requester can find signer-provider agents through Agent Discovery.
 - [ ] Keep gateway compatibility so a signer-provider can sit behind Agent Gateway if needed.
+- [ ] Let the requester choose or enforce `trust_tier` during provider selection and invocation.
 - [ ] Add targeted tests for requester-side quote/submit/result flows.
 
 ## Task 40 Breakdown
@@ -546,5 +552,6 @@ building OpenFox into a TOS-native agent platform.
 - [ ] Add signer-provider findings to `openfox health` and `openfox doctor`, especially for missing policy, expired delegation, or insufficient wallet funding.
 - [ ] Expose signer-provider service/operator state through the existing managed-service and service-status UX.
 - [ ] Document the operator flow for principal, requester, and signer-provider roles.
+- [ ] Surface the selected `trust_tier` and warn when a provider choice is too permissive for the intended execution scope.
 - [ ] Add a multi-node example showing programmable-wallet delegation plus signer-provider execution.
 - [ ] Link signer-provider docs back into the roadmap and operator-facing guides so the feature is part of the main runtime narrative.
