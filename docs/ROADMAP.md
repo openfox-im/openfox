@@ -572,6 +572,7 @@ Required work:
 
 - add a native sponsored transaction type or equivalent sponsor-aware transaction semantics in `gtos`
 - add sponsor identity, sponsor witness, and sponsor policy binding to the transaction model
+- keep `SponsoredSignerTxType` aligned with ordinary `SignerTxType` so sponsored execution supports the same `SignerType` matrix on both execution and sponsor sides
 - change mempool and state-transition rules so sponsor-side balance and sponsor-side authorization can replace requester-side gas funding
 - add first-class sponsor validation hooks in `gtos` and `tolang`
 - add an OpenFox paymaster-provider service mode and client path
@@ -588,6 +589,7 @@ Acceptance criteria:
 - a wallet with insufficient own `TOS` can execute through valid sponsor authorization
 - validation and execution costs are charged to the sponsor side
 - sponsorship is rejected outside sponsor policy boundaries
+- `SponsoredSignerTxType` supports the same `SignerType` set as ordinary `SignerTxType`
 - sponsored execution composes with signer-provider flows
 - OpenFox persists auditable sponsorship receipts
 

@@ -580,6 +580,7 @@ building OpenFox into a TOS-native agent platform.
 
 - [ ] Define canonical `paymaster.quote`, `paymaster.authorize`, `paymaster.status`, and `paymaster.receipt` request/response objects.
 - [ ] Define a canonical `PaymasterPolicyRef` shape with `sponsor_address`, `policy_hash`, wallet/target constraints, gas caps, and expiry metadata.
+- [ ] Define `sponsor_signer_type` as a first-class protocol field instead of leaving sponsor authorization implicitly bound to `secp256k1`.
 - [ ] Define a canonical paymaster-provider `trust_tier` model aligned with signer-provider:
   - `self_hosted`
   - `org_trusted`
@@ -593,6 +594,9 @@ building OpenFox into a TOS-native agent platform.
   - max value
   - expiry
   - replay protection expectations
+- [ ] Define signer-type parity as a hard protocol requirement:
+  - `SponsoredSignerTxType` must support the same `SignerType` set as ordinary `SignerTxType`
+  - this applies to both requester/execution signatures and sponsor/paymaster signatures
 - [ ] Define payment idempotency and payment-to-authorization binding rules for paymaster-provider flows.
 - [ ] Define how paymaster-provider capability publication maps into Agent Discovery and optional Agent Gateway routes.
 - [ ] Keep the protocol explicitly native sponsored execution, not a disguised top-up or faucet path.
@@ -601,8 +605,11 @@ building OpenFox into a TOS-native agent platform.
 
 - [ ] Add a native sponsored transaction type or equivalent sponsor-aware transaction semantics in `gtos`.
 - [ ] Add sponsor identity, sponsor witness, sponsor nonce, sponsor expiry, and sponsor policy-hash fields to the native transaction model.
+- [ ] Add `sponsor_signer_type` to the native transaction model and hashing/signing path.
 - [ ] Update mempool and state-transition rules so sponsor-side balance and sponsor-side authorization replace requester-side gas funding.
 - [ ] Add first-class sponsor validation hooks in `gtos` and `tolang`.
+- [ ] Make `SponsoredSignerTxType` support the same `SignerType` matrix as ordinary `SignerTxType`, rather than leaving sponsor-side signing locked to `secp256k1`.
+- [ ] Route both requester-side and sponsor-side verification through signer-type-aware verification code paths instead of hard-coded ECDSA-only helpers.
 - [ ] Add `tosdk` encoding, hashing, signing, and client support for native sponsored transactions.
 - [ ] Add targeted tests for sponsored validation, replay protection, rejection outside policy, and sponsor-funded execution paths.
 
@@ -613,6 +620,7 @@ building OpenFox into a TOS-native agent platform.
 - [ ] Reuse the paid-provider pattern so paymaster-provider requests can charge via `x402` when appropriate.
 - [ ] Add a requester-side paymaster-provider client that can request a quote and obtain one bounded sponsorship authorization.
 - [ ] Add `openfox paymaster ...` CLI surfaces for provider discovery, quote, authorize, and receipt lookup.
+- [ ] Surface requester-side and sponsor-side signer types in paymaster authorization objects and CLI output so operators can confirm signer-type parity in practice.
 - [ ] Support composition across:
   - local wallet + paymaster-provider
   - signer-provider + paymaster-provider
@@ -623,6 +631,7 @@ building OpenFox into a TOS-native agent platform.
 
 - [ ] Surface paymaster-provider routes, authorizations, receipts, and recent sponsorship state in `openfox status`.
 - [ ] Add paymaster-provider findings to `openfox health` and `openfox doctor`, especially for missing sponsor policy, expired sponsorship windows, or insufficient sponsor funding.
+- [ ] Surface signer-type mismatch findings when sponsored execution falls back to narrower signer support than ordinary `SignerTxType`.
 - [ ] Expose paymaster-provider service/operator state through the existing managed-service and service-status UX.
 - [ ] Document the operator flow for requester, sponsor principal, and paymaster-provider roles.
 - [ ] Add a multi-node example showing signer-provider plus paymaster-provider composition.

@@ -112,6 +112,7 @@ Suggested direction:
 
 - keep ordinary sender-pays transactions for simple direct use
 - add `SponsoredSignerTx` for sponsored execution
+- keep `SponsoredSignerTx` aligned with ordinary `SignerTx` on signer-type coverage instead of shrinking sponsorship to `secp256k1` only
 
 Suggested fields:
 
@@ -125,6 +126,7 @@ Suggested fields:
 - `from`
 - `signer_type`
 - `sponsor`
+- `sponsor_signer_type`
 - `sponsor_nonce`
 - `sponsor_expiry`
 - `sponsor_policy_hash`
@@ -133,6 +135,29 @@ Suggested fields:
 
 The transaction hash must cover both execution and sponsorship fields.
 Neither the relay nor the counterparty should be able to swap sponsor details after authorization.
+
+### 7.1.1 Signer-Type Compatibility
+
+`SponsoredSignerTx` should support the same signer-type matrix as ordinary `SignerTx`.
+
+That requirement applies to both:
+
+- the execution/requester signature
+- the sponsor/paymaster signature
+
+`v0` should target support for the current `SignerType` set already recognized by `gtos`:
+
+- `secp256k1`
+- `schnorr`
+- `secp256r1`
+- `ed25519`
+- `bls12-381`
+- `elgamal`
+
+The design goal is:
+
+- do not make `SponsoredSignerTx` a multi-signer-type wrapper on the requester side while leaving sponsor authorization as `secp256k1`-only
+- do not force OpenFox paymaster-provider operators onto a narrower signer set than ordinary wallet operators
 
 ### 7.2 Dual Authorization
 
@@ -161,6 +186,7 @@ This is the core protocol change.
 
 - add a native sponsored transaction type
 - add sponsor identity and sponsor witness fields
+- add `sponsor_signer_type` so sponsor-side verification is not implicitly hard-coded to one algorithm family
 - update hashing, signing, and RPC encoding accordingly
 
 ### 8.2 Mempool and Pre-Flight Checks
@@ -185,6 +211,16 @@ This is the core protocol change.
 
 The exact mechanism can vary, but `v0` needs a first-class protocol hook for sponsor validation.
 
+### 8.6 Signer-Type Parity
+
+`gtos` should treat signer-type support for sponsored transactions as a parity requirement, not as an optional enhancement.
+
+This means:
+
+- ordinary `SignerTx` and `SponsoredSignerTx` should share the same supported `SignerType` matrix
+- requester-side and sponsor-side verification should both flow through the same signer-type-aware verification framework
+- sponsor-side signing helpers should not be hard-coded to `secp256k1`
+
 ### 8.5 Failure Semantics
 
 The protocol must define:
@@ -207,6 +243,7 @@ Suggested direction:
 
 - add a `paymaster contract` or `sponsor contract` marker
 - require a standard validation entrypoint for sponsor approval
+- keep sponsorship compatible with the same signer-type set supported by ordinary programmable wallets
 - expose sponsor policy primitives such as:
   - allowed wallets
   - allowed targets
@@ -282,6 +319,7 @@ Suggested fields:
 
 - `authorization_id`
 - `sponsor_address`
+- `sponsor_signer_type`
 - `sponsor_nonce`
 - `sponsor_expiry`
 - `policy_hash`
