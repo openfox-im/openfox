@@ -633,7 +633,10 @@ Suggested priority order:
 
 ### P2: Do Later
 
-- add stronger provider reputation and lease-health reporting
+- completed:
+  - added provider reputation reporting across storage, artifacts, signer, and paymaster operators
+  - added storage lease-health reporting across CLI, operator API, fleet audits, status, and doctor
+- still next:
 - extract more reusable SDK surfaces for third-party storage and artifact clients
 - add tighter integration between signer receipts and storage/artifact audit trails
 
@@ -668,7 +671,7 @@ The more reasonable strategy for now is:
 
 There are only two next steps that matter most:
 
-1. continue deepening multi-node storage, artifact, signer, and paymaster operations on top of the new operator API and fleet audit surface so public deployments become easier to run and audit
-2. keep widening reusable SDK surfaces and operator automation around the now-expanded sponsored-execution signer parity so OpenFox’s funded execution path stays aligned with the broader native signer set
+1. extract more reusable SDK surfaces for third-party storage and artifact clients so public operators and external builders can reuse the same bundle, audit, lease, and anchor primitives without pulling in full OpenFox runtime internals
+2. tighten the integration between signer/paymaster receipts and storage/artifact audit trails so maintenance, anchoring, and evidence operations can be traced end-to-end across execution and artifact state
 
 Only after these two steps are complete should we expand into broader marketplace, reputation, and ecosystem-facing phases.

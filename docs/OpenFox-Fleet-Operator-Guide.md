@@ -86,9 +86,13 @@ openfox fleet status --manifest ./fleet.yml
 openfox fleet health --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
 openfox fleet storage --manifest ./fleet.yml
+openfox fleet lease-health --manifest ./fleet.yml
 openfox fleet artifacts --manifest ./fleet.yml
 openfox fleet signer --manifest ./fleet.yml
 openfox fleet paymaster --manifest ./fleet.yml
+openfox fleet providers --manifest ./fleet.yml
+openfox providers reputation --kind storage
+openfox storage lease-health --json
 openfox fleet repair storage --manifest ./fleet.yml
 openfox fleet repair artifacts --manifest ./fleet.yml
 ```
@@ -100,9 +104,11 @@ Use these to answer questions such as:
 - which public deployments have misconfigured operator auth
 - which gateway/service roles are currently exposed
 - which storage nodes have due renewals or under-replicated bundles
+- which individual storage leases are currently healthy, warning, or critical
 - which artifact nodes are storing, verifying, and anchoring bundles
 - which signer fleets have pending delegated executions
 - which paymaster fleets are funded, pending, or running with limited signer parity
+- which provider roles are accumulating weak local reputation due to failures, pending work, or audit debt
 
 ## 5. Recommended Use
 
@@ -117,6 +123,12 @@ Use fleet repair for:
 - storage fleets with due renewals or overdue local audits
 - artifact fleets that need batch verification or anchoring catch-up
 - mixed public/private deployment topologies
+
+Use provider and lease-health reporting for:
+
+- identifying weak storage, artifact, signer, or paymaster providers before they become operator incidents
+- spotting leases that are expiring, overdue for audits, or under-replicated
+- deciding which nodes need fleet repair before running a broad maintenance batch
 
 Do not treat the fleet API as a general public dashboard. It is an operator
 surface and should remain authenticated.

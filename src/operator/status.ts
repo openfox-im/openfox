@@ -1,6 +1,8 @@
 import { isHeartbeatPaused, getUnconsumedWakeEvents } from "../state/database.js";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 import { getManagedServiceStatus, type ManagedServiceStatus } from "../service/daemon.js";
+import { buildProviderReputationSnapshot } from "./provider-reputation.js";
+import { buildStorageLeaseHealthSnapshot } from "./storage-health.js";
 
 export interface RuntimeStatusSnapshot {
   configured: true;
@@ -26,6 +28,7 @@ export interface RuntimeStatusSnapshot {
   x402Payments: Record<string, unknown> | null;
   signerProvider: Record<string, unknown> | null;
   paymasterProvider: Record<string, unknown> | null;
+  providerReputation: Record<string, unknown>;
   storage: Record<string, unknown> | null;
   artifacts: Record<string, unknown> | null;
   settlement: Record<string, unknown> | null;
@@ -94,6 +97,12 @@ export function buildRuntimeStatusSnapshot(
   const verifiedArtifactCount = db.listArtifacts(100, { status: "verified" }).length;
   const anchoredArtifactCount = db.listArtifacts(100, { status: "anchored" }).length;
   const artifactAnchors = db.listArtifactAnchors(5);
+  const providerReputation = buildProviderReputationSnapshot({ db, limit: 20 });
+  const storageLeaseHealth = buildStorageLeaseHealthSnapshot({
+    config,
+    db,
+    limit: 50,
+  });
   const discovery = config.agentDiscovery;
   const gatewaySummary = discovery?.gatewayClient?.enabled
     ? discovery.gatewayClient.gatewayUrl || "discovery/bootnodes"
@@ -262,6 +271,20 @@ export function buildRuntimeStatusSnapshot(
           pendingAuthorizations: pendingPaymasterAuthorizations,
         }
       : null,
+    providerReputation: {
+      totalProviders: providerReputation.totalProviders,
+      weakProviders: providerReputation.weakProviders,
+      topProviders: providerReputation.entries.slice(0, 5).map((entry) => ({
+        kind: entry.kind,
+        providerAddress: entry.providerAddress,
+        providerBaseUrl: entry.providerBaseUrl,
+        score: entry.score,
+        grade: entry.grade,
+        successCount: entry.successCount,
+        failureCount: entry.failureCount,
+        pendingCount: entry.pendingCount,
+      })),
+    },
     storage: config.storage
       ? {
           enabled: config.storage.enabled,
@@ -311,6 +334,15 @@ export function buildRuntimeStatusSnapshot(
             status: item.status,
             checkedAt: item.checkedAt,
           })),
+          leaseHealthReport: {
+            totalLeases: storageLeaseHealth.totalLeases,
+            healthy: storageLeaseHealth.healthy,
+            warning: storageLeaseHealth.warning,
+            critical: storageLeaseHealth.critical,
+            dueRenewals: storageLeaseHealth.dueRenewals,
+            dueAudits: storageLeaseHealth.dueAudits,
+            underReplicated: storageLeaseHealth.underReplicated,
+          },
           recentAnchors: storageAnchors.map((item) => ({
             anchorId: item.anchorId,
             leaseId: item.leaseId,
@@ -446,7 +478,12 @@ export function buildRuntimeStatusReport(snapshot: RuntimeStatusSnapshot): strin
       }
     | null;
   const storage = snapshot.storage as
-    | { enabled: boolean; activeLeaseCount: number; recentAnchors: unknown[] }
+    | {
+        enabled: boolean;
+        activeLeaseCount: number;
+        recentAnchors: unknown[];
+        leaseHealthReport: { critical: number; warning: number };
+      }
     | null;
   const artifacts = snapshot.artifacts as
     | { enabled: boolean; recentArtifacts: unknown[]; anchoredCount: number }
@@ -459,6 +496,9 @@ export function buildRuntimeStatusReport(snapshot: RuntimeStatusSnapshot): strin
     | null;
   const paymaster = snapshot.paymasterProvider as
     | { enabled: boolean; recentQuotes: unknown[]; recentAuthorizations: unknown[]; pendingAuthorizations: number }
+    | null;
+  const providerReputation = snapshot.providerReputation as
+    | { totalProviders: number; weakProviders: number }
     | null;
   const settlement = snapshot.settlement as
     | { enabled: boolean; receiptCount: number; callbacks: { pendingCount: number } }
@@ -477,11 +517,12 @@ Gateway:    ${snapshot.discovery.gateway}
 Operator API: ${snapshot.operatorApi?.enabled ? `${snapshot.operatorApi.bind}${snapshot.operatorApi.pathPrefix}` : "disabled"}
 Bounty:     ${bounty?.enabled ? `${bounty.role}/${bounty.defaultKind} @ ${bounty.bind}${bounty.pathPrefix}` : "disabled"}
 Bounty auto: ${bounty?.enabled ? `open=${bounty.autoOpenOnStartup || bounty.autoOpenWhenIdle ? "on" : "off"} solve=${bounty.autoSolveOnStartup || bounty.autoSolveEnabled ? "on" : "off"}` : "disabled"}
-Storage:    ${storage?.enabled ? `enabled (${storage.activeLeaseCount} active lease${storage.activeLeaseCount === 1 ? "" : "s"}, ${storage.recentAnchors.length} recent anchor${storage.recentAnchors.length === 1 ? "" : "s"})` : "disabled"}
+Storage:    ${storage?.enabled ? `enabled (${storage.activeLeaseCount} active lease${storage.activeLeaseCount === 1 ? "" : "s"}, ${storage.leaseHealthReport.critical} critical, ${storage.leaseHealthReport.warning} warning)` : "disabled"}
 Artifacts:  ${artifacts?.enabled ? `enabled (${artifacts.recentArtifacts.length} recent, ${artifacts.anchoredCount} anchored)` : "disabled"}
 x402:       ${x402?.enabled ? `enabled (${x402.recentPayments.length} recent payment${x402.recentPayments.length === 1 ? "" : "s"}, ${x402.pendingCount} pending, ${x402.failedCount} failed)` : "disabled"}
 Signer:     ${signer?.enabled ? `enabled (${signer.recentQuotes.length} recent quote${signer.recentQuotes.length === 1 ? "" : "s"}, ${signer.recentExecutions.length} recent execution${signer.recentExecutions.length === 1 ? "" : "s"}, ${signer.pendingExecutions} pending)` : "disabled"}
 Paymaster:  ${paymaster?.enabled ? `enabled (${paymaster.recentQuotes.length} recent quote${paymaster.recentQuotes.length === 1 ? "" : "s"}, ${paymaster.recentAuthorizations.length} recent authorization${paymaster.recentAuthorizations.length === 1 ? "" : "s"}, ${paymaster.pendingAuthorizations} pending)` : "disabled"}
+Providers:  ${providerReputation ? `${providerReputation.totalProviders} tracked (${providerReputation.weakProviders} weak)` : "none"}
 Settlement: ${settlement?.enabled ? `enabled (${settlement.receiptCount} recent receipt${settlement.receiptCount === 1 ? "" : "s"}, ${settlement.callbacks.pendingCount} pending callback${settlement.callbacks.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Market:     ${market?.enabled ? `enabled (${market.recentBindings.length} recent binding${market.recentBindings.length === 1 ? "" : "s"}, ${market.pendingCount} pending callback${market.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Scout:      ${(snapshot.opportunityScout as { enabled?: boolean } | null)?.enabled ? "enabled" : "disabled"}

@@ -371,6 +371,29 @@ describe("operator api", () => {
       enabled: true,
     });
 
+    const leaseHealth = await fetch(`${server.url}/storage/lease-health?limit=5`, {
+      headers: {
+        Authorization: "Bearer secret-token",
+      },
+    });
+    expect(leaseHealth.status).toBe(200);
+    expect(await leaseHealth.json()).toMatchObject({
+      totalLeases: expect.any(Number),
+      summary: expect.any(String),
+    });
+
+    const providers = await fetch(`${server.url}/providers/reputation?limit=5`, {
+      headers: {
+        Authorization: "Bearer secret-token",
+      },
+    });
+    expect(providers.status).toBe(200);
+    expect(await providers.json()).toMatchObject({
+      totalProviders: expect.any(Number),
+      summary: expect.any(String),
+      entries: expect.any(Array),
+    });
+
     db.close();
   });
 });

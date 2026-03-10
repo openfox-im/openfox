@@ -154,8 +154,8 @@ It supports:
 - contract-native market bindings for bounty, observation, and oracle creation flows
 - `openfox market list|get|callbacks` for operator-visible binding and callback state
 - an authenticated operator API for multi-node status, health, doctor, service, gateway, storage, artifact, signer, and paymaster inspection
-- `openfox fleet status|health|doctor|storage|artifacts|signer|paymaster` for one-shot fleet-wide auditing across public OpenFox nodes
-- `openfox storage maintain`, `openfox artifacts maintain`, and `openfox fleet repair <storage|artifacts>` for remote due-work remediation across public storage and artifact fleets
+- `openfox fleet status|health|doctor|storage|lease-health|artifacts|signer|paymaster|providers` for one-shot fleet-wide auditing across public OpenFox nodes
+- `openfox providers reputation`, `openfox storage lease-health`, `openfox storage maintain`, `openfox artifacts maintain`, and `openfox fleet repair <storage|artifacts>` for remote due-work remediation plus provider/lease health reporting
 - a paid signer-provider surface for bounded delegated execution with:
   - `openfox signer discover`
   - `openfox signer quote`
@@ -375,7 +375,11 @@ openfox service status --json
 openfox fleet status --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
 openfox fleet storage --manifest ./fleet.yml
+openfox fleet lease-health --manifest ./fleet.yml
+openfox fleet providers --manifest ./fleet.yml
 openfox fleet signer --manifest ./fleet.yml
+openfox providers reputation --kind storage
+openfox storage lease-health --json
 openfox fleet repair storage --manifest ./fleet.yml
 openfox gateway status
 openfox gateway status --json
@@ -440,6 +444,8 @@ And inspect the fleet from another machine:
 ```bash
 openfox fleet status --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
+openfox fleet providers --manifest ./fleet.yml
+openfox fleet lease-health --manifest ./fleet.yml
 openfox fleet paymaster --manifest ./fleet.yml
 openfox fleet repair artifacts --manifest ./fleet.yml
 ```

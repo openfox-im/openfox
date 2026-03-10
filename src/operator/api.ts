@@ -20,6 +20,8 @@ import {
   runArtifactMaintenance,
   runStorageMaintenance,
 } from "./maintenance.js";
+import { buildProviderReputationSnapshot } from "./provider-reputation.js";
+import { buildStorageLeaseHealthSnapshot } from "./storage-health.js";
 
 const logger = createLogger("operator.api");
 
@@ -100,11 +102,13 @@ export async function startOperatorApiServer(
   const servicePath = `${pathPrefix}/service/status`;
   const gatewayPath = `${pathPrefix}/gateway/status`;
   const storagePath = `${pathPrefix}/storage/status`;
+  const storageLeaseHealthPath = `${pathPrefix}/storage/lease-health`;
   const storageMaintainPath = `${pathPrefix}/storage/maintain`;
   const artifactsPath = `${pathPrefix}/artifacts/status`;
   const artifactsMaintainPath = `${pathPrefix}/artifacts/maintain`;
   const signerPath = `${pathPrefix}/signer/status`;
   const paymasterPath = `${pathPrefix}/paymaster/status`;
+  const providersPath = `${pathPrefix}/providers/reputation`;
   const healthzPath = `${pathPrefix}/healthz`;
 
   const server = http.createServer(async (req, res) => {
@@ -169,6 +173,24 @@ export async function startOperatorApiServer(
         return;
       }
 
+      if (req.method === "GET" && url.pathname === storageLeaseHealthPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : undefined;
+        json(
+          res,
+          200,
+          buildStorageLeaseHealthSnapshot({
+            config: params.config,
+            db: params.db,
+            limit,
+          }),
+        );
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === storageMaintainPath) {
         const body = await readJsonBody(req);
         const limit =
@@ -217,6 +239,32 @@ export async function startOperatorApiServer(
 
       if (req.method === "GET" && url.pathname === paymasterPath) {
         json(res, 200, await buildPaymasterOperatorStatusSnapshot(params.config, params.db));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === providersPath) {
+        const kindParam = url.searchParams.get("kind");
+        const kind =
+          kindParam === "storage" ||
+          kindParam === "artifacts" ||
+          kindParam === "signer" ||
+          kindParam === "paymaster"
+            ? kindParam
+            : undefined;
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : undefined;
+        json(
+          res,
+          200,
+          buildProviderReputationSnapshot({
+            db: params.db,
+            kind,
+            limit,
+          }),
+        );
         return;
       }
 

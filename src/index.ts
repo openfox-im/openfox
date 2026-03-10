@@ -191,6 +191,11 @@ import {
   runArtifactMaintenance,
   runStorageMaintenance,
 } from "./operator/maintenance.js";
+import {
+  buildProviderReputationSnapshot,
+  type ProviderReputationKind,
+} from "./operator/provider-reputation.js";
+import { buildStorageLeaseHealthSnapshot } from "./operator/storage-health.js";
 
 const logger = createLogger("main");
 const VERSION = "0.2.1";
@@ -338,6 +343,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "providers") {
+    await handleProvidersCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "artifacts") {
     await handleArtifactCommand(args.slice(1));
     process.exit(0);
@@ -393,6 +403,7 @@ Usage:
   openfox payments ...   Inspect and recover server-side x402 payments
   openfox scout ...      Discover earning opportunities and task surfaces
   openfox storage ...    Use the OpenFox storage market
+  openfox providers ...  Inspect provider reputation snapshots
   openfox artifacts ...  Build and verify public news and oracle bundles
   openfox signer ...     Use delegated signer-provider execution
   openfox paymaster ...  Use native sponsored execution through a paymaster-provider
@@ -1278,9 +1289,11 @@ Usage:
   openfox fleet service --manifest <path> [--json]
   openfox fleet gateway --manifest <path> [--json]
   openfox fleet storage --manifest <path> [--json]
+  openfox fleet lease-health --manifest <path> [--json]
   openfox fleet artifacts --manifest <path> [--json]
   openfox fleet signer --manifest <path> [--json]
   openfox fleet paymaster --manifest <path> [--json]
+  openfox fleet providers --manifest <path> [--json]
   openfox fleet repair <storage|artifacts> --manifest <path> [--limit N] [--json]
 `);
     if (!manifestPath && !helpRequested) {
@@ -1318,9 +1331,11 @@ Usage:
     command === "service" ||
     command === "gateway" ||
     command === "storage" ||
+    command === "lease-health" ||
     command === "artifacts" ||
     command === "signer" ||
-    command === "paymaster"
+    command === "paymaster" ||
+    command === "providers"
       ? (command as FleetEndpoint)
       : null;
   if (!endpoint) {
@@ -2185,6 +2200,7 @@ Usage:
   openfox storage head --provider <base-url> --cid <cid> [--json]
   openfox storage get --provider <base-url> --cid <cid> [--output <path>] [--json]
   openfox storage audit --provider <base-url> --lease <lease-id> [--json]
+  openfox storage lease-health [--limit N] [--json]
   openfox storage maintain [--limit N] [--json]
 `);
     return;
@@ -2201,6 +2217,16 @@ Usage:
         config,
         db,
         limit: readNumberOption(args, "--limit", 10),
+      });
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "lease-health") {
+      const result = buildStorageLeaseHealthSnapshot({
+        config,
+        db,
+        limit: readNumberOption(args, "--limit", 25),
       });
       logger.info(JSON.stringify(result, null, 2));
       return;
@@ -2391,6 +2417,64 @@ ${leases
     }
 
     throw new Error(`Unknown storage command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleProvidersCommand(args: string[]): Promise<void> {
+  const command = args[0] || "reputation";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox providers
+
+Usage:
+  openfox providers reputation [--kind <storage|artifacts|signer|paymaster>] [--limit N] [--json]
+`);
+    return;
+  }
+
+  if (command !== "reputation") {
+    throw new Error(`Unknown providers command: ${command}`);
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    const kindValue = readOption(args, "--kind");
+    const kind =
+      kindValue === "storage" ||
+      kindValue === "artifacts" ||
+      kindValue === "signer" ||
+      kindValue === "paymaster"
+        ? (kindValue as ProviderReputationKind)
+        : undefined;
+    const snapshot = buildProviderReputationSnapshot({
+      db,
+      kind,
+      limit: readNumberOption(args, "--limit", 25),
+    });
+    if (asJson) {
+      logger.info(JSON.stringify(snapshot, null, 2));
+      return;
+    }
+    logger.info(`
+=== OPENFOX PROVIDER REPUTATION ===
+Generated: ${snapshot.generatedAt}
+Providers: ${snapshot.totalProviders}
+Weak:      ${snapshot.weakProviders}
+${snapshot.entries
+  .map(
+    (entry) =>
+      `${entry.kind}  ${entry.providerAddress || entry.providerBaseUrl || entry.providerKey}  score=${entry.score}  grade=${entry.grade}  success=${entry.successCount}  failure=${entry.failureCount}  pending=${entry.pendingCount}`,
+  )
+  .join("\n")}
+===================================
+`);
   } finally {
     db.close();
   }

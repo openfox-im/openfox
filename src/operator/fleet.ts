@@ -31,9 +31,11 @@ export type FleetEndpoint =
   | "service"
   | "gateway"
   | "storage"
+  | "lease-health"
   | "artifacts"
   | "signer"
-  | "paymaster";
+  | "paymaster"
+  | "providers";
 
 export interface FleetSnapshot {
   manifestPath: string;
@@ -67,12 +69,16 @@ function getEndpointPath(endpoint: FleetEndpoint): string {
       return "gateway/status";
     case "storage":
       return "storage/status";
+    case "lease-health":
+      return "storage/lease-health";
     case "artifacts":
       return "artifacts/status";
     case "signer":
       return "signer/status";
     case "paymaster":
       return "paymaster/status";
+    case "providers":
+      return "providers/reputation";
   }
 }
 

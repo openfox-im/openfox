@@ -223,6 +223,21 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Turn fleet auditing into fleet remediation by exposing authenticated
     remote maintenance actions for storage lease upkeep and artifact
     verification/anchoring, then batch them through the fleet CLI.
+- [x] Task 48: Add provider reputation and storage lease-health reporting
+  - Status: Complete
+  - Goal: Turn operator snapshots into stronger operating signals by exposing
+    provider reputation summaries plus lease-level health state for storage,
+    artifacts, signer, and paymaster roles through CLI, operator APIs, fleet
+    audits, status, and doctor.
+- [ ] Task 49: Extract more reusable SDK surfaces for third-party storage and artifact clients
+  - Status: Pending
+  - Goal: Move more storage, artifact, audit, and anchor helpers into `tosdk`
+    so third-party clients do not need to depend on OpenFox runtime internals.
+- [ ] Task 50: Bind signer receipts to storage and artifact audit trails
+  - Status: Pending
+  - Goal: Link delegated/sponsored execution receipts back into storage lease,
+    artifact verification, and anchoring records so public operations have one
+    auditable trail across execution, maintenance, and evidence.
 
 ## Task 1 Breakdown
 

@@ -152,6 +152,47 @@ describe("operator fleet", () => {
     expect(report).toContain("3 active leases, 1 due renewal");
   });
 
+  it("supports provider reputation and storage lease-health fleet endpoints", async () => {
+    const providersBaseUrl = await startEndpointServer("/operator/providers/reputation", {
+      totalProviders: 2,
+      weakProviders: 1,
+      summary: "2 providers tracked, 1 weak",
+      entries: [],
+    });
+    const leaseHealthBaseUrl = await startEndpointServer("/operator/storage/lease-health", {
+      totalLeases: 3,
+      critical: 1,
+      warning: 1,
+      healthy: 1,
+      summary: "3 leases, 1 critical, 1 warning",
+      entries: [],
+    });
+
+    const manifestPath = createManifest(
+      JSON.stringify({
+        version: 1,
+        nodes: [
+          { name: "providers-1", role: "provider", baseUrl: providersBaseUrl },
+          { name: "storage-1", role: "storage", baseUrl: leaseHealthBaseUrl },
+        ],
+      }),
+    );
+
+    const providersSnapshot = await buildFleetSnapshot({
+      manifestPath,
+      endpoint: "providers",
+    });
+    expect(providersSnapshot.ok).toBe(1);
+    expect(buildFleetReport(providersSnapshot)).toContain("2 providers tracked, 1 weak");
+
+    const leaseHealthSnapshot = await buildFleetSnapshot({
+      manifestPath,
+      endpoint: "lease-health",
+    });
+    expect(leaseHealthSnapshot.ok).toBe(1);
+    expect(buildFleetReport(leaseHealthSnapshot)).toContain("3 leases, 1 critical, 1 warning");
+  });
+
   it("supports fleet repair actions for storage and artifacts", async () => {
     const storageBaseUrl = await startEndpointServer("/operator/storage/maintain", {
       kind: "storage",

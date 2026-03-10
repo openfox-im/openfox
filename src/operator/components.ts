@@ -21,6 +21,7 @@ export async function buildStorageOperatorStatusSnapshot(
     ? [
         `${health.storageActiveLeases} active lease${health.storageActiveLeases === 1 ? "" : "s"}`,
         `${health.storageDueRenewals} due renewal${health.storageDueRenewals === 1 ? "" : "s"}`,
+        `${health.storageDueAudits} due audit${health.storageDueAudits === 1 ? "" : "s"}`,
         `${health.storageUnderReplicatedBundles} under-replicated bundle${health.storageUnderReplicatedBundles === 1 ? "" : "s"}`,
         `ready=${yesNo(health.storageReady)}`,
       ].join(", ")
@@ -40,6 +41,8 @@ export async function buildStorageOperatorStatusSnapshot(
       recentAudits: health.storageRecentAudits,
       recentAnchors: health.storageRecentAnchors,
       dueRenewals: health.storageDueRenewals,
+      dueAudits: health.storageDueAudits,
+      criticalLeases: health.storageCriticalLeases,
       underReplicatedBundles: health.storageUnderReplicatedBundles,
       replicationReady: health.storageReplicationReady,
     },

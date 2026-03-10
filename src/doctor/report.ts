@@ -17,6 +17,8 @@ import {
   type ManagedServiceStatus,
 } from "../service/daemon.js";
 import { createDatabase, getUnconsumedWakeEvents, isHeartbeatPaused } from "../state/database.js";
+import { buildProviderReputationSnapshot } from "../operator/provider-reputation.js";
+import { buildStorageLeaseHealthSnapshot } from "../operator/storage-health.js";
 
 export type DoctorSeverity = "ok" | "warn" | "error";
 
@@ -69,6 +71,8 @@ export interface HealthSnapshot {
   storageRecentAudits: number;
   storageRecentAnchors: number;
   storageDueRenewals: number;
+  storageDueAudits: number;
+  storageCriticalLeases: number;
   storageUnderReplicatedBundles: number;
   storageReplicationReady: boolean;
   artifactsEnabled: boolean;
@@ -76,6 +80,8 @@ export interface HealthSnapshot {
   artifactsRecentCount: number;
   artifactsVerifiedCount: number;
   artifactsAnchoredCount: number;
+  weakProviderCount: number;
+  criticalProviderKinds: string[];
   x402ServerEnabled: boolean;
   x402ServerReady: boolean;
   x402RecentPayments: number;
@@ -175,6 +181,8 @@ async function buildConfigSnapshot(
   storageRecentAudits: number;
   storageRecentAnchors: number;
   storageDueRenewals: number;
+  storageDueAudits: number;
+  storageCriticalLeases: number;
   storageUnderReplicatedBundles: number;
   storageReplicationReady: boolean;
   artifactsEnabled: boolean;
@@ -182,6 +190,8 @@ async function buildConfigSnapshot(
   artifactsRecentCount: number;
   artifactsVerifiedCount: number;
   artifactsAnchoredCount: number;
+  weakProviderCount: number;
+  criticalProviderKinds: string[];
   x402ServerEnabled: boolean;
   x402ServerReady: boolean;
   x402RecentPayments: number;
@@ -216,6 +226,15 @@ async function buildConfigSnapshot(
   const activeStorageLeases = config.storage?.enabled
     ? db.listStorageLeases(500, { status: "active" })
     : [];
+  const storageLeaseHealth = buildStorageLeaseHealthSnapshot({
+    config,
+    db,
+    limit: 500,
+  });
+  const providerReputation = buildProviderReputationSnapshot({
+    db,
+    limit: 500,
+  });
   const storageDueRenewals = config.storage?.enabled
     ? activeStorageLeases.filter((lease) => {
         const leadMs =
@@ -341,6 +360,8 @@ async function buildConfigSnapshot(
     storageRecentAudits: config.storage?.enabled ? db.listStorageAudits(20).length : 0,
     storageRecentAnchors: config.storage?.enabled ? db.listStorageAnchors(20).length : 0,
     storageDueRenewals,
+    storageDueAudits: storageLeaseHealth.dueAudits,
+    storageCriticalLeases: storageLeaseHealth.critical,
     storageUnderReplicatedBundles,
     storageReplicationReady: Boolean(
       !config.storage?.enabled ||
@@ -361,6 +382,14 @@ async function buildConfigSnapshot(
     artifactsAnchoredCount: config.artifacts?.enabled
       ? db.listArtifacts(100, { status: "anchored" }).length
       : 0,
+    weakProviderCount: providerReputation.weakProviders,
+    criticalProviderKinds: Array.from(
+      new Set(
+        providerReputation.entries
+          .filter((entry) => entry.score < 50)
+          .map((entry) => entry.kind),
+      ),
+    ),
     x402ServerEnabled: config.x402Server?.enabled === true,
     x402ServerReady: Boolean(!config.x402Server?.enabled || config.rpcUrl),
     x402RecentPayments: config.x402Server?.enabled ? db.listX402Payments(20).length : 0,
@@ -771,6 +800,24 @@ function collectFindings(
           "Run `openfox storage replicate` or keep `storage.leaseHealth.autoReplicate` enabled with valid replication providers.",
       });
     }
+    if (snapshot.storageDueAudits > 0) {
+      findings.push({
+        id: "storage-audits-due",
+        severity: "warn",
+        summary: `${snapshot.storageDueAudits} storage lease audit${snapshot.storageDueAudits === 1 ? "" : "s"} are overdue.`,
+        recommendation:
+          "Run `openfox storage lease-health --json` or `openfox storage maintain` to inspect and refresh overdue lease audits.",
+      });
+    }
+    if (snapshot.storageCriticalLeases > 0) {
+      findings.push({
+        id: "storage-critical-leases",
+        severity: "error",
+        summary: `${snapshot.storageCriticalLeases} storage lease${snapshot.storageCriticalLeases === 1 ? "" : "s"} are currently in critical health.`,
+        recommendation:
+          "Run `openfox storage lease-health --json` to identify expired, failed-audit, or under-replicated leases.",
+      });
+    }
   }
   if (snapshot.artifactsEnabled) {
     findings.push({
@@ -782,6 +829,18 @@ function collectFindings(
       recommendation: snapshot.artifactsReady
         ? "Use `openfox artifacts list` to inspect stored public news and oracle bundles."
         : "Set `artifacts.defaultProviderBaseUrl` or enable a local storage provider so artifact flows can store bundles.",
+    });
+  }
+
+  if (snapshot.weakProviderCount > 0) {
+    findings.push({
+      id: "provider-reputation-weak",
+      severity: "warn",
+      summary: `${snapshot.weakProviderCount} provider reputation snapshot${snapshot.weakProviderCount === 1 ? "" : "s"} are currently weak.`,
+      recommendation:
+        snapshot.criticalProviderKinds.length > 0
+          ? `Run \`openfox providers reputation --json\` and inspect weak providers in: ${snapshot.criticalProviderKinds.join(", ")}.`
+          : "Run `openfox providers reputation --json` to inspect weak provider scores and recent failures.",
     });
   }
 
@@ -933,6 +992,8 @@ export async function buildHealthSnapshot(
       storageRecentAudits: 0,
       storageRecentAnchors: 0,
       storageDueRenewals: 0,
+      storageDueAudits: 0,
+      storageCriticalLeases: 0,
       storageUnderReplicatedBundles: 0,
       storageReplicationReady: false,
       artifactsEnabled: false,
@@ -940,6 +1001,8 @@ export async function buildHealthSnapshot(
       artifactsRecentCount: 0,
       artifactsVerifiedCount: 0,
       artifactsAnchoredCount: 0,
+      weakProviderCount: 0,
+      criticalProviderKinds: [],
       x402ServerEnabled: false,
       x402ServerReady: false,
       x402RecentPayments: 0,
