@@ -342,6 +342,7 @@ function createStorageLeaseRecord(params: {
     bundleKind: params.storage.head.bundle_kind,
     requesterAddress: params.storage.quote.requester_address,
     providerAddress: params.storage.quote.provider_address,
+    providerBaseUrl: params.storage.providerBaseUrl,
     sizeBytes: params.storage.head.size_bytes,
     ttlSeconds: params.storage.head.ttl_seconds,
     amountWei: params.storage.head.amount_wei,

@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe("storage provider server", () => {
-  it("serves quote, head, get, and audit flows for stored bundles", async () => {
+  it("serves quote, head, get, audit, and renew endpoints for stored bundles", async () => {
     const db = createTestDb();
     const identity = createTestIdentity();
     const storageDir = makeTempDir("openfox-storage-provider-");
@@ -73,6 +73,7 @@ describe("storage provider server", () => {
       bundleKind: "artifact.bundle",
       requesterAddress: receipt.requesterAddress,
       providerAddress: identity.address,
+      providerBaseUrl: "http://127.0.0.1/storage",
       sizeBytes: built.bytes.byteLength,
       ttlSeconds: 86400,
       amountWei: "1000",
@@ -162,6 +163,26 @@ describe("storage provider server", () => {
       const audit = (await auditResponse.json()) as { lease_id: string; status: string };
       expect(audit.lease_id).toBe("lease-1");
       expect(audit.status).toBe("verified");
+
+      const renewResponse = await fetch(`${server.url}/renew`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requester: {
+            identity: {
+              kind: "tos",
+              value: receipt.requesterAddress,
+            },
+          },
+          request_nonce: "renewnonce123",
+          request_expires_at: Math.floor(Date.now() / 1000) + 300,
+          lease_id: "lease-1",
+          ttl_seconds: 3600,
+        }),
+      });
+      expect(renewResponse.status).toBe(400);
+      const renewBody = (await renewResponse.json()) as { reason: string };
+      expect(renewBody.reason).toContain("x402 payment manager is unavailable");
     } finally {
       await server.close();
       db.close();

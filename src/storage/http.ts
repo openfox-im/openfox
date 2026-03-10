@@ -13,6 +13,7 @@ import {
   type StorageLeaseRecord,
   type StorageMarketConfig,
   type StorageQuoteRecord,
+  type StorageRenewalRecord,
 } from "../types.js";
 import { resolvePath } from "../config.js";
 import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
@@ -60,6 +61,19 @@ export interface StoragePutRequest {
   cid?: string;
 }
 
+export interface StorageRenewRequest {
+  requester: {
+    identity: {
+      kind: "tos";
+      value: Address;
+    };
+  };
+  request_nonce: string;
+  request_expires_at: number;
+  lease_id: string;
+  ttl_seconds?: number;
+}
+
 export interface StorageQuoteResponse {
   quote_id: string;
   provider_address: Address;
@@ -77,6 +91,7 @@ export interface StorageLeaseResponse {
   cid: string;
   bundle_hash: string;
   bundle_kind: string;
+  provider_address: Address;
   size_bytes: number;
   ttl_seconds: number;
   amount_wei: string;
@@ -89,6 +104,13 @@ export interface StorageLeaseResponse {
   get_url: string;
   head_url: string;
   anchor_tx_hash?: string;
+}
+
+export interface StorageRenewalResponse extends StorageLeaseResponse {
+  renewal_id: string;
+  previous_expires_at: string;
+  renewed_expires_at: string;
+  added_ttl_seconds: number;
 }
 
 export interface StorageAuditResponse {
@@ -211,6 +233,21 @@ function buildStorageRequestKey(params: {
   ].join(":");
 }
 
+function buildStorageRenewalRequestKey(params: {
+  requesterAddress: string;
+  capability: string;
+  leaseId: string;
+  nonce: string;
+}): string {
+  return [
+    "storage:renew",
+    params.requesterAddress.toLowerCase(),
+    params.capability.toLowerCase(),
+    params.leaseId,
+    params.nonce,
+  ].join(":");
+}
+
 function buildHeadUrl(baseUrl: string, cid: string): string {
   return `${baseUrl}/head/${encodeURIComponent(cid)}`;
 }
@@ -267,6 +304,34 @@ function validatePutRequest(
   return { requesterAddress, nonce };
 }
 
+function validateRenewRequest(
+  body: StorageRenewRequest,
+  config: StorageMarketConfig,
+): { requesterAddress: Address; nonce: string; leaseId: string; ttlSeconds?: number } {
+  if (!body.requester?.identity?.value) {
+    throw new Error("missing requester identity");
+  }
+  const requesterAddress = normalizeAddress(body.requester.identity.value) as Address;
+  const nonce = normalizeNonce(body.request_nonce);
+  validateRequestExpiry(body.request_expires_at);
+  const leaseId = String(body.lease_id || "").trim();
+  if (!leaseId) {
+    throw new Error("lease_id is required");
+  }
+  const ttlSeconds =
+    body.ttl_seconds !== undefined ? Number(body.ttl_seconds) : undefined;
+  if (
+    ttlSeconds !== undefined &&
+    (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0)
+  ) {
+    throw new Error("ttl_seconds must be a positive number");
+  }
+  if (ttlSeconds !== undefined && ttlSeconds > config.maxTtlSeconds) {
+    throw new Error(`ttl_seconds exceeds maxTtlSeconds (${config.maxTtlSeconds})`);
+  }
+  return { requesterAddress, nonce, leaseId, ttlSeconds };
+}
+
 function quoteToResponse(record: StorageQuoteRecord): StorageQuoteResponse {
   return {
     quote_id: record.quoteId,
@@ -287,6 +352,7 @@ function leaseToResponse(baseUrl: string, lease: StorageLeaseRecord): StorageLea
     cid: lease.cid,
     bundle_hash: lease.bundleHash,
     bundle_kind: lease.bundleKind,
+    provider_address: lease.providerAddress,
     size_bytes: lease.sizeBytes,
     ttl_seconds: lease.ttlSeconds,
     amount_wei: lease.amountWei,
@@ -309,6 +375,20 @@ function auditToResponse(record: StorageAuditRecord): StorageAuditResponse {
     status: record.status,
     response_hash: record.responseHash,
     checked_at: record.checkedAt,
+  };
+}
+
+function renewalToResponse(
+  baseUrl: string,
+  lease: StorageLeaseRecord,
+  renewal: StorageRenewalRecord,
+): StorageRenewalResponse {
+  return {
+    renewal_id: renewal.renewalId,
+    previous_expires_at: renewal.previousExpiresAt,
+    renewed_expires_at: renewal.renewedExpiresAt,
+    added_ttl_seconds: renewal.addedTtlSeconds,
+    ...leaseToResponse(baseUrl, lease),
   };
 }
 
@@ -360,6 +440,13 @@ export async function startStorageProviderServer(params: {
           capability_prefix: params.storageConfig.capabilityPrefix,
           bind: `${params.storageConfig.bindHost}:${params.storageConfig.port}`,
           storage_dir: params.storageConfig.storageDir,
+          auto_audit: params.storageConfig.leaseHealth.autoAudit,
+          audit_interval_seconds: params.storageConfig.leaseHealth.auditIntervalSeconds,
+          auto_renew: params.storageConfig.leaseHealth.autoRenew,
+          renewal_lead_seconds: params.storageConfig.leaseHealth.renewalLeadSeconds,
+          replication_enabled: params.storageConfig.replication.enabled,
+          replication_target: params.storageConfig.replication.targetCopies,
+          replication_providers: params.storageConfig.replication.providerBaseUrls,
         });
         return;
       }
@@ -604,6 +691,7 @@ export async function startStorageProviderServer(params: {
           bundleKind: body.bundle_kind,
           requesterAddress,
           providerAddress: params.address,
+          providerBaseUrl: currentBaseUrl,
           sizeBytes: bytes.byteLength,
           ttlSeconds,
           amountWei,
@@ -654,6 +742,168 @@ export async function startStorageProviderServer(params: {
             anchorTxHash: anchorRecord?.anchorTxHash ?? null,
             anchorReceipt: anchorRecord?.anchorReceipt ?? null,
           }),
+          payment_tx_hash: payment.payment.txHash,
+          payment_status: payment.payment.status,
+        });
+        return;
+      }
+
+      if (parts.length === 1 && parts[0] === "renew" && req.method === "POST") {
+        const body = (await readJsonBody(req)) as StorageRenewRequest;
+        const { requesterAddress, nonce, leaseId, ttlSeconds } = validateRenewRequest(
+          body,
+          params.storageConfig,
+        );
+        const lease = params.db.getStorageLease(leaseId);
+        if (!lease) {
+          json(res, 404, { error: "lease not found" });
+          return;
+        }
+        if (lease.status !== "active") {
+          throw new Error("lease is not active");
+        }
+        if (lease.requesterAddress !== requesterAddress) {
+          throw new Error("lease requester does not match request");
+        }
+        const addedTtlSeconds = ttlSeconds ?? params.storageConfig.defaultTtlSeconds;
+        const requestKey = buildStorageRenewalRequestKey({
+          requesterAddress,
+          capability: `${params.storageConfig.capabilityPrefix}.renew`,
+          leaseId,
+          nonce,
+        });
+        const requestHash = hashX402RequestPayload({
+          requester_address: requesterAddress,
+          lease_id: leaseId,
+          ttl_seconds: addedTtlSeconds,
+          request_nonce: nonce,
+        });
+        const existingRenewalId = params.db.getKV(requestKey);
+        if (existingRenewalId) {
+          const existingRenewal = params.db.getStorageRenewal(existingRenewalId);
+          const existingLease = params.db.getStorageLease(leaseId);
+          if (existingRenewal && existingLease) {
+            json(res, 200, {
+              ...renewalToResponse(currentBaseUrl, existingLease, existingRenewal),
+              idempotent: true,
+            });
+            return;
+          }
+        }
+        ensureRequestNotReplayed({
+          db: params.db,
+          scope: "storage.renew",
+          requesterIdentity: requesterAddress,
+          capability: `${params.storageConfig.capabilityPrefix}.renew`,
+          nonce,
+        });
+        if (!paymentManager) {
+          throw new Error("x402 payment manager is unavailable; configure rpcUrl");
+        }
+        const amountWei = computeStoragePrice({
+          config: params.storageConfig,
+          sizeBytes: lease.sizeBytes,
+          ttlSeconds: addedTtlSeconds,
+        });
+        const payment = await paymentManager.requirePayment({
+          req,
+          serviceKind: "storage",
+          providerAddress: params.address,
+          requestKey,
+          requestHash,
+          amountWei,
+          description: "OpenFox storage.renew payment",
+        });
+        if (payment.state === "required") {
+          writeX402RequirementResponse({ res, requirement: payment.requirement });
+          return;
+        }
+        if (payment.state === "pending") {
+          json(res, 202, {
+            status: "pending",
+            reason: payment.reason,
+            payment_tx_hash: payment.payment.txHash,
+            payment_status: payment.payment.status,
+          });
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const previousExpiresAt = lease.receipt.expiresAt;
+        const previousExpiryMs = new Date(previousExpiresAt).getTime();
+        const effectiveStartMs = Math.max(Date.now(), previousExpiryMs);
+        const renewedExpiresAt = new Date(
+          effectiveStartMs + addedTtlSeconds * 1000,
+        ).toISOString();
+        const renewalId = `${leaseId}:renew:${nonce}`;
+        const nextAmountWei = (
+          BigInt(lease.amountWei || "0") + BigInt(amountWei)
+        ).toString();
+        const nextTtlSeconds = lease.ttlSeconds + addedTtlSeconds;
+        recordRequestNonce({
+          db: params.db,
+          scope: "storage.renew",
+          requesterIdentity: requesterAddress,
+          capability: `${params.storageConfig.capabilityPrefix}.renew`,
+          nonce,
+          expiresAt: body.request_expires_at,
+        });
+
+        const receipt = {
+          ...lease.receipt,
+          ttlSeconds: nextTtlSeconds,
+          amountWei: nextAmountWei,
+          issuedAt: nowIso,
+          expiresAt: renewedExpiresAt,
+          paymentTxHash: payment.payment.txHash,
+          metadata: {
+            ...(lease.receipt.metadata || {}),
+            previous_expires_at: previousExpiresAt,
+            renewal_id: renewalId,
+            renewal_count:
+              Number((lease.receipt.metadata as Record<string, unknown> | undefined)?.renewal_count || 0) +
+              1,
+            added_ttl_seconds: addedTtlSeconds,
+          },
+        };
+        const updatedLease: StorageLeaseRecord = {
+          ...lease,
+          providerBaseUrl: lease.providerBaseUrl ?? currentBaseUrl,
+          ttlSeconds: nextTtlSeconds,
+          amountWei: nextAmountWei,
+          paymentId: payment.payment.paymentId,
+          receipt,
+          receiptHash: hashStorageReceipt(receipt),
+          updatedAt: nowIso,
+        };
+        const renewal: StorageRenewalRecord = {
+          renewalId,
+          leaseId,
+          cid: lease.cid,
+          requesterAddress,
+          providerAddress: params.address,
+          providerBaseUrl: currentBaseUrl,
+          previousExpiresAt,
+          renewedExpiresAt,
+          addedTtlSeconds,
+          amountWei,
+          paymentId: payment.payment.paymentId,
+          receipt,
+          receiptHash: hashStorageReceipt(receipt),
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        params.db.upsertStorageLease(updatedLease);
+        params.db.upsertStorageRenewal(renewal);
+        params.db.setKV(requestKey, renewalId);
+        paymentManager.bindPayment({
+          paymentId: payment.payment.paymentId,
+          boundKind: "storage_renewal",
+          boundSubjectId: renewalId,
+          artifactUrl: updatedLease.receipt.artifactUrl || undefined,
+        });
+        json(res, 200, {
+          ...renewalToResponse(currentBaseUrl, updatedLease, renewal),
           payment_tx_hash: payment.payment.txHash,
           payment_status: payment.payment.status,
         });

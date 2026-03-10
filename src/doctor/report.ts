@@ -46,8 +46,12 @@ export interface HealthSnapshot {
   storageAnchorEnabled: boolean;
   storageRecentLeases: number;
   storageActiveLeases: number;
+  storageRecentRenewals: number;
   storageRecentAudits: number;
   storageRecentAnchors: number;
+  storageDueRenewals: number;
+  storageUnderReplicatedBundles: number;
+  storageReplicationReady: boolean;
   artifactsEnabled: boolean;
   artifactsReady: boolean;
   artifactsRecentCount: number;
@@ -128,8 +132,12 @@ async function buildConfigSnapshot(
   storageAnchorEnabled: boolean;
   storageRecentLeases: number;
   storageActiveLeases: number;
+  storageRecentRenewals: number;
   storageRecentAudits: number;
   storageRecentAnchors: number;
+  storageDueRenewals: number;
+  storageUnderReplicatedBundles: number;
+  storageReplicationReady: boolean;
   artifactsEnabled: boolean;
   artifactsReady: boolean;
   artifactsRecentCount: number;
@@ -166,6 +174,34 @@ async function buildConfigSnapshot(
   const ineligibleEnabledSkills = enabledSkills
     .filter((entry) => !entry.eligible)
     .map((entry) => entry.name);
+  const activeStorageLeases = config.storage?.enabled
+    ? db.listStorageLeases(500, { status: "active" })
+    : [];
+  const storageDueRenewals = config.storage?.enabled
+    ? activeStorageLeases.filter((lease) => {
+        const leadMs =
+          (config.storage?.leaseHealth.renewalLeadSeconds ?? 0) * 1000;
+        return new Date(lease.receipt.expiresAt).getTime() - Date.now() <= leadMs;
+      }).length
+    : 0;
+  const storageUnderReplicatedBundles = config.storage?.enabled
+    ? Math.max(
+        0,
+        Array.from(
+          activeStorageLeases.reduce((map, lease) => {
+            const items = map.get(lease.cid) ?? [];
+            items.push(lease);
+            map.set(lease.cid, items);
+            return map;
+          }, new Map<string, typeof activeStorageLeases>()),
+        ).filter(([, leases]) => {
+          const target = config.storage?.replication.enabled
+            ? config.storage.replication.targetCopies
+            : 1;
+          return leases.length < target;
+        }).length,
+      )
+    : 0;
 
   return {
     inferenceConfigured: hasConfiguredInference(config),
@@ -193,11 +229,20 @@ async function buildConfigSnapshot(
     storageAnchorEnabled:
       config.storage?.enabled === true && config.storage.anchor.enabled === true,
     storageRecentLeases: config.storage?.enabled ? db.listStorageLeases(20).length : 0,
-    storageActiveLeases: config.storage?.enabled
-      ? db.listStorageLeases(100, { status: "active" }).length
+    storageActiveLeases: activeStorageLeases.length,
+    storageRecentRenewals: config.storage?.enabled
+      ? db.listStorageRenewals(20).length
       : 0,
     storageRecentAudits: config.storage?.enabled ? db.listStorageAudits(20).length : 0,
     storageRecentAnchors: config.storage?.enabled ? db.listStorageAnchors(20).length : 0,
+    storageDueRenewals,
+    storageUnderReplicatedBundles,
+    storageReplicationReady: Boolean(
+      !config.storage?.enabled ||
+        !config.storage.replication?.enabled ||
+        config.storage.replication.targetCopies <= 1 ||
+        (config.storage.replication.providerBaseUrls?.length ?? 0) > 0,
+    ),
     artifactsEnabled: config.artifacts?.enabled === true,
     artifactsReady: Boolean(
       !config.artifacts?.enabled ||
@@ -497,7 +542,7 @@ function collectFindings(
       id: "storage-enabled",
       severity: snapshot.storageReady ? "ok" : "error",
       summary: snapshot.storageReady
-        ? `Storage market is enabled (${snapshot.storageActiveLeases} active lease${snapshot.storageActiveLeases === 1 ? "" : "s"}, ${snapshot.storageRecentAnchors} recent anchor${snapshot.storageRecentAnchors === 1 ? "" : "s"}).`
+        ? `Storage market is enabled (${snapshot.storageActiveLeases} active lease${snapshot.storageActiveLeases === 1 ? "" : "s"}, ${snapshot.storageRecentRenewals} recent renewal${snapshot.storageRecentRenewals === 1 ? "" : "s"}, ${snapshot.storageRecentAnchors} recent anchor${snapshot.storageRecentAnchors === 1 ? "" : "s"}).`
         : "Storage market is enabled but storage anchoring has no chain RPC configured.",
       recommendation: snapshot.storageReady
         ? undefined
@@ -510,6 +555,33 @@ function collectFindings(
         summary: "Storage retrieval requires paid or authenticated access.",
         recommendation:
           "This is expected for private providers. Enable `storage.allowAnonymousGet` if public retrieval is required.",
+      });
+    }
+    if (snapshot.storageDueRenewals > 0) {
+      findings.push({
+        id: "storage-renewals-due",
+        severity: "warn",
+        summary: `${snapshot.storageDueRenewals} storage lease renewal${snapshot.storageDueRenewals === 1 ? "" : "s"} are due soon.`,
+        recommendation:
+          "Run `openfox storage renew` manually or keep `storage.leaseHealth.autoRenew` enabled.",
+      });
+    }
+    if (!snapshot.storageReplicationReady) {
+      findings.push({
+        id: "storage-replication-misconfigured",
+        severity: "warn",
+        summary:
+          "Storage replication is enabled with more than one target copy, but no replication providers are configured.",
+        recommendation:
+          "Set `storage.replication.providerBaseUrls` or reduce `storage.replication.targetCopies` to 1.",
+      });
+    } else if (snapshot.storageUnderReplicatedBundles > 0) {
+      findings.push({
+        id: "storage-under-replicated",
+        severity: "warn",
+        summary: `${snapshot.storageUnderReplicatedBundles} stored bundle${snapshot.storageUnderReplicatedBundles === 1 ? "" : "s"} do not meet the replication target.`,
+        recommendation:
+          "Run `openfox storage replicate` or keep `storage.leaseHealth.autoReplicate` enabled with valid replication providers.",
       });
     }
   }
@@ -651,8 +723,12 @@ export async function buildHealthSnapshot(
       storageAnchorEnabled: false,
       storageRecentLeases: 0,
       storageActiveLeases: 0,
+      storageRecentRenewals: 0,
       storageRecentAudits: 0,
       storageRecentAnchors: 0,
+      storageDueRenewals: 0,
+      storageUnderReplicatedBundles: 0,
+      storageReplicationReady: false,
       artifactsEnabled: false,
       artifactsReady: false,
       artifactsRecentCount: 0,
@@ -728,7 +804,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,
-    `Storage enabled: ${yesNo(snapshot.storageEnabled)}${snapshot.storageEnabled ? ` (${snapshot.storageActiveLeases} active, ${snapshot.storageRecentAudits} audits, ${snapshot.storageRecentAnchors} anchors)` : ""}`,
+    `Storage enabled: ${yesNo(snapshot.storageEnabled)}${snapshot.storageEnabled ? ` (${snapshot.storageActiveLeases} active, ${snapshot.storageRecentRenewals} renewals, ${snapshot.storageRecentAudits} audits, ${snapshot.storageRecentAnchors} anchors, ${snapshot.storageUnderReplicatedBundles} under-replicated)` : ""}`,
     `Artifacts enabled: ${yesNo(snapshot.artifactsEnabled)}${snapshot.artifactsEnabled ? ` (${snapshot.artifactsRecentCount} recent, ${snapshot.artifactsVerifiedCount} verified, ${snapshot.artifactsAnchoredCount} anchored)` : ""}`,
     `x402 server: ${yesNo(snapshot.x402ServerEnabled)}${snapshot.x402ServerEnabled ? ` (${snapshot.x402RecentPayments} recent, ${snapshot.x402PendingPayments} pending, ${snapshot.x402FailedPayments} failed)` : ""}`,
     `Settlement enabled: ${yesNo(snapshot.settlementEnabled)}${snapshot.settlementEnabled ? ` (${snapshot.settlementRecentCount} recent)` : ""}`,

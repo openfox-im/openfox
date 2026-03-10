@@ -34,8 +34,12 @@ describe("doctor report formatting", () => {
       storageAnchorEnabled: true,
       storageRecentLeases: 2,
       storageActiveLeases: 1,
+      storageRecentRenewals: 1,
       storageRecentAudits: 1,
       storageRecentAnchors: 1,
+      storageDueRenewals: 0,
+      storageUnderReplicatedBundles: 0,
+      storageReplicationReady: true,
       artifactsEnabled: true,
       artifactsReady: true,
       artifactsRecentCount: 2,
@@ -107,7 +111,9 @@ describe("doctor report formatting", () => {
 
     expect(health).toContain("=== OPENFOX HEALTH ===");
     expect(health).toContain("Bounty enabled: yes (host)");
-    expect(health).toContain("Storage enabled: yes (1 active, 1 audits, 1 anchors)");
+    expect(health).toContain(
+      "Storage enabled: yes (1 active, 1 renewals, 1 audits, 1 anchors, 0 under-replicated)",
+    );
     expect(health).toContain("x402 server: yes (2 recent, 1 pending, 0 failed)");
     expect(health).toContain("Settlement enabled: yes (1 recent)");
     expect(health).toContain("Settlement callbacks: yes (2 pending)");

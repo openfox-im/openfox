@@ -58,6 +58,10 @@ export interface ServiceStatusSnapshot {
           url: string;
           capabilityPrefix: string;
           allowAnonymousGet: boolean;
+          autoAudit: boolean;
+          autoRenew: boolean;
+          replicationTarget: number;
+          configuredReplicationProviders: number;
         }
       | null;
     artifacts:
@@ -230,6 +234,12 @@ function inferProviderRoutes(config: OpenFoxConfig): Array<{
       mode: "paid",
       targetUrl: buildLocalHttpUrl(storage.bindHost, storage.port, `${storage.pathPrefix}/put`),
     });
+    routes.push({
+      path: `${storage.pathPrefix.replace(/\/$/, "")}/renew`,
+      capability: `${storage.capabilityPrefix}.renew`,
+      mode: "paid",
+      targetUrl: buildLocalHttpUrl(storage.bindHost, storage.port, `${storage.pathPrefix}/renew`),
+    });
   }
   const artifacts = config.artifacts;
   if (artifacts?.enabled && artifacts.service?.enabled && artifacts.service.port > 0) {
@@ -375,7 +385,7 @@ export function buildServiceStatusReport(
   }
   if (snapshot.providerSurfaces.storage) {
     lines.push(
-      `  - storage: ${snapshot.providerSurfaces.storage.url}  capability_prefix=${snapshot.providerSurfaces.storage.capabilityPrefix}  anonymous_get=${yesNo(snapshot.providerSurfaces.storage.allowAnonymousGet)}`,
+      `  - storage: ${snapshot.providerSurfaces.storage.url}  capability_prefix=${snapshot.providerSurfaces.storage.capabilityPrefix}  anonymous_get=${yesNo(snapshot.providerSurfaces.storage.allowAnonymousGet)}  auto_audit=${yesNo(snapshot.providerSurfaces.storage.autoAudit)}  auto_renew=${yesNo(snapshot.providerSurfaces.storage.autoRenew)}  replication_target=${snapshot.providerSurfaces.storage.replicationTarget}`,
     );
   }
   if (snapshot.providerSurfaces.artifacts) {
@@ -498,6 +508,13 @@ export function buildServiceStatusSnapshot(
               url: buildLocalHttpUrl(storage.bindHost, storage.port, storage.pathPrefix),
               capabilityPrefix: storage.capabilityPrefix,
               allowAnonymousGet: storage.allowAnonymousGet,
+              autoAudit: storage.leaseHealth?.autoAudit === true,
+              autoRenew: storage.leaseHealth?.autoRenew === true,
+              replicationTarget: storage.replication?.enabled
+                ? storage.replication.targetCopies
+                : 1,
+              configuredReplicationProviders:
+                storage.replication?.providerBaseUrls?.length ?? 0,
             }
           : null,
       artifacts:

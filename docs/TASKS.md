@@ -164,6 +164,30 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Support both sponsored capture endpoints and bounty-driven evidence
     capture so OpenFox can gather public news and oracle evidence without
     manual runtime rewrites.
+- [x] Task 36A: Add storage lease lifecycle automation
+  - Status: Complete
+  - Goal: Extend the first storage market slice with renewal, replication, and
+    scheduler-driven lease health maintenance so stored bundles can survive as
+    long-lived operator assets.
+- [ ] Task 37: Define the signer-provider protocol and wallet-policy profile
+  - Status: Planned
+  - Goal: Turn `tolang` programmable-wallet delegation into a stable OpenFox
+    network protocol for bounded delegated execution, without falling back to
+    custodial hosted-wallet behavior.
+- [ ] Task 38: Add a signer-provider service mode to OpenFox
+  - Status: Planned
+  - Goal: Let one OpenFox node act as a paid signer-provider that accepts
+    bounded execution requests, submits them to `TOS`, and returns durable
+    execution receipts.
+- [ ] Task 39: Add requester and remote-execution UX for signer-provider flows
+  - Status: Planned
+  - Goal: Let another OpenFox node discover a signer-provider, pay for one
+    delegated execution, and use it beside the existing local-wallet path.
+- [ ] Task 40: Add signer-provider operator visibility, diagnostics, and docs
+  - Status: Planned
+  - Goal: Make signer-provider state visible through status/health/doctor/docs
+    so programmable delegated execution becomes part of the same operator story
+    as storage, artifacts, settlement, and paid services.
 
 ## Task 1 Breakdown
 
@@ -471,3 +495,56 @@ building OpenFox into a TOS-native agent platform.
 - [x] Publish sponsored artifact capture capabilities through discovery and gateway-backed routes.
 - [x] Bind accepted public evidence bounties to the artifact pipeline so payouts and settlement can point at immutable bundles.
 - [x] Add targeted tests for sponsored capture and bounty-driven artifact capture flows.
+
+## Task 36A Breakdown
+
+- [x] Add persistent storage renewal records and provider-bound lease metadata.
+- [x] Add `openfox storage renew` and `openfox storage replicate`.
+- [x] Add paid provider-side storage renewal handling.
+- [x] Add scheduler-driven storage lease audit, renewal, and replication tasks.
+- [x] Surface due renewals, recent renewals, and under-replicated bundles
+  through `status`, `service`, `health`, and `doctor`.
+
+## Task 37 Breakdown
+
+- [ ] Define canonical `signer.quote`, `signer.submit`, `signer.status`, and `signer.receipt` request/response objects.
+- [ ] Define a canonical `SignerPolicyRef` shape with `wallet_address`, `policy_hash`, `delegate_identity`, `scope_hash`, and expiry metadata.
+- [ ] Define the first supported wallet-policy profile for bounded delegated execution:
+  - allowed target addresses
+  - allowed function selectors
+  - value caps
+  - expiry
+  - replay protection expectations
+- [ ] Define payment idempotency and payment-to-execution binding rules for signer-provider flows.
+- [ ] Define how signer-provider capability publication maps into Agent Discovery and optional Agent Gateway routes.
+- [ ] Document the funding boundary clearly:
+  - `v0` assumes the programmable wallet already has enough `TOS` or uses a separate funding flow.
+- [ ] Keep the protocol explicitly execution-centric, not a raw arbitrary-byte signing API.
+
+## Task 38 Breakdown
+
+- [ ] Add signer-provider config and local database tables for quotes, execution requests, and execution receipts.
+- [ ] Add a signer-provider HTTP service with bounded `quote`, `submit`, `status`, and `receipt` flows.
+- [ ] Reuse the existing paid-provider pattern so signer-provider requests can charge via `x402`.
+- [ ] Bind accepted payments to persisted signer execution receipts.
+- [ ] Add the first runtime path that submits a delegated programmable-wallet call to `TOS`.
+- [ ] Keep provider behavior constrained to delegated/session-key execution instead of root-key custody.
+- [ ] Add targeted tests for schema validation, idempotency, receipt persistence, and submission behavior.
+
+## Task 39 Breakdown
+
+- [ ] Add a requester-side signer-provider client that can request a quote and submit one bounded execution request.
+- [ ] Add `openfox signer ...` CLI surfaces for provider discovery, quote, submit, and receipt lookup.
+- [ ] Add a remote delegated-execution path beside the current local wallet path instead of replacing it.
+- [ ] Support discovery-first invocation so a requester can find signer-provider agents through Agent Discovery.
+- [ ] Keep gateway compatibility so a signer-provider can sit behind Agent Gateway if needed.
+- [ ] Add targeted tests for requester-side quote/submit/result flows.
+
+## Task 40 Breakdown
+
+- [ ] Surface signer-provider routes, receipts, and recent execution state in `openfox status`.
+- [ ] Add signer-provider findings to `openfox health` and `openfox doctor`, especially for missing policy, expired delegation, or insufficient wallet funding.
+- [ ] Expose signer-provider service/operator state through the existing managed-service and service-status UX.
+- [ ] Document the operator flow for principal, requester, and signer-provider roles.
+- [ ] Add a multi-node example showing programmable-wallet delegation plus signer-provider execution.
+- [ ] Link signer-provider docs back into the roadmap and operator-facing guides so the feature is part of the main runtime narrative.

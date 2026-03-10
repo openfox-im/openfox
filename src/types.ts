@@ -591,6 +591,20 @@ export interface StorageAnchorConfig {
   receiptTimeoutMs: number;
 }
 
+export interface StorageLeaseHealthConfig {
+  autoAudit: boolean;
+  auditIntervalSeconds: number;
+  autoRenew: boolean;
+  renewalLeadSeconds: number;
+  autoReplicate: boolean;
+}
+
+export interface StorageReplicationConfig {
+  enabled: boolean;
+  targetCopies: number;
+  providerBaseUrls: string[];
+}
+
 export interface StorageMarketConfig {
   enabled: boolean;
   bindHost: string;
@@ -606,6 +620,8 @@ export interface StorageMarketConfig {
   pricePerMiBWei: string;
   publishToDiscovery: boolean;
   allowAnonymousGet: boolean;
+  leaseHealth: StorageLeaseHealthConfig;
+  replication: StorageReplicationConfig;
   anchor: StorageAnchorConfig;
 }
 
@@ -632,6 +648,7 @@ export interface StorageLeaseRecord {
   bundleKind: string;
   requesterAddress: Address;
   providerAddress: Address;
+  providerBaseUrl?: string | null;
   sizeBytes: number;
   ttlSeconds: number;
   amountWei: string;
@@ -643,6 +660,24 @@ export interface StorageLeaseRecord {
   receiptHash: Hex;
   anchorTxHash?: Hex | null;
   anchorReceipt?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StorageRenewalRecord {
+  renewalId: string;
+  leaseId: string;
+  cid: string;
+  requesterAddress: Address;
+  providerAddress: Address;
+  providerBaseUrl?: string | null;
+  previousExpiresAt: string;
+  renewedExpiresAt: string;
+  addedTtlSeconds: number;
+  amountWei: string;
+  paymentId?: Hex | null;
+  receipt: StorageReceipt;
+  receiptHash: Hex;
   createdAt: string;
   updatedAt: string;
 }
@@ -959,6 +994,18 @@ export const DEFAULT_STORAGE_MARKET_CONFIG: StorageMarketConfig = {
   pricePerMiBWei: "1000000000000000",
   publishToDiscovery: true,
   allowAnonymousGet: true,
+  leaseHealth: {
+    autoAudit: true,
+    auditIntervalSeconds: 6 * 60 * 60,
+    autoRenew: true,
+    renewalLeadSeconds: 6 * 60 * 60,
+    autoReplicate: false,
+  },
+  replication: {
+    enabled: false,
+    targetCopies: 1,
+    providerBaseUrls: [],
+  },
   anchor: {
     enabled: false,
     sinkAddress: undefined,
@@ -1882,10 +1929,20 @@ export interface OpenFoxDatabase {
     limit: number,
     filters?: {
       status?: StorageLeaseStatus;
+      cid?: string;
       providerAddress?: Address;
       requesterAddress?: Address;
     },
   ): StorageLeaseRecord[];
+  upsertStorageRenewal(record: StorageRenewalRecord): void;
+  getStorageRenewal(renewalId: string): StorageRenewalRecord | undefined;
+  listStorageRenewals(
+    limit: number,
+    filters?: {
+      leaseId?: string;
+      cid?: string;
+    },
+  ): StorageRenewalRecord[];
   upsertStorageAudit(record: StorageAuditRecord): void;
   getStorageAudit(auditId: string): StorageAuditRecord | undefined;
   listStorageAudits(limit: number, filters?: { leaseId?: string; status?: StorageAuditStatus }): StorageAuditRecord[];

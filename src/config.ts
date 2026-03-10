@@ -590,6 +590,16 @@ export function loadConfig(): OpenFoxConfig | null {
   const storage: StorageMarketConfig = {
     ...DEFAULT_STORAGE_MARKET_CONFIG,
     ...((raw?.storage as JsonRecord | undefined) ?? {}),
+    leaseHealth: {
+      ...DEFAULT_STORAGE_MARKET_CONFIG.leaseHealth,
+      ...((((raw?.storage as JsonRecord | undefined)?.leaseHealth as JsonRecord | undefined) ??
+        {})),
+    },
+    replication: {
+      ...DEFAULT_STORAGE_MARKET_CONFIG.replication,
+      ...((((raw?.storage as JsonRecord | undefined)?.replication as JsonRecord | undefined) ??
+        {})),
+    },
     anchor: {
       ...DEFAULT_STORAGE_MARKET_CONFIG.anchor,
       ...((((raw?.storage as JsonRecord | undefined)?.anchor as JsonRecord | undefined) ?? {})),

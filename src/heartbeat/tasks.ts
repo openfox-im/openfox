@@ -26,6 +26,12 @@ import { createNativeSettlementCallbackDispatcher } from "../settlement/callback
 import { createMarketContractDispatcher } from "../market/contracts.js";
 import { createX402PaymentManager } from "../tos/x402-server.js";
 import { metricsInsertSnapshot, metricsPruneOld } from "../state/database.js";
+import { getWallet } from "../identity/wallet.js";
+import {
+  auditLocalStorageLease,
+  replicateTrackedLease,
+  renewTrackedLease,
+} from "../storage/lifecycle.js";
 import { ulid } from "ulid";
 
 const logger = createLogger("heartbeat.tasks");
@@ -281,6 +287,169 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       message:
         result.failed > 0
           ? `x402 payments have ${result.failed} failed item(s).`
+          : undefined,
+    };
+  },
+
+  audit_storage_leases: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const storageConfig = taskCtx.config.storage;
+    if (!storageConfig?.enabled || !storageConfig.leaseHealth.autoAudit) {
+      return { shouldWake: false };
+    }
+    const activeLeases = taskCtx.db.listStorageLeases(200, { status: "active" });
+    const auditIntervalMs = storageConfig.leaseHealth.auditIntervalSeconds * 1000;
+    let processed = 0;
+    let failed = 0;
+    for (const lease of activeLeases) {
+      const latestAudit = taskCtx.db.listStorageAudits(1, { leaseId: lease.leaseId })[0];
+      if (
+        latestAudit &&
+        Date.now() - new Date(latestAudit.checkedAt).getTime() < auditIntervalMs
+      ) {
+        continue;
+      }
+      const audit = await auditLocalStorageLease({ lease });
+      taskCtx.db.upsertStorageAudit(audit);
+      processed += 1;
+      if (audit.status === "failed") failed += 1;
+    }
+    taskCtx.db.setKV(
+      "last_storage_lease_audit",
+      JSON.stringify({
+        processed,
+        failed,
+        at: new Date().toISOString(),
+      }),
+    );
+    return {
+      shouldWake: failed > 0,
+      message:
+        failed > 0
+          ? `Storage audits detected ${failed} failed lease(s).`
+          : undefined,
+    };
+  },
+
+  renew_storage_leases: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const storageConfig = taskCtx.config.storage;
+    if (!storageConfig?.leaseHealth.autoRenew) {
+      return { shouldWake: false };
+    }
+    const { account } = await getWallet();
+    const activeLeases = taskCtx.db.listStorageLeases(200, {
+      status: "active",
+      requesterAddress: taskCtx.identity.address,
+    });
+    let renewed = 0;
+    let failed = 0;
+    for (const lease of activeLeases) {
+      const renewalLeadMs = storageConfig.leaseHealth.renewalLeadSeconds * 1000;
+      const expiresMs = new Date(lease.receipt.expiresAt).getTime();
+      if (expiresMs - Date.now() > renewalLeadMs) continue;
+      try {
+        await renewTrackedLease({
+          lease,
+          requesterAccount: account as any,
+          requesterAddress: taskCtx.identity.address,
+          ttlSeconds: storageConfig.defaultTtlSeconds,
+          db: taskCtx.db,
+        });
+        renewed += 1;
+      } catch (error) {
+        failed += 1;
+        logger.warn(
+          `Failed to renew storage lease ${lease.leaseId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    taskCtx.db.setKV(
+      "last_storage_lease_renewal",
+      JSON.stringify({
+        renewed,
+        failed,
+        at: new Date().toISOString(),
+      }),
+    );
+    return {
+      shouldWake: failed > 0,
+      message:
+        failed > 0
+          ? `Storage renewals have ${failed} failed item(s).`
+          : undefined,
+    };
+  },
+
+  replicate_storage_leases: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const storageConfig = taskCtx.config.storage;
+    if (
+      !storageConfig?.replication.enabled ||
+      !storageConfig.leaseHealth.autoReplicate ||
+      storageConfig.replication.targetCopies <= 1
+    ) {
+      return { shouldWake: false };
+    }
+    const { account } = await getWallet();
+    const activeLeases = taskCtx.db.listStorageLeases(500, {
+      status: "active",
+      requesterAddress: taskCtx.identity.address,
+    });
+    const byCid = new Map<string, typeof activeLeases>();
+    for (const lease of activeLeases) {
+      const items = byCid.get(lease.cid) ?? [];
+      items.push(lease);
+      byCid.set(lease.cid, items);
+    }
+    let replicated = 0;
+    let failed = 0;
+    for (const [cid, leases] of byCid.entries()) {
+      const currentProviders = new Set(
+        leases
+          .map((item) => item.providerBaseUrl?.replace(/\/+$/, ""))
+          .filter((value): value is string => Boolean(value)),
+      );
+      const targetCopies = Math.max(
+        1,
+        storageConfig.replication.targetCopies,
+      );
+      if (leases.length >= targetCopies) continue;
+      const sourceLease = leases[0];
+      if (!sourceLease) continue;
+      for (const providerBaseUrl of storageConfig.replication.providerBaseUrls) {
+        const normalized = providerBaseUrl.replace(/\/+$/, "");
+        if (currentProviders.has(normalized)) continue;
+        try {
+          const record = await replicateTrackedLease({
+            sourceLease,
+            targetProviderBaseUrl: normalized,
+            requesterAccount: account as any,
+            requesterAddress: taskCtx.identity.address,
+            ttlSeconds: storageConfig.defaultTtlSeconds,
+            db: taskCtx.db,
+          });
+          currentProviders.add(record.providerBaseUrl || normalized);
+          replicated += 1;
+          if (currentProviders.size >= targetCopies) break;
+        } catch (error) {
+          failed += 1;
+          logger.warn(
+            `Failed to replicate storage lease ${sourceLease.leaseId} for ${cid}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+    taskCtx.db.setKV(
+      "last_storage_replication",
+      JSON.stringify({
+        replicated,
+        failed,
+        at: new Date().toISOString(),
+      }),
+    );
+    return {
+      shouldWake: failed > 0,
+      message:
+        failed > 0
+          ? `Storage replication has ${failed} failed item(s).`
           : undefined,
     };
   },

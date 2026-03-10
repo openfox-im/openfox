@@ -6,6 +6,8 @@ import type {
   StorageLeaseResponse,
   StoragePutRequest,
   StorageQuoteResponse,
+  StorageRenewRequest,
+  StorageRenewalResponse,
 } from "./http.js";
 import { buildBundleFromInput } from "./bundle.js";
 import type { StorageBundle } from "./bundle.js";
@@ -174,4 +176,35 @@ export async function auditStoredBundle(params: {
     throw new Error(`storage audit failed (${response.status}): ${await response.text()}`);
   }
   return readJsonResponse<StorageAuditResponse>(response);
+}
+
+export async function renewStoredLease(params: {
+  providerBaseUrl: string;
+  leaseId: string;
+  requesterAccount: PrivateKeyAccount;
+  requesterAddress: string;
+  ttlSeconds?: number;
+}): Promise<StorageRenewalResponse> {
+  const payload: StorageRenewRequest = {
+    requester: {
+      identity: {
+        kind: "tos",
+        value: params.requesterAddress as any,
+      },
+    },
+    request_nonce: randomNonce(),
+    request_expires_at: Math.floor(Date.now() / 1000) + 300,
+    lease_id: params.leaseId,
+    ttl_seconds: params.ttlSeconds,
+  };
+  const result = await x402Fetch(
+    `${trimTrailingSlash(params.providerBaseUrl)}/renew`,
+    params.requesterAccount,
+    "POST",
+    JSON.stringify(payload),
+  );
+  if (!result.success) {
+    throw new Error(result.error || `storage renew failed (${result.status ?? 0})`);
+  }
+  return result.response as StorageRenewalResponse;
 }

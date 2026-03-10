@@ -134,9 +134,15 @@ import {
   auditStoredBundle,
   getStorageHead,
   getStoredBundle,
+  renewStoredLease,
   requestStorageQuote,
   storeBundleWithProvider,
 } from "./storage/client.js";
+import {
+  createTrackedStorageLeaseRecord,
+  createTrackedStorageRenewalRecord,
+  replicateTrackedLease,
+} from "./storage/lifecycle.js";
 import { createArtifactManager } from "./artifacts/manager.js";
 import { createNativeArtifactAnchorPublisher } from "./artifacts/publisher.js";
 import { startArtifactCaptureServer } from "./artifacts/server.js";
@@ -1821,9 +1827,11 @@ async function handleStorageCommand(args: string[]): Promise<void> {
 OpenFox storage
 
 Usage:
-  openfox storage list [--status <quoted|active|expired|released>] [--json]
+  openfox storage list [--status <quoted|active|expired|released>] [--cid <cid>] [--json]
   openfox storage quote --provider <base-url> --input <path> [--kind <kind>] [--ttl-seconds N] [--json]
   openfox storage put --provider <base-url> --input <path> [--kind <kind>] [--ttl-seconds N] [--quote-id <id>] [--json]
+  openfox storage renew --provider <base-url> --lease <lease-id> [--ttl-seconds N] [--json]
+  openfox storage replicate --provider <base-url> --lease <lease-id> [--ttl-seconds N] [--json]
   openfox storage head --provider <base-url> --cid <cid> [--json]
   openfox storage get --provider <base-url> --cid <cid> [--output <path>] [--json]
   openfox storage audit --provider <base-url> --lease <lease-id> [--json]
@@ -1844,22 +1852,25 @@ Usage:
         | "expired"
         | "released"
         | undefined;
-      const leases = db.listStorageLeases(50, { status });
+      const cid = readOption(args, "--cid") || undefined;
+      const leases = db.listStorageLeases(50, { status, cid });
+      const renewals = db.listStorageRenewals(20, cid ? { cid } : undefined);
       const audits = db.listStorageAudits(20);
       const anchors = db.listStorageAnchors(20);
       if (asJson) {
-        logger.info(JSON.stringify({ leases, audits, anchors }, null, 2));
+        logger.info(JSON.stringify({ leases, renewals, audits, anchors }, null, 2));
         return;
       }
       logger.info(`
 === OPENFOX STORAGE LEASES ===
 Leases: ${leases.length}
+Renewals: ${renewals.length}
 Audits: ${audits.length}
 Anchors: ${anchors.length}
 ${leases
   .map(
     (item) =>
-      `${item.leaseId}  status=${item.status}  cid=${item.cid}  kind=${item.bundleKind}  expires=${item.receipt.expiresAt}`,
+      `${item.leaseId}  status=${item.status}  cid=${item.cid}  kind=${item.bundleKind}  expires=${item.receipt.expiresAt}${item.providerBaseUrl ? `  provider=${item.providerBaseUrl}` : ""}`,
   )
   .join("\n")}
 ==============================
@@ -1908,6 +1919,81 @@ ${leases
         requesterAddress: config.walletAddress,
         ttlSeconds,
         quoteId: readOption(args, "--quote-id"),
+      });
+      db.upsertStorageLease(
+        createTrackedStorageLeaseRecord({
+          response: result,
+          requesterAddress: config.walletAddress,
+          providerBaseUrl,
+          requestKey: `storage:cli-put:${result.lease_id}:${Date.now()}`,
+        }),
+      );
+      logger.info(asJson ? JSON.stringify(result, null, 2) : JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "renew") {
+      const leaseId = readOption(args, "--lease");
+      if (!leaseId) throw new Error("Missing --lease <lease-id>.");
+      const { account } = await getWallet();
+      const ttlValue = readOption(args, "--ttl-seconds");
+      const ttlSeconds = ttlValue ? Number(ttlValue) : undefined;
+      if (
+        ttlValue &&
+        (ttlSeconds === undefined ||
+          !Number.isFinite(ttlSeconds) ||
+          ttlSeconds <= 0)
+      ) {
+        throw new Error("Invalid --ttl-seconds value.");
+      }
+      const result = await renewStoredLease({
+        providerBaseUrl,
+        leaseId,
+        requesterAccount: account,
+        requesterAddress: config.walletAddress,
+        ttlSeconds,
+      });
+      db.upsertStorageLease(
+        createTrackedStorageLeaseRecord({
+          response: result,
+          requesterAddress: config.walletAddress,
+          providerBaseUrl,
+          requestKey: `storage:cli-renew:${leaseId}:${Date.now()}`,
+          createdAt:
+            db.getStorageLease(leaseId)?.createdAt || new Date().toISOString(),
+        }),
+      );
+      db.upsertStorageRenewal(
+        createTrackedStorageRenewalRecord({
+          response: result,
+          requesterAddress: config.walletAddress,
+          providerBaseUrl,
+        }),
+      );
+      logger.info(asJson ? JSON.stringify(result, null, 2) : JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "replicate") {
+      const leaseId = readOption(args, "--lease");
+      if (!leaseId) throw new Error("Missing --lease <lease-id>.");
+      const sourceLease = db.getStorageLease(leaseId);
+      if (!sourceLease) {
+        throw new Error(`Storage lease not found: ${leaseId}`);
+      }
+      const { account } = await getWallet();
+      const ttlSeconds = readNumberOption(
+        args,
+        "--ttl-seconds",
+        sourceLease.ttlSeconds,
+      );
+      const result = await replicateTrackedLease({
+        sourceLease,
+        targetProviderBaseUrl: providerBaseUrl,
+        requesterAccount: account as any,
+        requesterAddress: config.walletAddress,
+        ttlSeconds,
+        db,
       });
       logger.info(asJson ? JSON.stringify(result, null, 2) : JSON.stringify(result, null, 2));
       return;
@@ -2268,6 +2354,7 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
     status: "failed",
   }).length;
   const storageLeases = db.listStorageLeases(5);
+  const storageRenewals = db.listStorageRenewals(5);
   const activeStorageLeaseCount = db.listStorageLeases(100, { status: "active" }).length;
   const storageAudits = db.listStorageAudits(5);
   const storageAnchors = db.listStorageAnchors(5);
@@ -2342,6 +2429,18 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
           storageDir: config.storage.storageDir,
           publishToDiscovery: config.storage.publishToDiscovery,
           allowAnonymousGet: config.storage.allowAnonymousGet,
+          leaseHealth: {
+            autoAudit: config.storage.leaseHealth.autoAudit,
+            auditIntervalSeconds: config.storage.leaseHealth.auditIntervalSeconds,
+            autoRenew: config.storage.leaseHealth.autoRenew,
+            renewalLeadSeconds: config.storage.leaseHealth.renewalLeadSeconds,
+            autoReplicate: config.storage.leaseHealth.autoReplicate,
+          },
+          replication: {
+            enabled: config.storage.replication.enabled,
+            targetCopies: config.storage.replication.targetCopies,
+            providerBaseUrls: config.storage.replication.providerBaseUrls,
+          },
           anchor: {
             enabled: config.storage.anchor.enabled,
             sinkAddress: config.storage.anchor.sinkAddress || null,
@@ -2353,7 +2452,16 @@ async function showStatus(options: { asJson?: boolean } = {}): Promise<void> {
             bundleKind: item.bundleKind,
             status: item.status,
             expiresAt: item.receipt.expiresAt,
+            providerBaseUrl: item.providerBaseUrl || null,
             anchorTxHash: item.anchorTxHash,
+          })),
+          recentRenewals: storageRenewals.map((item) => ({
+            renewalId: item.renewalId,
+            leaseId: item.leaseId,
+            cid: item.cid,
+            renewedExpiresAt: item.renewedExpiresAt,
+            addedTtlSeconds: item.addedTtlSeconds,
+            providerBaseUrl: item.providerBaseUrl || null,
           })),
           recentAudits: storageAudits.map((item) => ({
             auditId: item.auditId,

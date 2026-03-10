@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -361,6 +361,7 @@ export const CREATE_TABLES = `
     bundle_kind TEXT NOT NULL,
     requester_address TEXT NOT NULL,
     provider_address TEXT NOT NULL,
+    provider_base_url TEXT,
     size_bytes INTEGER NOT NULL,
     ttl_seconds INTEGER NOT NULL,
     amount_wei TEXT NOT NULL,
@@ -381,6 +382,30 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_storage_leases_cid
     ON storage_leases(cid, status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS storage_renewals (
+    renewal_id TEXT PRIMARY KEY,
+    lease_id TEXT NOT NULL,
+    cid TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    provider_base_url TEXT,
+    previous_expires_at TEXT NOT NULL,
+    renewed_expires_at TEXT NOT NULL,
+    added_ttl_seconds INTEGER NOT NULL,
+    amount_wei TEXT NOT NULL,
+    payment_id TEXT,
+    receipt_json TEXT NOT NULL,
+    receipt_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_storage_renewals_lease
+    ON storage_renewals(lease_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_storage_renewals_cid
+    ON storage_renewals(cid, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS storage_audits (
     audit_id TEXT PRIMARY KEY,
@@ -590,6 +615,7 @@ export const MIGRATION_V18 = `
     bundle_kind TEXT NOT NULL,
     requester_address TEXT NOT NULL,
     provider_address TEXT NOT NULL,
+    provider_base_url TEXT,
     size_bytes INTEGER NOT NULL,
     ttl_seconds INTEGER NOT NULL,
     amount_wei TEXT NOT NULL,
@@ -610,6 +636,30 @@ export const MIGRATION_V18 = `
 
   CREATE INDEX IF NOT EXISTS idx_storage_leases_cid
     ON storage_leases(cid, status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS storage_renewals (
+    renewal_id TEXT PRIMARY KEY,
+    lease_id TEXT NOT NULL,
+    cid TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    provider_base_url TEXT,
+    previous_expires_at TEXT NOT NULL,
+    renewed_expires_at TEXT NOT NULL,
+    added_ttl_seconds INTEGER NOT NULL,
+    amount_wei TEXT NOT NULL,
+    payment_id TEXT,
+    receipt_json TEXT NOT NULL,
+    receipt_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_storage_renewals_lease
+    ON storage_renewals(lease_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_storage_renewals_cid
+    ON storage_renewals(cid, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS storage_audits (
     audit_id TEXT PRIMARY KEY,
@@ -846,6 +896,34 @@ export const MIGRATION_V20 = `
     ON artifacts(subject_id);
   CREATE INDEX IF NOT EXISTS idx_artifacts_title
     ON artifacts(title);
+`;
+
+export const MIGRATION_V21 = `
+  ALTER TABLE storage_leases ADD COLUMN provider_base_url TEXT;
+
+  CREATE TABLE IF NOT EXISTS storage_renewals (
+    renewal_id TEXT PRIMARY KEY,
+    lease_id TEXT NOT NULL,
+    cid TEXT NOT NULL,
+    requester_address TEXT NOT NULL,
+    provider_address TEXT NOT NULL,
+    provider_base_url TEXT,
+    previous_expires_at TEXT NOT NULL,
+    renewed_expires_at TEXT NOT NULL,
+    added_ttl_seconds INTEGER NOT NULL,
+    amount_wei TEXT NOT NULL,
+    payment_id TEXT,
+    receipt_json TEXT NOT NULL,
+    receipt_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_storage_renewals_lease
+    ON storage_renewals(lease_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_storage_renewals_cid
+    ON storage_renewals(cid, created_at DESC);
 `;
 
 export const MIGRATION_V3 = `

@@ -53,6 +53,7 @@ import type {
   StorageLeaseRecord,
   StorageLeaseStatus,
   StorageQuoteRecord,
+  StorageRenewalRecord,
 } from "../types.js";
 import { DEFAULT_BOUNTY_POLICY } from "../types.js";
 import {
@@ -1184,10 +1185,10 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO storage_leases (
         lease_id, quote_id, cid, bundle_hash, bundle_kind, requester_address,
-        provider_address, size_bytes, ttl_seconds, amount_wei, status, storage_path,
-        request_key, payment_id, receipt_json, receipt_hash, anchor_tx_hash,
-        anchor_receipt_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        provider_address, provider_base_url, size_bytes, ttl_seconds, amount_wei,
+        status, storage_path, request_key, payment_id, receipt_json, receipt_hash,
+        anchor_tx_hash, anchor_receipt_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(lease_id) DO UPDATE SET
         quote_id = excluded.quote_id,
         cid = excluded.cid,
@@ -1195,6 +1196,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         bundle_kind = excluded.bundle_kind,
         requester_address = excluded.requester_address,
         provider_address = excluded.provider_address,
+        provider_base_url = excluded.provider_base_url,
         size_bytes = excluded.size_bytes,
         ttl_seconds = excluded.ttl_seconds,
         amount_wei = excluded.amount_wei,
@@ -1215,6 +1217,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.bundleKind,
       record.requesterAddress,
       record.providerAddress,
+      record.providerBaseUrl ?? null,
       record.sizeBytes,
       record.ttlSeconds,
       record.amountWei,
@@ -1259,6 +1262,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     limit: number,
     filters?: {
       status?: StorageLeaseStatus;
+      cid?: string;
       providerAddress?: string;
       requesterAddress?: string;
     },
@@ -1268,6 +1272,10 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     if (filters?.status) {
       clauses.push("status = ?");
       params.push(filters.status);
+    }
+    if (filters?.cid) {
+      clauses.push("cid = ?");
+      params.push(filters.cid);
     }
     if (filters?.providerAddress) {
       clauses.push("provider_address = ?");
@@ -1282,6 +1290,75 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       .prepare(`SELECT * FROM storage_leases ${where} ORDER BY created_at DESC LIMIT ?`)
       .all(...params, limit) as any[];
     return rows.map(deserializeStorageLeaseRecord);
+  };
+
+  const upsertStorageRenewal = (record: StorageRenewalRecord): void => {
+    db.prepare(
+      `INSERT INTO storage_renewals (
+        renewal_id, lease_id, cid, requester_address, provider_address,
+        provider_base_url, previous_expires_at, renewed_expires_at,
+        added_ttl_seconds, amount_wei, payment_id, receipt_json, receipt_hash,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(renewal_id) DO UPDATE SET
+        lease_id = excluded.lease_id,
+        cid = excluded.cid,
+        requester_address = excluded.requester_address,
+        provider_address = excluded.provider_address,
+        provider_base_url = excluded.provider_base_url,
+        previous_expires_at = excluded.previous_expires_at,
+        renewed_expires_at = excluded.renewed_expires_at,
+        added_ttl_seconds = excluded.added_ttl_seconds,
+        amount_wei = excluded.amount_wei,
+        payment_id = excluded.payment_id,
+        receipt_json = excluded.receipt_json,
+        receipt_hash = excluded.receipt_hash,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.renewalId,
+      record.leaseId,
+      record.cid,
+      record.requesterAddress,
+      record.providerAddress,
+      record.providerBaseUrl ?? null,
+      record.previousExpiresAt,
+      record.renewedExpiresAt,
+      record.addedTtlSeconds,
+      record.amountWei,
+      record.paymentId ?? null,
+      JSON.stringify(record.receipt),
+      record.receiptHash,
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getStorageRenewal = (renewalId: string): StorageRenewalRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM storage_renewals WHERE renewal_id = ?")
+      .get(renewalId) as any | undefined;
+    return row ? deserializeStorageRenewalRecord(row) : undefined;
+  };
+
+  const listStorageRenewals = (
+    limit: number,
+    filters?: { leaseId?: string; cid?: string },
+  ): StorageRenewalRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.leaseId) {
+      clauses.push("lease_id = ?");
+      params.push(filters.leaseId);
+    }
+    if (filters?.cid) {
+      clauses.push("cid = ?");
+      params.push(filters.cid);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(`SELECT * FROM storage_renewals ${where} ORDER BY created_at DESC LIMIT ?`)
+      .all(...params, limit) as any[];
+    return rows.map(deserializeStorageRenewalRecord);
   };
 
   const upsertStorageAudit = (record: StorageAuditRecord): void => {
@@ -1690,6 +1767,9 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getStorageLease,
     getStorageLeaseByCid,
     listStorageLeases,
+    upsertStorageRenewal,
+    getStorageRenewal,
+    listStorageRenewals,
     upsertStorageAudit,
     getStorageAudit,
     listStorageAudits,
@@ -1811,6 +1891,42 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 20,
       apply: () => db.exec(MIGRATION_V20),
+    },
+    {
+      version: 21,
+      apply: () => {
+        const columns = db
+          .prepare("PRAGMA table_info(storage_leases)")
+          .all() as Array<{ name: string }>;
+        if (!columns.some((column) => column.name === "provider_base_url")) {
+          db.exec("ALTER TABLE storage_leases ADD COLUMN provider_base_url TEXT;");
+        }
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS storage_renewals (
+            renewal_id TEXT PRIMARY KEY,
+            lease_id TEXT NOT NULL,
+            cid TEXT NOT NULL,
+            requester_address TEXT NOT NULL,
+            provider_address TEXT NOT NULL,
+            provider_base_url TEXT,
+            previous_expires_at TEXT NOT NULL,
+            renewed_expires_at TEXT NOT NULL,
+            added_ttl_seconds INTEGER NOT NULL,
+            amount_wei TEXT NOT NULL,
+            payment_id TEXT,
+            receipt_json TEXT NOT NULL,
+            receipt_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_storage_renewals_lease
+            ON storage_renewals(lease_id, created_at DESC);
+
+          CREATE INDEX IF NOT EXISTS idx_storage_renewals_cid
+            ON storage_renewals(cid, created_at DESC);
+        `);
+      },
     },
   ];
 
@@ -3095,6 +3211,7 @@ function deserializeStorageLeaseRecord(row: any): StorageLeaseRecord {
     bundleKind: row.bundle_kind,
     requesterAddress: row.requester_address,
     providerAddress: row.provider_address,
+    providerBaseUrl: row.provider_base_url ?? null,
     sizeBytes: Number(row.size_bytes || 0),
     ttlSeconds: Number(row.ttl_seconds || 0),
     amountWei: row.amount_wei,
@@ -3116,6 +3233,30 @@ function deserializeStorageLeaseRecord(row: any): StorageLeaseRecord {
           "deserializeStorageLeaseRecord.anchor_receipt_json",
         )
       : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeStorageRenewalRecord(row: any): StorageRenewalRecord {
+  return {
+    renewalId: row.renewal_id,
+    leaseId: row.lease_id,
+    cid: row.cid,
+    requesterAddress: row.requester_address,
+    providerAddress: row.provider_address,
+    providerBaseUrl: row.provider_base_url ?? null,
+    previousExpiresAt: row.previous_expires_at,
+    renewedExpiresAt: row.renewed_expires_at,
+    addedTtlSeconds: Number(row.added_ttl_seconds || 0),
+    amountWei: row.amount_wei,
+    paymentId: row.payment_id ?? null,
+    receipt: parseJsonSafe(
+      row.receipt_json ?? "{}",
+      {} as StorageRenewalRecord["receipt"],
+      "deserializeStorageRenewalRecord.receipt_json",
+    ),
+    receiptHash: row.receipt_hash,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

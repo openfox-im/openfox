@@ -142,12 +142,13 @@ It supports:
 - persisted result lookup with `GET /jobs/:id`
 - paid capabilities such as `oracle.resolve`
 - a built-in paid oracle resolver with `POST /oracle/quote`, `POST /oracle/resolve`, and `GET /oracle/result/:id`
-- a built-in paid storage market with `POST /storage/quote`, `POST /storage/put`, `GET /storage/head/:cid`, `GET /storage/get/:cid`, and `POST /storage/audit`
+- a built-in paid storage market with `POST /storage/quote`, `POST /storage/put`, `POST /storage/renew`, `GET /storage/head/:cid`, `GET /storage/get/:cid`, and `POST /storage/audit`
 - a verifiable public-artifact pipeline with `openfox artifacts capture-news`, `oracle-evidence`, `committee-vote`, `oracle-aggregate`, `verify`, and `anchor`
 - a durable server-side `x402` payment ledger for paid provider requests
 - `openfox payments list|get|retry` for operator-visible payment delivery and recovery
 - canonical settlement receipts and on-chain settlement anchors for bounty, observation, and oracle flows
-- canonical storage receipts, storage audits, and lightweight storage anchors for immutable bundle leases
+- canonical storage receipts, storage audits, storage renewals, and lightweight storage anchors for immutable bundle leases
+- scheduler-driven storage lease audit, renewal, and replication upkeep
 - canonical artifact verification receipts and lightweight artifact anchors for public news and oracle bundles
 - contract callback adapters and heartbeat-driven retry for contract-bound settlement flows
 - contract-native market bindings for bounty, observation, and oracle creation flows
@@ -219,6 +220,7 @@ pnpm openfox payments list
 pnpm openfox settlement list
 pnpm openfox market list
 pnpm openfox storage list
+pnpm openfox storage renew --help
 pnpm openfox artifacts list
 pnpm openfox onboard --fund-local
 ```
@@ -235,6 +237,7 @@ openfox payments list
 openfox settlement list
 openfox market list
 openfox storage list
+openfox storage renew --help
 openfox artifacts list
 ```
 

@@ -49,7 +49,7 @@ However, this is still "integrated and testable," not yet "production-ready and 
 
 ## 3. Overall Roadmap
 
-The recommended path is to move in six stages, with one narrow MVP stage inserted between the completed core path and the broader onboarding/productization work.
+The recommended path is staged.
 
 ### Phase 0: Core Path Working ✅
 
@@ -431,10 +431,11 @@ Delivered surface target:
 - paid storage provider mode inside OpenFox
 - canonical bundle manifest and `CID` handling
 - persisted lease and receipt tracking
-- retrieval and audit endpoints
+- retrieval, audit, renewal, and replication endpoints
 - lightweight `TOS` anchor support for stored bundles
-- `openfox storage list|quote|put|head|get|audit`
-- storage lease, audit, and anchor visibility in `status`, `health`, and `doctor`
+- `openfox storage list|quote|put|renew|replicate|head|get|audit`
+- scheduler-driven lease audit, renewal, and replication upkeep
+- storage lease, renewal, audit, replication, and anchor visibility in `status`, `health`, and `doctor`
 
 ### Phase 7: Verifiable Public News and Oracle Bundles
 
@@ -484,6 +485,52 @@ Delivered surface:
 - explicit multi-node deployment guidance for requester/provider/gateway/storage/artifact roles
 - artifact visibility in `openfox status`, `openfox health`, and `openfox doctor`
 
+### Phase 8: Programmable Wallet and Signer-Provider v0
+
+Status: planned
+
+Goal:
+
+- turn `tolang` programmable wallets and `gtos` delegation/account-abstraction primitives into a discoverable OpenFox service for bounded delegated execution
+
+This phase is not a detached wallet feature.
+It is the execution-control layer for the systems already shipped in earlier phases:
+
+- bounty payouts
+- oracle and observation settlement callbacks
+- storage renewal and audit operations
+- artifact anchoring and maintenance
+
+Suggested capability surface:
+
+- `signer.quote`
+- `signer.submit`
+- `signer.status`
+- `signer.receipt`
+
+Required work:
+
+- define the signer-provider request, quote, and receipt schema
+- add a signer-provider service mode to OpenFox
+- integrate signer-provider publication into Agent Discovery and optional Agent Gateway
+- bind signer-provider payments to execution receipts via `x402`
+- add a remote delegated-execution client path beside the local wallet path
+- persist signer-provider quotes, requests, and receipts in the OpenFox database
+- expose signer-provider visibility in `status`, `health`, and `doctor`
+- document the funding boundary clearly: `v0` assumes the programmable wallet already holds enough `TOS` or uses a separate funding flow
+
+Acceptance criteria:
+
+- one OpenFox node can publish signer-provider capability
+- another node can discover it, pay it, and request bounded delegated execution
+- the delegated wallet call is accepted or rejected by the programmable wallet's `validate()` rules
+- the provider cannot exceed the delegated policy boundary
+- OpenFox persists an auditable execution receipt for each request
+
+Design reference:
+
+- `OpenFox-Signer-Provider-v0.md`
+
 ## 4. Near-Term Priorities
 
 Suggested priority order:
@@ -501,11 +548,14 @@ Suggested priority order:
 - add audit, renewal, and replication policy for stored bundles
 - extend operator deployment automation and monitoring around long-lived storage leases
 - add stronger public indexing and search over anchored bundle summaries
+- finalize the signer-provider protocol and wallet-policy profile for programmable delegated execution
 
 ### P2: Do Later
 
 - add stronger provider reputation and lease-health reporting
 - extract more reusable SDK surfaces for third-party storage and artifact clients
+- implement the first signer-provider provider/requester pair inside OpenFox
+- add tighter integration between signer receipts and storage/artifact audit trails
 
 ## 5. What Not to Do Yet
 
@@ -515,6 +565,9 @@ Suggested priority order:
 - do not push large artifacts and proof bundles directly onto `TOS`
 - do not push all application logic into native chain modules
 - do not try to build a Filecoin-scale storage economy in v0
+- do not model signer-provider as raw arbitrary-byte signing
+- do not turn signer-provider into custodial hosted-wallet outsourcing in v0
+- do not assume ERC-4337-style paymaster economics already exist in the current `gtos` path
 
 The more reasonable strategy for now is:
 
@@ -524,12 +577,13 @@ The more reasonable strategy for now is:
 - paid services later expand into `oracle + observation`
 - the current mainline now includes `agent-native paid storage + immutable artifact bundles + lightweight TOS anchors`
 - the next mainline broadens public artifact capture, indexing, and multi-node deployment on top of that storage layer
+- the following mainline turns programmable delegated execution into a paid network service through signer-provider agents
 
 ## 6. Recommended Next Step
 
 There are only two next steps that matter most:
 
 1. run a broader multi-node deployment for client/provider/gateway/storage-provider roles around the completed artifact pipeline
-2. add stronger public indexing, sponsor flows, and verification coverage for anchored artifact bundles
+2. finalize the signer-provider protocol so programmable wallet delegation becomes part of the same operator/runtime story as storage, artifacts, settlement, and paid services
 
 Only after these two steps are complete should we expand into broader marketplace, reputation, and ecosystem-facing phases.
