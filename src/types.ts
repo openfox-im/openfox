@@ -731,8 +731,10 @@ export interface PaymasterQuoteRecord {
   chainId: string;
   providerAddress: Address;
   sponsorAddress: Address;
+  sponsorSignerType: string;
   walletAddress: Address;
   requesterAddress: Address;
+  requesterSignerType: string;
   targetAddress: Address;
   valueWei: string;
   dataHex: Hex;
@@ -759,8 +761,10 @@ export interface PaymasterAuthorizationRecord {
   requestHash: Hex;
   providerAddress: Address;
   sponsorAddress: Address;
+  sponsorSignerType: string;
   walletAddress: Address;
   requesterAddress: Address;
+  requesterSignerType: string;
   targetAddress: Address;
   valueWei: string;
   dataHex: Hex;

@@ -1,5 +1,5 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
-import { createHash, randomUUID } from "crypto";
+import { createHash, createPublicKey, randomUUID, verify as verifySignature } from "crypto";
 import {
   createPublicClient,
   hashTransaction,
@@ -219,6 +219,83 @@ function buildReceiptHash(receipt: Record<string, unknown> | null | undefined): 
     .replace(/^/, "0x") as Hex;
 }
 
+type RpcSignerDescriptor = {
+  type: string;
+  value: string;
+  defaulted: boolean;
+};
+
+function normalizeSignerType(value: string | undefined): string {
+  const normalized = (value || "secp256k1").trim().toLowerCase();
+  if (normalized === "ethereum_secp256k1") return "secp256k1";
+  if (normalized === "bls12381") return "bls12-381";
+  return normalized;
+}
+
+async function resolveSignerDescriptor(
+  publicClient: ReturnType<typeof createPublicClient>,
+  address: TOSAddress,
+): Promise<RpcSignerDescriptor> {
+  const raw = await publicClient.request<{
+    signer?: { type?: string; value?: string; defaulted?: boolean };
+  }>("tos_getSigner", [address, "latest"]);
+  return {
+    type: normalizeSignerType(raw.signer?.type),
+    value: String(raw.signer?.value || ""),
+    defaulted: raw.signer?.defaulted === true,
+  };
+}
+
+function signatureToRawBytes(signature: Signature): Buffer {
+  const r = signature.r.replace(/^0x/, "").padStart(64, "0");
+  const s = signature.s.replace(/^0x/, "").padStart(64, "0");
+  return Buffer.from(`${r}${s}`, "hex");
+}
+
+function ed25519PublicKeyFromHex(value: string) {
+  const raw = Buffer.from(value.replace(/^0x/, ""), "hex");
+  if (raw.length !== 32) {
+    throw new Error("invalid ed25519 signer value");
+  }
+  // SubjectPublicKeyInfo for Ed25519 OID 1.3.101.112
+  const der = Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), raw]);
+  return createPublicKey({ key: der, format: "der", type: "spki" });
+}
+
+async function verifyExecutionAuthorization(params: {
+  publicClient: ReturnType<typeof createPublicClient>;
+  transaction: TransactionSerializableNative;
+  walletAddress: TOSAddress;
+  signerType: string;
+  executionSignature: Signature;
+}): Promise<boolean> {
+  const signerType = normalizeSignerType(params.signerType);
+  if (signerType === "secp256k1") {
+    const recoveredWallet = normalizeAddress(
+      await recoverAddress({
+        hash: hashTransaction(params.transaction),
+        signature: params.executionSignature,
+      }),
+    );
+    return recoveredWallet === params.walletAddress;
+  }
+
+  if (signerType === "ed25519") {
+    const signer = await resolveSignerDescriptor(params.publicClient, params.walletAddress);
+    if (normalizeSignerType(signer.type) !== "ed25519" || !signer.value) {
+      return false;
+    }
+    return verifySignature(
+      null,
+      Buffer.from(hashTransaction(params.transaction).replace(/^0x/, ""), "hex"),
+      ed25519PublicKeyFromHex(signer.value),
+      signatureToRawBytes(params.executionSignature),
+    );
+  }
+
+  return false;
+}
+
 function buildAuthorizationResponse(params: {
   authorization: PaymasterAuthorizationRecord;
   paymentState?: X402ServerPaymentResult;
@@ -248,8 +325,8 @@ function buildAuthorizationResponse(params: {
     execution_nonce: params.authorization.executionNonce,
     sponsor_nonce: params.authorization.sponsorNonce,
     sponsor_expiry: params.authorization.sponsorExpiry,
-    requester_signer_type: "secp256k1",
-    sponsor_signer_type: "secp256k1",
+    requester_signer_type: params.authorization.requesterSignerType,
+    sponsor_signer_type: params.authorization.sponsorSignerType,
     tx_hash: params.authorization.submittedTxHash,
     receipt_hash: params.authorization.receiptHash,
     payment_tx_hash:
@@ -390,8 +467,8 @@ export async function startPaymasterProviderServer(
           execution_nonce: authorization.executionNonce,
           sponsor_nonce: authorization.sponsorNonce,
           sponsor_expiry: authorization.sponsorExpiry,
-          requester_signer_type: "secp256k1",
-          sponsor_signer_type: "secp256k1",
+          requester_signer_type: authorization.requesterSignerType,
+          sponsor_signer_type: authorization.sponsorSignerType,
           tx_hash: authorization.submittedTxHash,
           receipt: authorization.submittedReceipt,
           receipt_hash: authorization.receiptHash,
@@ -423,6 +500,23 @@ export async function startPaymasterProviderServer(
             blockTag: "latest",
           }),
         ]);
+        const [requesterSigner, sponsorSigner] = await Promise.all([
+          resolveSignerDescriptor(publicClient, walletAddress),
+          resolveSignerDescriptor(publicClient, scope.sponsorAddress),
+        ]);
+        const localSponsorSignerType = normalizeSignerType(
+          (params.identity.account as { signerType?: string }).signerType,
+        );
+        if (normalizeSignerType(sponsorSigner.type) !== localSponsorSignerType) {
+          json(res, 503, {
+            status: "rejected",
+            reason:
+              "paymaster sponsor signer metadata does not match the local provider signer",
+            sponsor_signer_type: sponsorSigner.type,
+            local_signer_type: localSponsorSignerType,
+          });
+          return;
+        }
         const now = new Date();
         const expiresAt = new Date(
           now.getTime() + paymasterConfig.quoteValiditySeconds * 1000,
@@ -443,8 +537,10 @@ export async function startPaymasterProviderServer(
           chainId: chainId.toString(),
           providerAddress: address,
           sponsorAddress: scope.sponsorAddress,
+          sponsorSignerType: sponsorSigner.type,
           walletAddress,
           requesterAddress,
+          requesterSignerType: requesterSigner.type,
           targetAddress: scope.targetAddress,
           valueWei: scope.valueWei,
           dataHex: scope.dataHex,
@@ -483,8 +579,8 @@ export async function startPaymasterProviderServer(
           amount_wei: quote.amountWei,
           sponsor_nonce: quote.sponsorNonce,
           sponsor_expiry: quote.sponsorExpiry,
-          requester_signer_type: "secp256k1",
-          sponsor_signer_type: "secp256k1",
+          requester_signer_type: quote.requesterSignerType,
+          sponsor_signer_type: quote.sponsorSignerType,
           expires_at: quote.expiresAt,
           delegate_identity: quote.delegateIdentity,
         });
@@ -563,21 +659,22 @@ export async function startPaymasterProviderServer(
           value: BigInt(quote.valueWei),
           data: quote.dataHex,
           from: quote.walletAddress,
-          signerType: "secp256k1",
+          signerType: quote.requesterSignerType,
           sponsor: quote.sponsorAddress,
-          sponsorSignerType: "secp256k1",
+          sponsorSignerType: quote.sponsorSignerType,
           sponsorNonce: BigInt(quote.sponsorNonce),
           sponsorExpiry: BigInt(quote.sponsorExpiry),
           sponsorPolicyHash: quote.policyHash,
         };
         const executionSignature = normalizeExecutionSignature(body.execution_signature);
-        const recoveredWallet = normalizeAddress(
-          await recoverAddress({
-            hash: hashTransaction(transaction),
-            signature: executionSignature,
-          }),
-        );
-        if (recoveredWallet !== quote.walletAddress) {
+        const validExecutionSignature = await verifyExecutionAuthorization({
+          publicClient,
+          transaction,
+          walletAddress: quote.walletAddress,
+          signerType: quote.requesterSignerType,
+          executionSignature,
+        });
+        if (!validExecutionSignature) {
           json(res, 400, {
             status: "rejected",
             reason: "execution signature does not match wallet_address",
@@ -636,8 +733,10 @@ export async function startPaymasterProviderServer(
           requestHash,
           providerAddress: address,
           sponsorAddress: quote.sponsorAddress,
+          sponsorSignerType: quote.sponsorSignerType,
           walletAddress: quote.walletAddress,
           requesterAddress,
+          requesterSignerType: quote.requesterSignerType,
           targetAddress: quote.targetAddress,
           valueWei: quote.valueWei,
           dataHex: quote.dataHex,

@@ -313,7 +313,9 @@ async function buildConfigSnapshot(
         new Date(config.paymasterProvider.policy.expiresAt).getTime() <= Date.now(),
     ),
     paymasterSponsorFunded,
-    paymasterSignerParityAligned: config.paymasterProvider?.enabled ? false : true,
+    paymasterSignerParityAligned: Boolean(
+      !config.paymasterProvider?.enabled || config.rpcUrl,
+    ),
     bountyEnabled: config.bounty?.enabled === true,
     bountyRole: config.bounty?.enabled ? config.bounty.role : undefined,
     bountyAutoEnabled: Boolean(
@@ -509,7 +511,7 @@ function collectFindings(
       severity: "warn",
       summary: `Active signer metadata is ${snapshot.walletSignerType}.`,
       recommendation:
-        "OpenFox native transaction sending still assumes secp256k1. Use non-secp signer mode only if you intentionally switched the account and understand the signer bootstrap boundary.",
+        "OpenFox local wallet flows still use the built-in secp256k1 wallet. Use non-secp signer mode only if you intentionally switched the on-chain signer metadata and understand the delegated execution boundary.",
     });
   }
 
@@ -688,16 +690,6 @@ function collectFindings(
                   ? "Run `openfox paymaster list --status authorized` to inspect pending sponsored executions."
                   : undefined,
     });
-    if (!snapshot.paymasterSignerParityAligned) {
-      findings.push({
-        id: "paymaster-signer-parity",
-        severity: "warn",
-        summary:
-          "Paymaster-provider is enabled but sponsored execution currently uses a narrower signer surface than ordinary native execution.",
-        recommendation:
-          "Treat sponsored execution as secp256k1-only for now and avoid assuming full signer-type parity until the sponsored transaction matrix is widened end-to-end.",
-      });
-    }
   }
 
   if (snapshot.bountyEnabled) {
@@ -1019,7 +1011,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Operator API enabled: ${yesNo(snapshot.operatorApiEnabled)}${snapshot.operatorApiEnabled ? ` (auth=${snapshot.operatorApiReady ? "configured" : "missing"})` : ""}`,
     `Provider enabled: ${yesNo(snapshot.providerEnabled)}`,
     `Signer provider enabled: ${yesNo(snapshot.signerProviderEnabled)}${snapshot.signerProviderEnabled ? ` (${snapshot.signerRecentQuotes} quotes, ${snapshot.signerRecentExecutions} executions, ${snapshot.signerPendingExecutions} pending)` : ""}`,
-    `Paymaster provider enabled: ${yesNo(snapshot.paymasterProviderEnabled)}${snapshot.paymasterProviderEnabled ? ` (${snapshot.paymasterRecentQuotes} quotes, ${snapshot.paymasterRecentAuthorizations} authorizations, ${snapshot.paymasterPendingAuthorizations} pending, sponsor funded=${snapshot.paymasterSponsorFunded === null ? "unknown" : yesNo(snapshot.paymasterSponsorFunded)}, signer parity=${snapshot.paymasterSignerParityAligned ? "aligned" : "secp256k1-only"})` : ""}`,
+    `Paymaster provider enabled: ${yesNo(snapshot.paymasterProviderEnabled)}${snapshot.paymasterProviderEnabled ? ` (${snapshot.paymasterRecentQuotes} quotes, ${snapshot.paymasterRecentAuthorizations} authorizations, ${snapshot.paymasterPendingAuthorizations} pending, sponsor funded=${snapshot.paymasterSponsorFunded === null ? "unknown" : yesNo(snapshot.paymasterSponsorFunded)}, signer parity=${snapshot.paymasterSignerParityAligned ? "aligned" : "limited"})` : ""}`,
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,

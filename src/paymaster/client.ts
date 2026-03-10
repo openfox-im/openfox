@@ -3,10 +3,10 @@ import {
   createWalletClient,
   http,
   type Hex,
-  type PrivateKeyAccount,
   type Signature,
 } from "tosdk";
 import type { Address } from "tosdk";
+import type { LocalAccount } from "tosdk/accounts";
 import { x402Fetch } from "../runtime/x402.js";
 import type { PaymasterQuoteRecord } from "../types.js";
 
@@ -24,7 +24,7 @@ export interface RemotePaymasterQuoteInput {
 export interface RemotePaymasterAuthorizeInput {
   providerBaseUrl: string;
   rpcUrl: string;
-  account: PrivateKeyAccount;
+  account: LocalAccount;
   requesterAddress: Address;
   quote: PaymasterQuoteRecord;
   requestNonce: string;
@@ -92,7 +92,8 @@ export async function authorizePaymasterExecution(
     data: input.quote.dataHex,
     from: input.quote.walletAddress,
     sponsor: input.quote.sponsorAddress,
-    sponsorSignerType: "secp256k1",
+    signerType: input.quote.requesterSignerType,
+    sponsorSignerType: input.quote.sponsorSignerType,
     sponsorNonce: BigInt(input.quote.sponsorNonce),
     sponsorExpiry: BigInt(input.quote.sponsorExpiry),
     sponsorPolicyHash: input.quote.policyHash,

@@ -258,7 +258,7 @@ describe("doctor report formatting", () => {
     ).toBe(true);
   });
 
-  it("warns when sponsored execution signer parity is narrower than native execution", async () => {
+  it("treats paymaster signer parity as aligned once native signer metadata is available", async () => {
     const snapshot = await buildHealthSnapshot(
       createTestConfig({
         rpcUrl: "http://127.0.0.1:8545",
@@ -294,11 +294,9 @@ describe("doctor report formatting", () => {
     );
 
     expect(
-      snapshot.findings.some(
-        (finding) =>
-          finding.id === "paymaster-signer-parity" && finding.severity === "warn",
-      ),
-    ).toBe(true);
+      snapshot.findings.some((finding) => finding.id === "paymaster-signer-parity"),
+    ).toBe(false);
+    expect(snapshot.paymasterSignerParityAligned).toBe(true);
   });
 
   it("flags a solver auto mode with no remote host and no discovery source", async () => {

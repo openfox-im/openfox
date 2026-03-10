@@ -629,7 +629,7 @@ Suggested priority order:
 - add stronger provider reputation and lease-health reporting
 - extract more reusable SDK surfaces for third-party storage and artifact clients
 - add tighter integration between signer receipts and storage/artifact audit trails
-- widen signer-type parity for sponsored execution beyond the current practical `secp256k1` path
+- widen signer-type parity for sponsored execution beyond the current practical `secp256k1 + ed25519` path
 
 ## 5. What Not to Do Yet
 
@@ -663,6 +663,6 @@ The more reasonable strategy for now is:
 There are only two next steps that matter most:
 
 1. continue deepening multi-node storage, artifact, signer, and paymaster operations on top of the new operator API and fleet audit surface so public deployments become easier to run and audit
-2. widen sponsored-execution signer parity and reusable SDK surfaces so OpenFox’s funded execution path can support more native signer classes over time
+2. keep widening sponsored-execution signer parity and reusable SDK surfaces so OpenFox’s funded execution path can support more native signer classes beyond the current `secp256k1 + ed25519` surface
 
 Only after these two steps are complete should we expand into broader marketplace, reputation, and ecosystem-facing phases.

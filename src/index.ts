@@ -734,8 +734,10 @@ function toPaymasterQuoteRecord(body: Record<string, unknown>): PaymasterQuoteRe
     chainId: String(body.chain_id ?? "0"),
     providerAddress: normalizeTOSAddress(String(body.provider_address)),
     sponsorAddress: normalizeTOSAddress(String(body.sponsor_address)),
+    sponsorSignerType: String(body.sponsor_signer_type ?? "secp256k1"),
     walletAddress: normalizeTOSAddress(String(body.wallet_address)),
     requesterAddress: normalizeTOSAddress(String(body.requester_address)),
+    requesterSignerType: String(body.requester_signer_type ?? "secp256k1"),
     targetAddress: normalizeTOSAddress(String(body.target_address)),
     valueWei: String(body.value_wei ?? "0"),
     dataHex: String(body.data_hex ?? "0x") as `0x${string}`,
@@ -769,9 +771,15 @@ function toPaymasterAuthorizationRecord(
     requestHash: String(body.request_hash ?? "0x") as `0x${string}`,
     providerAddress: normalizeTOSAddress(String(body.provider_address ?? quote.providerAddress)),
     sponsorAddress: normalizeTOSAddress(String(body.sponsor_address ?? quote.sponsorAddress)),
+    sponsorSignerType: String(
+      body.sponsor_signer_type ?? quote.sponsorSignerType ?? "secp256k1",
+    ),
     walletAddress: normalizeTOSAddress(String(body.wallet_address ?? quote.walletAddress)),
     requesterAddress: normalizeTOSAddress(
       String(body.requester_address ?? quote.requesterAddress),
+    ),
+    requesterSignerType: String(
+      body.requester_signer_type ?? quote.requesterSignerType ?? "secp256k1",
     ),
     targetAddress: normalizeTOSAddress(String(body.target_address ?? quote.targetAddress)),
     valueWei: String(body.value_wei ?? quote.valueWei),

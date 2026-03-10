@@ -215,8 +215,8 @@ paymaster roles may be combined or composed across nodes:
 ## Current Signer Parity Boundary
 
 Paymaster-provider v0 uses native sponsored execution. At the current stage,
-the practical requester/sponsor signer surface in OpenFox is still
-`secp256k1`.
+the practical requester/sponsor signer surface in OpenFox includes
+`secp256k1` and `ed25519`.
 
 That means:
 
@@ -224,8 +224,8 @@ That means:
 - requester and sponsor signer types are exposed in authorization records
 - operators can inspect signer parity through `openfox status`, `openfox
   doctor`, and paymaster receipt/status responses
-- non-`secp256k1` sponsored execution should still be treated as future work,
-  not an operator assumption
+- additional signer classes beyond `secp256k1` and `ed25519` should still be
+  treated as future work, not an operator assumption
 
 If you need stronger guarantees, prefer:
 

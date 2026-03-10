@@ -4,7 +4,7 @@
  * Enables the openfox to make native TOS payments via HTTP 402.
  */
 
-import type { PrivateKeyAccount } from "tosdk";
+import type { LocalAccount } from "tosdk/accounts";
 import { TOSRpcClient, buildTOSX402Payment, parseTOSAmount } from "../tos/client.js";
 import { normalizeTOSAddress as normalizeAddress, type TOSAddress } from "../tos/address.js";
 import { loadConfig } from "../config.js";
@@ -201,7 +201,7 @@ export async function checkX402(
 
 export async function x402Fetch(
   url: string,
-  account: PrivateKeyAccount,
+  account: LocalAccount,
   method: string = "GET",
   body?: string,
   headers?: Record<string, string>,
@@ -302,7 +302,7 @@ async function parsePaymentRequired(
 }
 
 async function signPayment(
-  _account: PrivateKeyAccount,
+  _account: LocalAccount,
   requirement: PaymentRequirement,
 ): Promise<unknown> {
   if (!hasNativePaymentSupport()) {

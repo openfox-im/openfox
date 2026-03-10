@@ -1342,17 +1342,19 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
   const upsertPaymasterQuote = (record: PaymasterQuoteRecord): void => {
     db.prepare(
       `INSERT INTO paymaster_quotes (
-        quote_id, chain_id, provider_address, sponsor_address, wallet_address, requester_address,
+        quote_id, chain_id, provider_address, sponsor_address, sponsor_signer_type, wallet_address, requester_address, requester_signer_type,
         target_address, value_wei, data_hex, gas, policy_id, policy_hash, scope_hash,
         delegate_identity, trust_tier, amount_wei, sponsor_nonce, sponsor_expiry,
         status, expires_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(quote_id) DO UPDATE SET
         chain_id = excluded.chain_id,
         provider_address = excluded.provider_address,
         sponsor_address = excluded.sponsor_address,
+        sponsor_signer_type = excluded.sponsor_signer_type,
         wallet_address = excluded.wallet_address,
         requester_address = excluded.requester_address,
+        requester_signer_type = excluded.requester_signer_type,
         target_address = excluded.target_address,
         value_wei = excluded.value_wei,
         data_hex = excluded.data_hex,
@@ -1373,8 +1375,10 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.chainId,
       record.providerAddress,
       record.sponsorAddress,
+      record.sponsorSignerType,
       record.walletAddress,
       record.requesterAddress,
+      record.requesterSignerType,
       record.targetAddress,
       record.valueWei,
       record.dataHex,
@@ -1442,13 +1446,13 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
   ): void => {
     db.prepare(
       `INSERT INTO paymaster_authorizations (
-        authorization_id, quote_id, chain_id, request_key, request_hash, provider_address, sponsor_address,
-        wallet_address, requester_address, target_address, value_wei, data_hex, gas,
+        authorization_id, quote_id, chain_id, request_key, request_hash, provider_address, sponsor_address, sponsor_signer_type,
+        wallet_address, requester_address, requester_signer_type, target_address, value_wei, data_hex, gas,
         policy_id, policy_hash, scope_hash, delegate_identity, trust_tier,
         request_nonce, request_expires_at, execution_nonce, sponsor_nonce, sponsor_expiry, reason, payment_id,
         execution_signature_json, sponsor_signature_json, submitted_tx_hash, submitted_receipt_json,
         receipt_hash, status, last_error, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(authorization_id) DO UPDATE SET
         quote_id = excluded.quote_id,
         chain_id = excluded.chain_id,
@@ -1456,8 +1460,10 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         request_hash = excluded.request_hash,
         provider_address = excluded.provider_address,
         sponsor_address = excluded.sponsor_address,
+        sponsor_signer_type = excluded.sponsor_signer_type,
         wallet_address = excluded.wallet_address,
         requester_address = excluded.requester_address,
+        requester_signer_type = excluded.requester_signer_type,
         target_address = excluded.target_address,
         value_wei = excluded.value_wei,
         data_hex = excluded.data_hex,
@@ -1490,8 +1496,10 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.requestHash,
       record.providerAddress,
       record.sponsorAddress,
+      record.sponsorSignerType,
       record.walletAddress,
       record.requesterAddress,
+      record.requesterSignerType,
       record.targetAddress,
       record.valueWei,
       record.dataHex,
@@ -2426,6 +2434,46 @@ function applyMigrations(db: DatabaseType): void {
         if (!paymasterAuthorizationColumns.some((column) => column.name === "execution_nonce")) {
           db.exec(
             "ALTER TABLE paymaster_authorizations ADD COLUMN execution_nonce TEXT NOT NULL DEFAULT '0';",
+          );
+        }
+      },
+    },
+    {
+      version: 25,
+      apply: () => {
+        const paymasterQuoteColumns = db
+          .prepare("PRAGMA table_info(paymaster_quotes)")
+          .all() as Array<{ name: string }>;
+        if (!paymasterQuoteColumns.some((column) => column.name === "sponsor_signer_type")) {
+          db.exec(
+            "ALTER TABLE paymaster_quotes ADD COLUMN sponsor_signer_type TEXT NOT NULL DEFAULT 'secp256k1';",
+          );
+        }
+        if (!paymasterQuoteColumns.some((column) => column.name === "requester_signer_type")) {
+          db.exec(
+            "ALTER TABLE paymaster_quotes ADD COLUMN requester_signer_type TEXT NOT NULL DEFAULT 'secp256k1';",
+          );
+        }
+
+        const paymasterAuthorizationColumns = db
+          .prepare("PRAGMA table_info(paymaster_authorizations)")
+          .all() as Array<{ name: string }>;
+        if (
+          !paymasterAuthorizationColumns.some(
+            (column) => column.name === "sponsor_signer_type",
+          )
+        ) {
+          db.exec(
+            "ALTER TABLE paymaster_authorizations ADD COLUMN sponsor_signer_type TEXT NOT NULL DEFAULT 'secp256k1';",
+          );
+        }
+        if (
+          !paymasterAuthorizationColumns.some(
+            (column) => column.name === "requester_signer_type",
+          )
+        ) {
+          db.exec(
+            "ALTER TABLE paymaster_authorizations ADD COLUMN requester_signer_type TEXT NOT NULL DEFAULT 'secp256k1';",
           );
         }
       },
@@ -3760,8 +3808,10 @@ function deserializePaymasterQuoteRecord(row: any): PaymasterQuoteRecord {
     chainId: row.chain_id ?? "0",
     providerAddress: row.provider_address,
     sponsorAddress: row.sponsor_address,
+    sponsorSignerType: row.sponsor_signer_type ?? "secp256k1",
     walletAddress: row.wallet_address,
     requesterAddress: row.requester_address,
+    requesterSignerType: row.requester_signer_type ?? "secp256k1",
     targetAddress: row.target_address,
     valueWei: row.value_wei,
     dataHex: row.data_hex,
@@ -3792,8 +3842,10 @@ function deserializePaymasterAuthorizationRecord(
     requestHash: row.request_hash,
     providerAddress: row.provider_address,
     sponsorAddress: row.sponsor_address,
+    sponsorSignerType: row.sponsor_signer_type ?? "secp256k1",
     walletAddress: row.wallet_address,
     requesterAddress: row.requester_address,
+    requesterSignerType: row.requester_signer_type ?? "secp256k1",
     targetAddress: row.target_address,
     valueWei: row.value_wei,
     dataHex: row.data_hex,

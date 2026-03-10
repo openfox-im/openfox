@@ -39,7 +39,7 @@ Usage:
 Notes:
   - local funding uses a local node-managed account via personal_sendTransaction
   - testnet funding first tries a configured faucet URL, then falls back to Agent Discovery
-  - non-secp signer bootstrap is an advanced path; OpenFox native transaction sending still assumes secp256k1 today
+  - non-secp signer bootstrap is an advanced path; OpenFox local wallet flows still use the built-in secp256k1 wallet, while delegated and sponsored execution can follow on-chain signer metadata
 `;
 }
 
@@ -155,7 +155,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
           `Signer value: ${result.signerValue}`,
           `Tx: ${result.txHash}`,
           ...(result.keyPath ? [`Key file: ${result.keyPath}`] : []),
-          "Warning: OpenFox native transaction sending still assumes secp256k1. Use this advanced flow only if you understand the signer switch semantics.",
+          "Warning: OpenFox local wallet flows still use the built-in secp256k1 wallet. Use this advanced flow only if you understand the signer switch and delegated execution semantics.",
         ].join("\n"),
       );
       return;
