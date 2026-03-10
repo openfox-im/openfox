@@ -57,7 +57,7 @@ export function explainTOSRpcError(error: unknown): TOSRpcErrorExplanation {
     return {
       kind: "signer_metadata_missing",
       summary: "Signer metadata is missing or invalid for this account.",
-      recommendation: "Run `openfox wallet bootstrap-signer --type ed25519` or use a wallet with secp256k1 metadata already active.",
+      recommendation: "Publish signer metadata for the intended native signer type, or use the default secp256k1 recovery path when appropriate.",
     };
   }
 

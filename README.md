@@ -531,6 +531,7 @@ Current support includes:
 - durable server-side `x402` payment ledger and retry semantics for paid services
 - bounded delegated execution through signer-provider discovery, quotes, submission, and receipts
 - bounded sponsored execution through paymaster-provider discovery, quotes, authorization, status, and receipts
+- sponsored execution parity for `secp256k1`, `ed25519`, `secp256r1`, `bls12-381`, and `elgamal`
 
 CLI examples:
 

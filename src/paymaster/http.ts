@@ -1,5 +1,5 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
-import { createHash, createPublicKey, randomUUID, verify as verifySignature } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import {
   createPublicClient,
   hashTransaction,
@@ -7,6 +7,7 @@ import {
   privateKeyToAccount,
   recoverAddress,
   serializeTransaction,
+  verifyHashSignature,
   type Hex,
   type Signature,
   type TransactionSerializableNative,
@@ -246,22 +247,6 @@ async function resolveSignerDescriptor(
   };
 }
 
-function signatureToRawBytes(signature: Signature): Buffer {
-  const r = signature.r.replace(/^0x/, "").padStart(64, "0");
-  const s = signature.s.replace(/^0x/, "").padStart(64, "0");
-  return Buffer.from(`${r}${s}`, "hex");
-}
-
-function ed25519PublicKeyFromHex(value: string) {
-  const raw = Buffer.from(value.replace(/^0x/, ""), "hex");
-  if (raw.length !== 32) {
-    throw new Error("invalid ed25519 signer value");
-  }
-  // SubjectPublicKeyInfo for Ed25519 OID 1.3.101.112
-  const der = Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), raw]);
-  return createPublicKey({ key: der, format: "der", type: "spki" });
-}
-
 async function verifyExecutionAuthorization(params: {
   publicClient: ReturnType<typeof createPublicClient>;
   transaction: TransactionSerializableNative;
@@ -280,20 +265,16 @@ async function verifyExecutionAuthorization(params: {
     return recoveredWallet === params.walletAddress;
   }
 
-  if (signerType === "ed25519") {
-    const signer = await resolveSignerDescriptor(params.publicClient, params.walletAddress);
-    if (normalizeSignerType(signer.type) !== "ed25519" || !signer.value) {
-      return false;
-    }
-    return verifySignature(
-      null,
-      Buffer.from(hashTransaction(params.transaction).replace(/^0x/, ""), "hex"),
-      ed25519PublicKeyFromHex(signer.value),
-      signatureToRawBytes(params.executionSignature),
-    );
+  const signer = await resolveSignerDescriptor(params.publicClient, params.walletAddress);
+  if (normalizeSignerType(signer.type) !== signerType || !signer.value) {
+    return false;
   }
-
-  return false;
+  return verifyHashSignature({
+    hash: hashTransaction(params.transaction),
+    publicKey: signer.value as Hex,
+    signerType,
+    signature: params.executionSignature,
+  });
 }
 
 function buildAuthorizationResponse(params: {

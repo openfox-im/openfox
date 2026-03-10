@@ -2,8 +2,11 @@ import { generateKeyPairSync, sign as signWithNode } from "node:crypto";
 import http from "http";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  bls12381PrivateKeyToAccount,
+  elgamalPrivateKeyToAccount,
   hashTransaction,
   privateKeyToAccount,
+  secp256r1PrivateKeyToAccount,
   type Address,
   type Hex,
   type LocalAccount,
@@ -200,6 +203,25 @@ function createEd25519Requester(address: Address): {
     },
   };
   return { account, publicKey: publicKeyHex };
+}
+
+function createNativeRequester(params: {
+  signerType: "secp256r1" | "bls12-381" | "elgamal";
+  privateKey: Hex;
+}): {
+  account: LocalAccount<"privateKey", Address>;
+  publicKey: Hex;
+} {
+  const account =
+    params.signerType === "secp256r1"
+      ? secp256r1PrivateKeyToAccount(params.privateKey)
+      : params.signerType === "bls12-381"
+        ? bls12381PrivateKeyToAccount(params.privateKey)
+        : elgamalPrivateKeyToAccount(params.privateKey);
+  return {
+    account,
+    publicKey: account.publicKey,
+  };
 }
 
 afterEach(async () => {
@@ -762,4 +784,186 @@ afterEach(async () => {
     await provider.close();
     db.close();
   });
+
+  it.each([
+    {
+      signerType: "secp256r1" as const,
+      privateKey:
+        "0x0000000000000000000000000000000000000000000000000000000000000001" as Hex,
+      requestKey: "paymaster:secp256r1",
+    },
+    {
+      signerType: "bls12-381" as const,
+      privateKey:
+        "0x153f6d8b207e967e0e8561298dde431fc54d6756726a4101ac6b93cf2956f40c" as Hex,
+      requestKey: "paymaster:bls12381",
+    },
+    {
+      signerType: "elgamal" as const,
+      privateKey:
+        "0x0100000000000000000000000000000000000000000000000000000000000000" as Hex,
+      requestKey: "paymaster:elgamal",
+    },
+  ])(
+    "accepts a $signerType requester when chain signer metadata matches",
+    async ({ signerType, privateKey, requestKey }) => {
+      const providerKey =
+        "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as Hex;
+      const providerIdentity = createIdentity(providerKey);
+      const requester = createNativeRequester({
+        signerType,
+        privateKey,
+      });
+      const rpc = await startRpcServer({
+        signerProfiles: {
+          [providerIdentity.address]: {
+            type: providerIdentity.account.signerType,
+            value: providerIdentity.address,
+          },
+          [requester.account.address]: {
+            type: requester.account.signerType,
+            value: requester.publicKey,
+          },
+        },
+      });
+      const db = createTestDb();
+      const config = createTestConfig({
+        rpcUrl: rpc.url,
+        chainId: 1666,
+        x402Server: {
+          enabled: true,
+          confirmationPolicy: "receipt",
+          receiptTimeoutMs: 15000,
+          receiptPollIntervalMs: 1000,
+          retryBatchSize: 10,
+          retryAfterSeconds: 30,
+          maxAttempts: 5,
+        },
+        paymasterProvider: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 0,
+          pathPrefix: "/paymaster",
+          capabilityPrefix: "paymaster",
+          publishToDiscovery: true,
+          quoteValiditySeconds: 300,
+          authorizationValiditySeconds: 600,
+          quotePriceWei: "0",
+          authorizePriceWei: "5",
+          requestTimeoutMs: 15000,
+          maxDataBytes: 2048,
+          defaultGas: "21000",
+          policy: {
+            trustTier: "self_hosted",
+            policyId: "policy-test",
+            sponsorAddress: providerIdentity.address,
+            delegateIdentity: "delegate:test",
+            allowedWallets: [requester.account.address],
+            allowedTargets: [
+              "0x9999999999999999999999999999999999999999999999999999999999999999",
+            ],
+            allowedFunctionSelectors: [],
+            maxValueWei: "1000",
+            allowSystemAction: false,
+          },
+        },
+      });
+      const payment = buildPaymentRecord({
+        paymentId: `0x${requestKey.replace(/[^a-f0-9]/gi, "").padEnd(64, "a")}` as Hex,
+        requestKey,
+        requestHash: `0x${requestKey.replace(/[^a-f0-9]/gi, "").padEnd(64, "b")}` as Hex,
+        txHash: `0x${requestKey.replace(/[^a-f0-9]/gi, "").padEnd(64, "c")}` as Hex,
+      });
+      db.upsertX402Payment(payment);
+
+      const provider = await startPaymasterProviderServer({
+        identity: providerIdentity,
+        config,
+        db,
+        address: providerIdentity.address,
+        privateKey: providerKey,
+        paymasterConfig: config.paymasterProvider!,
+        paymentManager: {
+          async requirePayment() {
+            return { state: "ready", payment };
+          },
+          bindPayment() {},
+        },
+        async submitSponsoredTransaction({ transaction }) {
+          const sponsorSignature = await providerIdentity.account.signAuthorization(transaction);
+          return {
+            sponsorSignature,
+            rawTransaction: "0xdeadbeef" as Hex,
+            txHash:
+              "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as Hex,
+            receipt: { status: "0x1", blockNumber: "0x10" },
+          };
+        },
+      });
+
+      const quote = await postJson(`${provider.url}/quote`, {
+        requester: {
+          identity: {
+            kind: "tos",
+            value: requester.account.address,
+          },
+        },
+        wallet_address: requester.account.address,
+        target:
+          "0x9999999999999999999999999999999999999999999999999999999999999999",
+        value_wei: "7",
+        reason: `${signerType}-test`,
+      });
+
+      expect(quote.status).toBe(200);
+      expect(quote.json.requester_signer_type).toBe(signerType);
+      expect(quote.json.sponsor_signer_type).toBe("secp256k1");
+
+      const executionSignature = await requester.account.signAuthorization({
+        chainId: BigInt(String(quote.json.chain_id)),
+        nonce: 9n,
+        gas: BigInt(String(quote.json.gas)),
+        to:
+          "0x9999999999999999999999999999999999999999999999999999999999999999",
+        value: 7n,
+        data: "0x",
+        from: requester.account.address,
+        signerType,
+        sponsor: String(quote.json.sponsor_address) as Hex,
+        sponsorSignerType: "secp256k1",
+        sponsorNonce: BigInt(String(quote.json.sponsor_nonce)),
+        sponsorExpiry: BigInt(Number(quote.json.sponsor_expiry)),
+        sponsorPolicyHash: String(quote.json.policy_hash) as Hex,
+      });
+
+      const response = await postJson(`${provider.url}/authorize`, {
+        quote_id: quote.json.quote_id,
+        requester: {
+          identity: {
+            kind: "tos",
+            value: requester.account.address,
+          },
+        },
+        wallet_address: requester.account.address,
+        request_nonce: `${signerType}-req-1`,
+        request_expires_at: Math.floor(Date.now() / 1000) + 300,
+        execution_nonce: "9",
+        target:
+          "0x9999999999999999999999999999999999999999999999999999999999999999",
+        value_wei: "7",
+        gas: String(quote.json.gas),
+        data: "0x",
+        execution_signature: toJsonSignature(executionSignature),
+        reason: `${signerType}-test`,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.json.status).toBe("ok");
+      expect(response.json.requester_signer_type).toBe(signerType);
+      expect(response.json.sponsor_signer_type).toBe("secp256k1");
+
+      await provider.close();
+      db.close();
+    },
+  );
 });
