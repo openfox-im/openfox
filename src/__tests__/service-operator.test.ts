@@ -125,11 +125,38 @@ describe("service operator", () => {
           receiptTimeoutMs: 60000,
         },
       },
+      artifacts: {
+        enabled: true,
+        publishToDiscovery: true,
+        defaultProviderBaseUrl: "http://127.0.0.1:4895/storage",
+        defaultTtlSeconds: 604800,
+        autoAnchorOnStore: false,
+        captureCapability: "public_news.capture",
+        evidenceCapability: "oracle.evidence",
+        aggregateCapability: "oracle.aggregate",
+        verificationCapability: "artifact.verify",
+        service: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4896,
+          pathPrefix: "/artifacts",
+          requireNativeIdentity: true,
+          maxBodyBytes: 256 * 1024,
+          maxTextChars: 32 * 1024,
+        },
+        anchor: {
+          enabled: false,
+          gas: "180000",
+          waitForReceipt: true,
+          receiptTimeoutMs: 60000,
+        },
+      },
     });
 
     const snapshot = buildServiceStatusSnapshot(config, db.raw);
     expect(snapshot.roles).toEqual(["requester", "provider", "gateway"]);
     expect(snapshot.providerSurfaces.storage?.capabilityPrefix).toBe("storage.ipfs");
+    expect(snapshot.providerSurfaces.artifacts?.captureCapability).toBe("public_news.capture");
     expect(snapshot.gatewayCache?.providerSessionCacheEntries).toBe(1);
     expect(snapshot.gatewayCache?.serverSessionCacheEntries).toBe(1);
     expect(snapshot.x402Server.enabled).toBe(true);
@@ -138,6 +165,7 @@ describe("service operator", () => {
     expect(report).toContain("Roles: requester, provider, gateway");
     expect(report).toContain("x402 server:");
     expect(report).toContain("capability_prefix=storage.ipfs");
+    expect(report).toContain("artifacts:");
     expect(report).toContain("provider session cache entries: 1");
     expect(report).toContain("server session cache entries: 1");
 
@@ -222,6 +250,32 @@ describe("service operator", () => {
         pricePerMiBWei: "1000",
         publishToDiscovery: true,
         allowAnonymousGet: true,
+        anchor: {
+          enabled: false,
+          gas: "180000",
+          waitForReceipt: true,
+          receiptTimeoutMs: 60000,
+        },
+      },
+      artifacts: {
+        enabled: true,
+        publishToDiscovery: true,
+        defaultProviderBaseUrl: `${faucet.url}/storage`,
+        defaultTtlSeconds: 604800,
+        autoAnchorOnStore: false,
+        captureCapability: "public_news.capture",
+        evidenceCapability: "oracle.evidence",
+        aggregateCapability: "oracle.aggregate",
+        verificationCapability: "artifact.verify",
+        service: {
+          enabled: true,
+          bindHost: faucetUrl.hostname,
+          port: Number(faucetUrl.port),
+          pathPrefix: "",
+          requireNativeIdentity: true,
+          maxBodyBytes: 256 * 1024,
+          maxTextChars: 32 * 1024,
+        },
         anchor: {
           enabled: false,
           gas: "180000",

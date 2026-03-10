@@ -139,6 +139,7 @@ import {
 } from "./storage/client.js";
 import { createArtifactManager } from "./artifacts/manager.js";
 import { createNativeArtifactAnchorPublisher } from "./artifacts/publisher.js";
+import { startArtifactCaptureServer } from "./artifacts/server.js";
 import fs from "fs/promises";
 
 const logger = createLogger("main");
@@ -1956,7 +1957,7 @@ async function handleArtifactCommand(args: string[]): Promise<void> {
 OpenFox artifacts
 
 Usage:
-  openfox artifacts list [--kind <public_news.capture|oracle.evidence|oracle.aggregate|committee.vote>] [--status <stored|verified|anchored|failed>] [--json]
+  openfox artifacts list [--kind <public_news.capture|oracle.evidence|oracle.aggregate|committee.vote>] [--status <stored|verified|anchored|failed>] [--source-url-prefix <url>] [--subject <text>] [--query <text>] [--anchored] [--verified] [--json]
   openfox artifacts get --artifact-id <id> [--json]
   openfox artifacts capture-news --title "<text>" --source-url <url> [--headline "<text>"] [--body-file <path> | --body-text <text>] [--provider <base-url>] [--ttl-seconds N] [--anchor] [--json]
   openfox artifacts oracle-evidence --title "<text>" --question "<text>" [--evidence-file <path> | --evidence-text <text>] [--source-url <url>] [--provider <base-url>] [--ttl-seconds N] [--anchor] [--json]
@@ -1999,6 +2000,7 @@ Usage:
       db,
       config: config.artifacts ?? {
         enabled: false,
+        publishToDiscovery: true,
         defaultProviderBaseUrl: undefined,
         defaultTtlSeconds: 604800,
         autoAnchorOnStore: false,
@@ -2006,6 +2008,15 @@ Usage:
         evidenceCapability: "oracle.evidence",
         aggregateCapability: "oracle.aggregate",
         verificationCapability: "artifact.verify",
+        service: {
+          enabled: false,
+          bindHost: "127.0.0.1",
+          port: 4896,
+          pathPrefix: "/artifacts",
+          requireNativeIdentity: true,
+          maxBodyBytes: 256 * 1024,
+          maxTextChars: 32 * 1024,
+        },
         anchor: {
           enabled: false,
           gas: "180000",
@@ -2029,7 +2040,20 @@ Usage:
         | "anchored"
         | "failed"
         | undefined;
-      const items = manager.listArtifacts(50, { kind, status });
+      const sourceUrlPrefix = readOption(args, "--source-url-prefix");
+      const subjectContains = readOption(args, "--subject");
+      const query = readOption(args, "--query");
+      const anchoredOnly = args.includes("--anchored");
+      const verifiedOnly = args.includes("--verified");
+      const items = manager.listArtifacts(50, {
+        kind,
+        status,
+        sourceUrlPrefix,
+        subjectContains,
+        query,
+        anchoredOnly,
+        verifiedOnly,
+      });
       if (asJson) {
         logger.info(JSON.stringify({ items }, null, 2));
         return;
@@ -2592,12 +2616,16 @@ async function run(): Promise<void> {
   let storageServer:
     | Awaited<ReturnType<typeof startStorageProviderServer>>
     | undefined;
+  let artifactServer:
+    | Awaited<ReturnType<typeof startArtifactCaptureServer>>
+    | undefined;
   let bountyServer:
     | Awaited<ReturnType<typeof startBountyHttpServer>>
     | undefined;
   let bountyAutomation:
     | Awaited<ReturnType<typeof startBountyAutomation>>
     | undefined;
+  let runtimeArtifactManager: ReturnType<typeof createArtifactManager> | undefined;
   let gatewayServer:
     | Awaited<ReturnType<typeof startAgentGatewayServer>>
     | undefined;
@@ -2724,6 +2752,47 @@ async function run(): Promise<void> {
     }
   }
 
+  if (config.artifacts?.enabled) {
+    try {
+      const artifactAnchorPublisher =
+        config.artifacts.anchor.enabled && config.rpcUrl
+          ? createNativeArtifactAnchorPublisher({
+              db,
+              rpcUrl: config.rpcUrl,
+              privateKey,
+              config: config.artifacts.anchor,
+              publisherAddress: config.walletAddress,
+            })
+          : undefined;
+      runtimeArtifactManager = createArtifactManager({
+        identity,
+        requesterAccount: account,
+        db,
+        config: {
+          ...config.artifacts,
+          defaultProviderBaseUrl:
+            config.artifacts.defaultProviderBaseUrl || storageServer?.url,
+        },
+        anchorPublisher: artifactAnchorPublisher,
+      });
+      if (config.artifacts.service.enabled) {
+        artifactServer = await startArtifactCaptureServer({
+          identity,
+          db,
+          manager: runtimeArtifactManager,
+          config: config.artifacts.service,
+          captureCapability: config.artifacts.captureCapability,
+          evidenceCapability: config.artifacts.evidenceCapability,
+        });
+        logger.info(`Artifact capture service enabled at ${artifactServer.url}`);
+      }
+    } catch (error) {
+      logger.warn(
+        `Artifact pipeline startup failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   if (config.agentDiscovery?.gatewayServer?.enabled) {
     try {
       if (
@@ -2805,6 +2874,7 @@ async function run(): Promise<void> {
         observationUrl: observationServer?.url,
         oracleUrl: oracleServer?.url,
         storageUrl: storageServer?.url,
+        artifactUrl: artifactServer?.url,
       });
       current = buildPublishedAgentDiscoveryConfig({
         baseConfig: current,
@@ -2935,6 +3005,43 @@ async function run(): Promise<void> {
         ],
       };
     }
+    if (current && artifactServer && config.artifacts?.enabled && config.artifacts.publishToDiscovery) {
+      current = {
+        ...current,
+        endpoints: [
+          ...current.endpoints,
+          {
+            kind: "http",
+            url: artifactServer.url,
+            role: "requester_invocation",
+          },
+        ],
+        capabilities: [
+          ...current.capabilities,
+          {
+            name: config.artifacts.captureCapability,
+            mode: "sponsored",
+            description: "Capture public news into immutable artifact bundles",
+          },
+          {
+            name: config.artifacts.evidenceCapability,
+            mode: "sponsored",
+            description: "Capture oracle evidence into immutable artifact bundles",
+          },
+          {
+            name: config.artifacts.aggregateCapability,
+            mode: "paid",
+            priceModel: "x402-exact",
+            description: "Build aggregate oracle artifact bundles from stored evidence",
+          },
+          {
+            name: config.artifacts.verificationCapability,
+            mode: "sponsored",
+            description: "Verify stored artifact bundles and publish verification receipts",
+          },
+        ],
+      };
+    }
     return current;
   };
 
@@ -2978,6 +3085,7 @@ async function run(): Promise<void> {
         observationUrl: observationServer?.url,
         oracleUrl: oracleServer?.url,
         storageUrl: storageServer?.url,
+        artifactUrl: artifactServer?.url,
       });
       if (!routes.length) {
         logger.warn(
@@ -3087,6 +3195,7 @@ async function run(): Promise<void> {
               privateKey,
             })
           : undefined,
+        artifactManager: runtimeArtifactManager,
         marketBindingPublisher,
         marketContractDispatcher: marketContracts,
         settlementPublisher: config.settlement?.publishBounties
@@ -3186,6 +3295,7 @@ async function run(): Promise<void> {
       bountyServer?.close(),
       bountyAutomation?.close(),
       storageServer?.close(),
+      artifactServer?.close(),
       gatewayProviderSessions?.close(),
       gatewayServer?.close(),
       faucetServer?.close(),

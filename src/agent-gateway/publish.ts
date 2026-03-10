@@ -32,6 +32,7 @@ export function buildGatewayProviderRoutes(params: {
   observationUrl?: string;
   oracleUrl?: string;
   storageUrl?: string;
+  artifactUrl?: string;
 }): AgentGatewayProviderRoute[] {
   const routes: AgentGatewayProviderRoute[] = [
     ...(params.config.agentDiscovery?.gatewayClient?.routes ?? []),
@@ -88,6 +89,30 @@ export function buildGatewayProviderRoutes(params: {
       mode: "paid",
       targetUrl: params.storageUrl,
     });
+  }
+  const artifacts = params.config.artifacts;
+  if (
+    artifacts?.enabled &&
+    artifacts.service.enabled &&
+    params.artifactUrl
+  ) {
+    const pathPrefix = artifacts.service.pathPrefix.replace(/\/+$/, "");
+    if (!routes.some((entry) => entry.capability === artifacts.captureCapability)) {
+      routes.push({
+        path: `${pathPrefix}/capture-news`,
+        capability: artifacts.captureCapability,
+        mode: "sponsored",
+        targetUrl: `${params.artifactUrl}/capture-news`,
+      });
+    }
+    if (!routes.some((entry) => entry.capability === artifacts.evidenceCapability)) {
+      routes.push({
+        path: `${pathPrefix}/oracle-evidence`,
+        capability: artifacts.evidenceCapability,
+        mode: "sponsored",
+        targetUrl: `${params.artifactUrl}/oracle-evidence`,
+      });
+    }
   }
   return uniqueByName(routes, (entry) => `${entry.path}:${entry.capability}`);
 }

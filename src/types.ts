@@ -679,8 +679,19 @@ export interface ArtifactAnchorConfig {
   receiptTimeoutMs: number;
 }
 
+export interface ArtifactCaptureServerConfig {
+  enabled: boolean;
+  bindHost: string;
+  port: number;
+  pathPrefix: string;
+  requireNativeIdentity: boolean;
+  maxBodyBytes: number;
+  maxTextChars: number;
+}
+
 export interface ArtifactPipelineConfig {
   enabled: boolean;
+  publishToDiscovery: boolean;
   defaultProviderBaseUrl?: string;
   defaultTtlSeconds: number;
   autoAnchorOnStore: boolean;
@@ -688,6 +699,7 @@ export interface ArtifactPipelineConfig {
   evidenceCapability: string;
   aggregateCapability: string;
   verificationCapability: string;
+  service: ArtifactCaptureServerConfig;
   anchor: ArtifactAnchorConfig;
 }
 
@@ -712,6 +724,16 @@ export interface ArtifactRecord {
   anchorId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ArtifactSearchFilters {
+  kind?: ArtifactBundleKind;
+  status?: ArtifactRecordStatus;
+  query?: string;
+  sourceUrlPrefix?: string;
+  subjectContains?: string;
+  anchoredOnly?: boolean;
+  verifiedOnly?: boolean;
 }
 
 export interface ArtifactVerificationRecord {
@@ -948,6 +970,7 @@ export const DEFAULT_STORAGE_MARKET_CONFIG: StorageMarketConfig = {
 
 export const DEFAULT_ARTIFACT_PIPELINE_CONFIG: ArtifactPipelineConfig = {
   enabled: false,
+  publishToDiscovery: true,
   defaultProviderBaseUrl: undefined,
   defaultTtlSeconds: 7 * 24 * 60 * 60,
   autoAnchorOnStore: false,
@@ -955,6 +978,15 @@ export const DEFAULT_ARTIFACT_PIPELINE_CONFIG: ArtifactPipelineConfig = {
   evidenceCapability: "oracle.evidence",
   aggregateCapability: "oracle.aggregate",
   verificationCapability: "artifact.verify",
+  service: {
+    enabled: false,
+    bindHost: "127.0.0.1",
+    port: 4896,
+    pathPrefix: "/artifacts",
+    requireNativeIdentity: true,
+    maxBodyBytes: 256 * 1024,
+    maxTextChars: 32 * 1024,
+  },
   anchor: {
     enabled: false,
     sinkAddress: undefined,
@@ -1006,6 +1038,8 @@ export const DEFAULT_OPPORTUNITY_SCOUT_CONFIG: OpportunityScoutConfig = {
     "task.solve",
     "sponsor.topup.testnet",
     "observation.once",
+    "public_news.capture",
+    "oracle.evidence",
   ],
   remoteBaseUrls: [],
   maxItems: 25,
@@ -1864,10 +1898,7 @@ export interface OpenFoxDatabase {
   getArtifactByLeaseId(leaseId: string): ArtifactRecord | undefined;
   listArtifacts(
     limit: number,
-    filters?: {
-      kind?: ArtifactBundleKind;
-      status?: ArtifactRecordStatus;
-    },
+    filters?: ArtifactSearchFilters,
   ): ArtifactRecord[];
   upsertArtifactVerification(record: ArtifactVerificationRecord): void;
   getArtifactVerification(verificationId: string): ArtifactVerificationRecord | undefined;

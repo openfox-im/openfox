@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -169,7 +169,7 @@ export const CREATE_TABLES = `
     bounty_id TEXT PRIMARY KEY,
     host_agent_id TEXT NOT NULL,
     host_address TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK(kind IN ('question','translation','social_proof','problem_solving')),
+    kind TEXT NOT NULL CHECK(kind IN ('question','translation','social_proof','problem_solving','public_news_capture','oracle_evidence_capture')),
     title TEXT NOT NULL,
     task_prompt TEXT NOT NULL,
     reference_output TEXT NOT NULL,
@@ -437,6 +437,12 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_artifacts_kind_status
     ON artifacts(kind, status, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_artifacts_source_url
+    ON artifacts(source_url);
+  CREATE INDEX IF NOT EXISTS idx_artifacts_subject_id
+    ON artifacts(subject_id);
+  CREATE INDEX IF NOT EXISTS idx_artifacts_title
+    ON artifacts(title);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_lease
     ON artifacts(lease_id);
 
@@ -690,6 +696,156 @@ export const MIGRATION_V19 = `
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_anchors_artifact
     ON artifact_anchors(artifact_id);
+`;
+
+export const MIGRATION_V20 = `
+  ALTER TABLE bounty_results RENAME TO bounty_results_old;
+  ALTER TABLE bounty_submissions RENAME TO bounty_submissions_old;
+  ALTER TABLE bounties RENAME TO bounties_old;
+
+  CREATE TABLE bounties (
+    bounty_id TEXT PRIMARY KEY,
+    host_agent_id TEXT NOT NULL,
+    host_address TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('question','translation','social_proof','problem_solving','public_news_capture','oracle_evidence_capture')),
+    title TEXT NOT NULL,
+    task_prompt TEXT NOT NULL,
+    reference_output TEXT NOT NULL,
+    skill_name TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    policy_json TEXT NOT NULL DEFAULT '{}',
+    reward_wei TEXT NOT NULL,
+    submission_deadline TEXT NOT NULL,
+    judge_mode TEXT NOT NULL CHECK(judge_mode IN ('local_model')),
+    status TEXT NOT NULL CHECK(status IN ('open','submitted','under_review','approved','rejected','paid','expired')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status, created_at);
+
+  INSERT INTO bounties (
+    bounty_id,
+    host_agent_id,
+    host_address,
+    kind,
+    title,
+    task_prompt,
+    reference_output,
+    skill_name,
+    metadata_json,
+    policy_json,
+    reward_wei,
+    submission_deadline,
+    judge_mode,
+    status,
+    created_at,
+    updated_at
+  )
+  SELECT
+    bounty_id,
+    host_agent_id,
+    host_address,
+    CASE
+      WHEN kind IN ('question','translation','social_proof','problem_solving','public_news_capture','oracle_evidence_capture') THEN kind
+      ELSE 'question'
+    END,
+    title,
+    task_prompt,
+    reference_output,
+    skill_name,
+    metadata_json,
+    policy_json,
+    reward_wei,
+    submission_deadline,
+    judge_mode,
+    status,
+    created_at,
+    updated_at
+  FROM bounties_old;
+
+  CREATE TABLE bounty_submissions (
+    submission_id TEXT PRIMARY KEY,
+    bounty_id TEXT NOT NULL REFERENCES bounties(bounty_id) ON DELETE CASCADE,
+    solver_agent_id TEXT,
+    solver_address TEXT NOT NULL,
+    submission_text TEXT NOT NULL,
+    proof_url TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL CHECK(status IN ('submitted','accepted','rejected')),
+    submitted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bounty_submissions_bounty ON bounty_submissions(bounty_id, submitted_at);
+
+  INSERT INTO bounty_submissions (
+    submission_id,
+    bounty_id,
+    solver_agent_id,
+    solver_address,
+    submission_text,
+    proof_url,
+    metadata_json,
+    status,
+    submitted_at,
+    updated_at
+  )
+  SELECT
+    submission_id,
+    bounty_id,
+    solver_agent_id,
+    solver_address,
+    submission_text,
+    proof_url,
+    metadata_json,
+    status,
+    submitted_at,
+    updated_at
+  FROM bounty_submissions_old;
+
+  CREATE TABLE bounty_results (
+    bounty_id TEXT PRIMARY KEY REFERENCES bounties(bounty_id) ON DELETE CASCADE,
+    winning_submission_id TEXT,
+    decision TEXT NOT NULL CHECK(decision IN ('accepted','rejected')),
+    confidence REAL NOT NULL,
+    judge_reason TEXT NOT NULL,
+    payout_tx_hash TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  INSERT INTO bounty_results (
+    bounty_id,
+    winning_submission_id,
+    decision,
+    confidence,
+    judge_reason,
+    payout_tx_hash,
+    created_at,
+    updated_at
+  )
+  SELECT
+    bounty_id,
+    winning_submission_id,
+    decision,
+    confidence,
+    judge_reason,
+    payout_tx_hash,
+    created_at,
+    updated_at
+  FROM bounty_results_old;
+
+  DROP TABLE bounty_results_old;
+  DROP TABLE bounty_submissions_old;
+  DROP TABLE bounties_old;
+
+  CREATE INDEX IF NOT EXISTS idx_artifacts_source_url
+    ON artifacts(source_url);
+  CREATE INDEX IF NOT EXISTS idx_artifacts_subject_id
+    ON artifacts(subject_id);
+  CREATE INDEX IF NOT EXISTS idx_artifacts_title
+    ON artifacts(title);
 `;
 
 export const MIGRATION_V3 = `
@@ -1226,7 +1382,7 @@ export const MIGRATION_V13 = `
     bounty_id TEXT PRIMARY KEY,
     host_agent_id TEXT NOT NULL,
     host_address TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK(kind IN ('question','translation','social_proof','problem_solving')),
+    kind TEXT NOT NULL CHECK(kind IN ('question','translation','social_proof','problem_solving','public_news_capture','oracle_evidence_capture')),
     title TEXT NOT NULL,
     task_prompt TEXT NOT NULL,
     reference_output TEXT NOT NULL,
@@ -1266,7 +1422,7 @@ export const MIGRATION_V13 = `
     host_agent_id,
     host_address,
     CASE
-      WHEN kind IN ('question','translation','social_proof','problem_solving') THEN kind
+      WHEN kind IN ('question','translation','social_proof','problem_solving','public_news_capture','oracle_evidence_capture') THEN kind
       ELSE 'question'
     END,
     substr(question, 1, 160),

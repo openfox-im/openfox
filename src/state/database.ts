@@ -30,6 +30,7 @@ import type {
   ArtifactAnchorRecord,
   ArtifactRecord,
   ArtifactRecordStatus,
+  ArtifactSearchFilters,
   ArtifactVerificationRecord,
   ArtifactBundleKind,
   MarketBindingKind,
@@ -81,6 +82,7 @@ import {
   MIGRATION_V17,
   MIGRATION_V18,
   MIGRATION_V19,
+  MIGRATION_V20,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -1454,7 +1456,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
 
   const listArtifacts = (
     limit: number,
-    filters?: { kind?: ArtifactBundleKind; status?: ArtifactRecordStatus },
+    filters?: ArtifactSearchFilters,
   ): ArtifactRecord[] => {
     const clauses: string[] = [];
     const params: unknown[] = [];
@@ -1465,6 +1467,27 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     if (filters?.status) {
       clauses.push("status = ?");
       params.push(filters.status);
+    }
+    if (filters?.sourceUrlPrefix) {
+      clauses.push("source_url LIKE ?");
+      params.push(`${filters.sourceUrlPrefix}%`);
+    }
+    if (filters?.subjectContains) {
+      clauses.push("LOWER(COALESCE(subject_id, '')) LIKE ?");
+      params.push(`%${filters.subjectContains.toLowerCase()}%`);
+    }
+    if (filters?.query) {
+      clauses.push(
+        "(LOWER(title) LIKE ? OR LOWER(COALESCE(summary_text, '')) LIKE ? OR LOWER(COALESCE(source_url, '')) LIKE ? OR LOWER(COALESCE(subject_id, '')) LIKE ? OR LOWER(cid) LIKE ?)",
+      );
+      const query = `%${filters.query.toLowerCase()}%`;
+      params.push(query, query, query, query, query);
+    }
+    if (filters?.anchoredOnly) {
+      clauses.push("anchor_id IS NOT NULL");
+    }
+    if (filters?.verifiedOnly) {
+      clauses.push("verification_id IS NOT NULL");
     }
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     const rows = db
@@ -1784,6 +1807,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 19,
       apply: () => db.exec(MIGRATION_V19),
+    },
+    {
+      version: 20,
+      apply: () => db.exec(MIGRATION_V20),
     },
   ];
 

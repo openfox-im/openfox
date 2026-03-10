@@ -90,6 +90,10 @@ describe("bounty engine", () => {
         ...DEFAULT_BOUNTY_CONFIG,
         enabled: true,
         role: "host",
+        policy: {
+          ...DEFAULT_BOUNTY_CONFIG.policy,
+          trustedProofUrlPrefixes: ["https://example.com/"],
+        },
       },
       payoutSender: {
         async send() {
@@ -131,6 +135,10 @@ describe("bounty engine", () => {
         ...DEFAULT_BOUNTY_CONFIG,
         enabled: true,
         role: "host",
+        policy: {
+          ...DEFAULT_BOUNTY_CONFIG.policy,
+          trustedProofUrlPrefixes: ["https://example.com/"],
+        },
       },
       payoutSender: {
         async send() {
@@ -173,5 +181,117 @@ describe("bounty engine", () => {
         submissionText: "openfox test",
       }),
     ).rejects.toThrow("requires a proofUrl");
+  });
+
+  it("captures accepted public evidence tasks into artifact-backed settlements", async () => {
+    const inference = new MockInferenceClient([
+      noToolResponse(
+        '{"decision":"accepted","confidence":0.97,"reason":"The captured article matches the requested evidence."}',
+      ),
+    ]);
+    let publishedArtifactUrl: string | null = null;
+    const engine = createBountyEngine({
+      identity: createIdentity(),
+      db,
+      inference,
+      bountyConfig: {
+        ...DEFAULT_BOUNTY_CONFIG,
+        enabled: true,
+        role: "host",
+        policy: {
+          ...DEFAULT_BOUNTY_CONFIG.policy,
+          trustedProofUrlPrefixes: ["https://example.com/"],
+        },
+      },
+      artifactManager: {
+        async capturePublicNews() {
+          return {
+            artifact: {
+              artifactId: "artifact-news-1",
+            },
+            lease: {
+              get_url: "http://provider.test/storage/get/bafynews",
+            },
+            anchor: null,
+          } as any;
+        },
+        async createOracleEvidence() {
+          throw new Error("not expected");
+        },
+        async createOracleAggregate() {
+          throw new Error("not expected");
+        },
+        async createCommitteeVote() {
+          throw new Error("not expected");
+        },
+        async verifyArtifact() {
+          throw new Error("not expected");
+        },
+        async anchorArtifact() {
+          throw new Error("not expected");
+        },
+        listArtifacts() {
+          return [];
+        },
+        getArtifact() {
+          return undefined;
+        },
+      },
+      settlementPublisher: {
+        async publish(input) {
+          publishedArtifactUrl = input.artifactUrl;
+          return {
+            receiptId: `bounty:${input.subjectId}`,
+            kind: "bounty",
+            subjectId: input.subjectId,
+            receipt: {
+              version: 1,
+              receiptId: `bounty:${input.subjectId}`,
+              kind: "bounty",
+              subjectId: input.subjectId,
+              publisherAddress: HOST_ADDRESS,
+              resultHash:
+                "0x1111111111111111111111111111111111111111111111111111111111111111",
+              createdAt: "2026-03-09T00:00:00.000Z",
+            },
+            receiptHash:
+              "0x2222222222222222222222222222222222222222222222222222222222222222",
+            settlementTxHash:
+              "0x3333333333333333333333333333333333333333333333333333333333333333",
+            createdAt: "2026-03-09T00:00:00.000Z",
+            updatedAt: "2026-03-09T00:00:00.000Z",
+          };
+        },
+      },
+      payoutSender: {
+        async send() {
+          return { txHash: "0xartifactpaid" };
+        },
+      },
+      now: () => new Date("2026-03-09T00:00:00.000Z"),
+    });
+
+    const bounty = engine.openBounty({
+      kind: "public_news_capture",
+      title: "Capture this article",
+      taskPrompt: "Submit the body text of the target article.",
+      referenceOutput: "expected evidence",
+      rewardWei: "1000",
+      submissionDeadline: "2026-03-09T01:00:00.000Z",
+    });
+
+    const result = await engine.submitSubmission({
+      bountyId: bounty.bountyId,
+      solverAddress: SOLVER_ADDRESS,
+      submissionText: "Full article body",
+      proofUrl: "https://example.com/news/1",
+      metadata: {
+        headline: "Captured headline",
+      },
+    });
+
+    expect(result.result.decision).toBe("accepted");
+    expect(result.settlement?.receiptId).toBe(`bounty:${bounty.bountyId}`);
+    expect(publishedArtifactUrl).toBe("http://provider.test/storage/get/bafynews");
   });
 });

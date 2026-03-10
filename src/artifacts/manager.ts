@@ -22,6 +22,7 @@ import type {
   ArtifactAnchorRecord,
   ArtifactPipelineConfig,
   ArtifactRecord,
+  ArtifactSearchFilters,
   ArtifactVerificationRecord,
   OpenFoxDatabase,
   OpenFoxIdentity,
@@ -98,7 +99,7 @@ export interface ArtifactManager {
     artifactId: string;
     metadata?: Record<string, unknown>;
   }): Promise<ArtifactAnchorRecord>;
-  listArtifacts(limit: number, filters?: { kind?: ArtifactBundleKind; status?: ArtifactRecord["status"] }): ArtifactRecord[];
+  listArtifacts(limit: number, filters?: ArtifactSearchFilters): ArtifactRecord[];
   getArtifact(artifactId: string): ArtifactRecord | undefined;
 }
 
@@ -164,6 +165,7 @@ async function storeArtifactBundle(params: {
 }) {
   const canonicalProviderBaseUrl = normalizeProviderBaseUrl(params.providerBaseUrl, {
     enabled: true,
+    publishToDiscovery: false,
     defaultProviderBaseUrl: params.providerBaseUrl,
     defaultTtlSeconds: params.ttlSeconds,
     autoAnchorOnStore: false,
@@ -171,6 +173,15 @@ async function storeArtifactBundle(params: {
     evidenceCapability: "oracle.evidence",
     aggregateCapability: "oracle.aggregate",
     verificationCapability: "artifact.verify",
+    service: {
+      enabled: false,
+      bindHost: "127.0.0.1",
+      port: 0,
+      pathPrefix: "/artifacts",
+      requireNativeIdentity: true,
+      maxBodyBytes: 256 * 1024,
+      maxTextChars: 32 * 1024,
+    },
     anchor: {
       enabled: false,
       gas: "0",

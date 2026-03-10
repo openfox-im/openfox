@@ -475,10 +475,13 @@ Delivered surface:
 - canonical artifact verification and anchor hashing helpers in `tosdk`
 - persisted artifact, verification, and anchor records in OpenFox
 - `openfox artifacts list|get|capture-news|oracle-evidence|oracle-aggregate|committee-vote|verify|anchor`
+- sponsored public artifact capture service inside OpenFox
 - storage-backed public news capture bundles
 - storage-backed oracle evidence, committee vote, and aggregate bundles
 - local verification receipts with persistent verification records
 - lightweight native artifact anchors with persistent anchor records
+- artifact search and indexing across source URL, subject, query, anchored, and verified filters
+- explicit multi-node deployment guidance for requester/provider/gateway/storage/artifact roles
 - artifact visibility in `openfox status`, `openfox health`, and `openfox doctor`
 
 ## 4. Near-Term Priorities
@@ -487,16 +490,16 @@ Suggested priority order:
 
 ### P0: Do Immediately
 
-- harden multi-node deployment guidance for client/provider/gateway/storage-provider roles
-- broaden artifact verification and indexing around anchored public bundles
-- add sponsor and bounty flows for public evidence capture
+- completed:
+  - hardened multi-node deployment guidance for client/provider/gateway/storage-provider roles
+  - broadened artifact verification and indexing around anchored public bundles
+  - added sponsor and bounty flows for public evidence capture
 
 ### P1: Do Next
 
 - run a broader multi-node testnet deployment for client/provider/gateway/storage-provider roles
 - add audit, renewal, and replication policy for stored bundles
 - extend operator deployment automation and monitoring around long-lived storage leases
-- add sponsor and bounty flows for public evidence capture
 - add stronger public indexing and search over anchored bundle summaries
 
 ### P2: Do Later

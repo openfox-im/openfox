@@ -202,4 +202,142 @@ describe("artifact manager", () => {
     expect(stored.artifact.subjectId).toBe("Will event X happen?");
     expect(stored.artifact.summaryText).toBe("yes");
   });
+
+  it("supports artifact indexing filters for source, subject, and anchored state", async () => {
+    const db = createTestDb();
+    dbs.push(db);
+    const identity = createTestIdentity();
+    const manager = createArtifactManager({
+      identity,
+      requesterAccount: identity.account,
+      db,
+      config: {
+        ...DEFAULT_ARTIFACT_PIPELINE_CONFIG,
+        enabled: true,
+        defaultProviderBaseUrl: "http://provider.test/storage",
+      },
+      storageDriver: {
+        async quote(input) {
+          return {
+            quote_id: `quote-${input.cid}`,
+            provider_address:
+              "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            requester_address: identity.address,
+            cid: input.cid,
+            bundle_kind: input.bundleKind,
+            size_bytes: input.sizeBytes,
+            ttl_seconds: input.ttlSeconds,
+            amount_wei: "1000",
+            expires_at: "2026-03-10T01:00:00.000Z",
+          };
+        },
+        async put(input) {
+          return {
+            lease_id: `lease-${input.cid}`,
+            cid: input.cid,
+            bundle_hash: "0x99",
+            bundle_kind: input.bundleKind,
+            size_bytes: 256,
+            ttl_seconds: input.ttlSeconds,
+            amount_wei: "1000",
+            issued_at: "2026-03-10T00:00:00.000Z",
+            expires_at: "2026-03-10T01:00:00.000Z",
+            receipt_id: `storage:lease-${input.cid}`,
+            receipt_hash: "0xaa",
+            payment_tx_hash: "0xbb",
+            get_url: `http://provider.test/storage/get/${input.cid}`,
+            head_url: `http://provider.test/storage/head/${input.cid}`,
+          };
+        },
+        async head(input) {
+          return {
+            lease_id: `lease-${input.cid}`,
+            cid: input.cid,
+            bundle_hash: "0x99",
+            bundle_kind: "public_news.capture",
+            size_bytes: 256,
+            ttl_seconds: 3600,
+            amount_wei: "1000",
+            issued_at: "2026-03-10T00:00:00.000Z",
+            expires_at: "2026-03-10T01:00:00.000Z",
+            receipt_id: `storage:lease-${input.cid}`,
+            receipt_hash: "0xaa",
+            payment_tx_hash: "0xbb",
+            get_url: `http://provider.test/storage/get/${input.cid}`,
+            head_url: `http://provider.test/storage/head/${input.cid}`,
+          };
+        },
+        async audit(input) {
+          return {
+            audit_id: `audit-${input.leaseId}`,
+            lease_id: input.leaseId,
+            cid: input.leaseId.replace("lease-", ""),
+            status: "verified" as const,
+            response_hash: "0xcc",
+            checked_at: "2026-03-10T00:02:00.000Z",
+          };
+        },
+      },
+      anchorPublisher: {
+        async publish({ artifact, publisherAddress, metadata }) {
+          const createdAt = "2026-03-10T00:03:00.000Z";
+          const anchor = {
+            anchorId: `anchor:${artifact.artifactId}`,
+            artifactId: artifact.artifactId,
+            summary: {
+              version: 1,
+              artifactId: artifact.artifactId,
+              leaseId: artifact.leaseId,
+              cid: artifact.cid,
+              bundleHash: artifact.bundleHash,
+              artifactKind: artifact.kind,
+              publisherAddress,
+              metadata: metadata ?? null,
+              createdAt,
+            },
+            summaryHash:
+              "0x1111111111111111111111111111111111111111111111111111111111111111",
+            anchorTxHash:
+              "0x2222222222222222222222222222222222222222222222222222222222222222",
+            anchorReceipt: { status: "0x1" },
+            createdAt,
+            updatedAt: createdAt,
+          };
+          db.upsertArtifactAnchor(anchor);
+          return anchor;
+        },
+      },
+    });
+
+    const first = await manager.capturePublicNews({
+      title: "First capture",
+      sourceUrl: "https://example.com/news/alpha",
+      headline: "Alpha headline",
+      bodyText: "Alpha body",
+    });
+    const second = await manager.createOracleEvidence({
+      title: "Second capture",
+      question: "Question Beta",
+      evidenceText: "Beta body",
+      sourceUrl: "https://elsewhere.test/news/beta",
+    });
+    await manager.verifyArtifact({ artifactId: first.artifact.artifactId });
+    await manager.anchorArtifact({ artifactId: first.artifact.artifactId });
+
+    expect(
+      manager.listArtifacts(10, { sourceUrlPrefix: "https://example.com/news" }).map((item) => item.artifactId),
+    ).toEqual([first.artifact.artifactId]);
+    expect(
+      manager.listArtifacts(10, { subjectContains: "Question" }).map((item) => item.artifactId),
+    ).toEqual([second.artifact.artifactId]);
+    expect(
+      manager.listArtifacts(10, { query: "beta" }).map((item) => item.artifactId),
+    ).toEqual([second.artifact.artifactId]);
+    expect(
+      manager.listArtifacts(10, { anchoredOnly: true }).map((item) => item.artifactId),
+    ).toEqual([first.artifact.artifactId]);
+    expect(
+      manager.listArtifacts(10, { verifiedOnly: true }).map((item) => item.artifactId),
+    ).toEqual([first.artifact.artifactId]);
+  });
 });

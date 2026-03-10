@@ -19,6 +19,7 @@ import type { SettlementPublisher } from "../settlement/publisher.js";
 import type { SettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import type { MarketBindingPublisher } from "../market/publisher.js";
 import type { MarketContractDispatcher } from "../market/contracts.js";
+import type { ArtifactManager } from "../artifacts/manager.js";
 
 export interface BountyEngine {
   openBounty(input: BountyCreateInput): BountyRecord;
@@ -79,7 +80,11 @@ function isTrustedProofUrl(policy: BountyPolicy, proofUrl: string | null | undef
 }
 
 function requiresProofUrl(kind: BountyRecord["kind"]): boolean {
-  return kind === "social_proof";
+  return (
+    kind === "social_proof" ||
+    kind === "public_news_capture" ||
+    kind === "oracle_evidence_capture"
+  );
 }
 
 function collectSolverPayoutStats(params: {
@@ -119,6 +124,7 @@ export function createBountyEngine(params: {
   bountyConfig: BountyConfig;
   skillInstructions?: string;
   payoutSender?: BountyPayoutSender;
+  artifactManager?: ArtifactManager;
   settlementPublisher?: SettlementPublisher;
   settlementCallbacks?: SettlementCallbackDispatcher;
   marketBindingPublisher?: MarketBindingPublisher;
@@ -142,6 +148,12 @@ export function createBountyEngine(params: {
     }
     if (!referenceOutput) {
       throw new Error("referenceOutput is required");
+    }
+    if (
+      (input.kind === "public_news_capture" || input.kind === "oracle_evidence_capture") &&
+      !params.artifactManager
+    ) {
+      throw new Error("artifact pipeline is required for public evidence capture bounties");
     }
 
     const timestamp = now().toISOString();
@@ -292,7 +304,42 @@ export function createBountyEngine(params: {
 
     let payoutTxHash: string | null = null;
     let bountyStatus: BountyRecord["status"] = accepted ? "approved" : "open";
+    let artifactUrl: string | null = null;
     if (accepted) {
+      if (params.artifactManager && bounty.kind === "public_news_capture") {
+        const captured = await params.artifactManager.capturePublicNews({
+          title: bounty.title,
+          sourceUrl:
+            submission.proofUrl ||
+            (typeof submission.metadata?.source_url === "string"
+              ? submission.metadata.source_url
+              : ""),
+          headline:
+            (typeof submission.metadata?.headline === "string" &&
+            submission.metadata.headline.trim()
+              ? submission.metadata.headline.trim()
+              : bounty.title) || bounty.title,
+          bodyText: submission.submissionText,
+        });
+        artifactUrl = captured.lease.get_url;
+      } else if (params.artifactManager && bounty.kind === "oracle_evidence_capture") {
+        const captured = await params.artifactManager.createOracleEvidence({
+          title: bounty.title,
+          question: bounty.taskPrompt,
+          evidenceText: submission.submissionText,
+          sourceUrl:
+            submission.proofUrl ||
+            (typeof submission.metadata?.source_url === "string"
+              ? submission.metadata.source_url
+              : undefined),
+          relatedArtifactIds: Array.isArray(submission.metadata?.related_artifact_ids)
+            ? submission.metadata?.related_artifact_ids.filter(
+                (value): value is string => typeof value === "string" && value.trim().length > 0,
+              )
+            : undefined,
+        });
+        artifactUrl = captured.lease.get_url;
+      }
       const projectedDailyPayout = payoutStats.paidWeiLast24h + BigInt(bounty.rewardWei);
       const withinDailyBudget =
         projectedDailyPayout <= BigInt(policy.maxAutoPayPerSolverPerDayWei);
@@ -331,7 +378,9 @@ export function createBountyEngine(params: {
         publisherAddress: params.identity.address,
         capability: "task.result",
         solverAddress: submission.solverAddress,
-        artifactUrl: `${params.bountyConfig.pathPrefix.replace(/\/+$/, "")}/bounties/${bounty.bountyId}/result`,
+        artifactUrl:
+          artifactUrl ||
+          `${params.bountyConfig.pathPrefix.replace(/\/+$/, "")}/bounties/${bounty.bountyId}/result`,
         payoutTxHash: (payoutTxHash as `0x${string}` | null) ?? undefined,
         result: {
           bounty_id: bounty.bountyId,
@@ -345,6 +394,7 @@ export function createBountyEngine(params: {
           bounty_kind: bounty.kind,
           host_agent_id: bounty.hostAgentId,
           solver_agent_id: submission.solverAgentId,
+          artifact_url: artifactUrl,
         },
       });
       if (settlement && params.settlementCallbacks) {

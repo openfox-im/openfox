@@ -599,6 +599,11 @@ export function loadConfig(): OpenFoxConfig | null {
   const artifacts: ArtifactPipelineConfig = {
     ...DEFAULT_ARTIFACT_PIPELINE_CONFIG,
     ...((raw?.artifacts as JsonRecord | undefined) ?? {}),
+    service: {
+      ...DEFAULT_ARTIFACT_PIPELINE_CONFIG.service,
+      ...((((raw?.artifacts as JsonRecord | undefined)?.service as JsonRecord | undefined) ??
+        {})),
+    },
     anchor: {
       ...DEFAULT_ARTIFACT_PIPELINE_CONFIG.anchor,
       ...((((raw?.artifacts as JsonRecord | undefined)?.anchor as JsonRecord | undefined) ??

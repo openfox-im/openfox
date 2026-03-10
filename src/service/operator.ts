@@ -60,6 +60,13 @@ export interface ServiceStatusSnapshot {
           allowAnonymousGet: boolean;
         }
       | null;
+    artifacts:
+      | {
+          url: string;
+          captureCapability: string;
+          evidenceCapability: string;
+        }
+      | null;
     routes: ServiceRouteSnapshot[];
   };
   gatewayServer:
@@ -165,6 +172,7 @@ function detectServiceRoles(config: OpenFoxConfig): string[] {
     config.agentDiscovery?.observationServer?.enabled ||
     config.agentDiscovery?.oracleServer?.enabled ||
     config.storage?.enabled ||
+    config.artifacts?.enabled ||
     (config.agentDiscovery?.gatewayClient?.enabled &&
       (config.agentDiscovery.gatewayClient.routes?.length ?? 0) > 0)
   ) {
@@ -221,6 +229,29 @@ function inferProviderRoutes(config: OpenFoxConfig): Array<{
       capability: `${storage.capabilityPrefix}.put`,
       mode: "paid",
       targetUrl: buildLocalHttpUrl(storage.bindHost, storage.port, `${storage.pathPrefix}/put`),
+    });
+  }
+  const artifacts = config.artifacts;
+  if (artifacts?.enabled && artifacts.service?.enabled && artifacts.service.port > 0) {
+    routes.push({
+      path: `${artifacts.service.pathPrefix.replace(/\/$/, "")}/capture-news`,
+      capability: artifacts.captureCapability,
+      mode: "sponsored",
+      targetUrl: buildLocalHttpUrl(
+        artifacts.service.bindHost,
+        artifacts.service.port,
+        `${artifacts.service.pathPrefix}/capture-news`,
+      ),
+    });
+    routes.push({
+      path: `${artifacts.service.pathPrefix.replace(/\/$/, "")}/oracle-evidence`,
+      capability: artifacts.evidenceCapability,
+      mode: "sponsored",
+      targetUrl: buildLocalHttpUrl(
+        artifacts.service.bindHost,
+        artifacts.service.port,
+        `${artifacts.service.pathPrefix}/oracle-evidence`,
+      ),
     });
   }
   return routes;
@@ -347,6 +378,11 @@ export function buildServiceStatusReport(
       `  - storage: ${snapshot.providerSurfaces.storage.url}  capability_prefix=${snapshot.providerSurfaces.storage.capabilityPrefix}  anonymous_get=${yesNo(snapshot.providerSurfaces.storage.allowAnonymousGet)}`,
     );
   }
+  if (snapshot.providerSurfaces.artifacts) {
+    lines.push(
+      `  - artifacts: ${snapshot.providerSurfaces.artifacts.url}  capture=${snapshot.providerSurfaces.artifacts.captureCapability}  evidence=${snapshot.providerSurfaces.artifacts.evidenceCapability}`,
+    );
+  }
   for (const route of snapshot.providerSurfaces.routes) {
     lines.push(
       `  - route: ${route.path} -> ${route.targetUrl}  capability=${route.capability}  mode=${route.mode}`,
@@ -357,6 +393,7 @@ export function buildServiceStatusReport(
     !snapshot.providerSurfaces.observation &&
     !snapshot.providerSurfaces.oracle &&
     !snapshot.providerSurfaces.storage &&
+    !snapshot.providerSurfaces.artifacts &&
     snapshot.providerSurfaces.routes.length === 0
   ) {
     lines.push("  (none)");
@@ -413,6 +450,7 @@ export function buildServiceStatusSnapshot(
   const observation = config.agentDiscovery?.observationServer;
   const oracle = config.agentDiscovery?.oracleServer;
   const storage = config.storage;
+  const artifacts = config.artifacts;
 
   return {
     roles: detectServiceRoles(config),
@@ -460,6 +498,18 @@ export function buildServiceStatusSnapshot(
               url: buildLocalHttpUrl(storage.bindHost, storage.port, storage.pathPrefix),
               capabilityPrefix: storage.capabilityPrefix,
               allowAnonymousGet: storage.allowAnonymousGet,
+            }
+          : null,
+      artifacts:
+        artifacts?.enabled && artifacts.service?.enabled && artifacts.service.port > 0
+          ? {
+              url: buildLocalHttpUrl(
+                artifacts.service.bindHost,
+                artifacts.service.port,
+                artifacts.service.pathPrefix,
+              ),
+              captureCapability: artifacts.captureCapability,
+              evidenceCapability: artifacts.evidenceCapability,
             }
           : null,
       routes: inferProviderRoutes(config),
@@ -733,6 +783,15 @@ export async function buildServiceHealthSnapshot(
   const storage = config.storage;
   if (storage?.enabled && storage.port > 0) {
     const base = buildLocalHttpUrl(storage.bindHost, storage.port, storage.pathPrefix);
+    checks.push(await probeHttpJson(`${base}/healthz`));
+  }
+  const artifacts = config.artifacts;
+  if (artifacts?.enabled && artifacts.service?.enabled && artifacts.service.port > 0) {
+    const base = buildLocalHttpUrl(
+      artifacts.service.bindHost,
+      artifacts.service.port,
+      artifacts.service.pathPrefix,
+    );
     checks.push(await probeHttpJson(`${base}/healthz`));
   }
 

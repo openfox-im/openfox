@@ -651,6 +651,7 @@ For a concrete host/solver walkthrough, see:
 
 - [OpenFox-Bounty-Host-Solver-Guide.md](./docs/OpenFox-Bounty-Host-Solver-Guide.md)
 - [OpenFox-Local-Task-Marketplace-Guide.md](./docs/OpenFox-Local-Task-Marketplace-Guide.md)
+- [OpenFox-Multi-Node-Deployment-Guide.md](./docs/OpenFox-Multi-Node-Deployment-Guide.md)
 
 The longer-term fit is even stronger for:
 
@@ -705,6 +706,7 @@ to inspect how the current config maps to these roles.
 For deployment examples, health checks, and troubleshooting, see:
 
 - [OpenFox Service Operator Guide](docs/OpenFox-Service-Operator-Guide.md)
+- [OpenFox-Multi-Node-Deployment-Guide.md](docs/OpenFox-Multi-Node-Deployment-Guide.md)
 
 ---
 

@@ -150,6 +150,20 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Build the first storage-backed artifact pipeline for public news
     capture, oracle evidence, committee votes, aggregate oracle reports, local
     verification, and lightweight native anchors.
+- [x] Task 34: Harden multi-node deployment guidance for public artifact and marketplace roles
+  - Status: Complete
+  - Goal: Give operators a concrete deployment path for requester, provider,
+    gateway, storage-provider, artifact capture, host, solver, and scout roles
+    across local and public nodes.
+- [x] Task 35: Broaden artifact verification and indexing around anchored bundles
+  - Status: Complete
+  - Goal: Make anchored and verified public bundles easier to search, inspect,
+    and operate through CLI, service surfaces, and persistent indexes.
+- [x] Task 36: Add sponsor and bounty flows for public evidence capture
+  - Status: Complete
+  - Goal: Support both sponsored capture endpoints and bounty-driven evidence
+    capture so OpenFox can gather public news and oracle evidence without
+    manual runtime rewrites.
 
 ## Task 1 Breakdown
 
@@ -437,3 +451,23 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add lightweight native artifact anchors and persistent anchor records.
 - [x] Surface artifact pipeline health through `status`, `health`, and `doctor`.
 - [x] Add targeted tests for artifact hashing and artifact manager flows.
+
+## Task 34 Breakdown
+
+- [x] Add an explicit multi-node deployment guide for requester/provider/gateway/storage/artifact roles.
+- [x] Keep deployment examples free of hardcoded user-specific home paths.
+- [x] Link the new deployment guide from the roadmap-facing task tracker.
+
+## Task 35 Breakdown
+
+- [x] Add persistent artifact indexes for source URL, subject, and title.
+- [x] Extend `openfox artifacts list` with query, source, subject, anchored, and verified filters.
+- [x] Add targeted tests for artifact indexing and search behavior.
+- [x] Surface artifact provider routes and health through service/operator UX.
+
+## Task 36 Breakdown
+
+- [x] Add a sponsored artifact capture server for public news and oracle evidence.
+- [x] Publish sponsored artifact capture capabilities through discovery and gateway-backed routes.
+- [x] Bind accepted public evidence bounties to the artifact pipeline so payouts and settlement can point at immutable bundles.
+- [x] Add targeted tests for sponsored capture and bounty-driven artifact capture flows.
