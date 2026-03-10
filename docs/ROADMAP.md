@@ -681,3 +681,5 @@ The latest completed slice under this next stage is:
 - `openfox dashboard show --manifest ...`
 - `openfox dashboard export --manifest ... --format json|html`
 - reusable fleet dashboard snapshots and HTML exports for public operator fleets
+- reusable `tosdk` signer-provider and paymaster-provider requester clients for
+  third-party builders
