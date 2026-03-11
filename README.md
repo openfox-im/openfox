@@ -147,6 +147,9 @@ It supports:
 - persisted result lookup with `GET /jobs/:id`
 - paid capabilities such as `oracle.resolve`
 - a built-in paid oracle resolver with `POST /oracle/quote`, `POST /oracle/resolve`, and `GET /oracle/result/:id`
+- a bounded paid `news.fetch` capability for canonical HTTP capture receipts, content hashes, and bundle hashes
+- a bounded paid `proof.verify` capability for subject-hash, bundle-hash, and referenced-receipt verification
+- bounded `storage.put` and `storage.get` capabilities with immutable local object storage, TTL, and expiry enforcement
 - a built-in paid storage market with `POST /storage/quote`, `POST /storage/put`, `POST /storage/renew`, `GET /storage/head/:cid`, `GET /storage/get/:cid`, and `POST /storage/audit`
 - a verifiable public-artifact pipeline with `openfox artifacts capture-news`, `oracle-evidence`, `committee-vote`, `oracle-aggregate`, `verify`, and `anchor`
 - a durable server-side `x402` payment ledger for paid provider requests

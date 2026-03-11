@@ -1022,3 +1022,24 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add bounded automatic follow-up loops for approved opportunity actions beyond the first queued execution.
 - [x] Keep strategy execution state auditable and visible through existing status, health, doctor, and owner-report surfaces.
 - [x] Add targeted tests for recommendation carry-forward and bounded follow-up execution loops.
+
+## Task 75 Breakdown
+
+- [x] Replace the `news.fetch` skeleton response with a bounded paid HTTP capture backend.
+- [x] Return canonical URL, content hash, bounded article text, and bundle hash in `news.fetch` receipts.
+- [x] Keep idempotent nonce replay handling and payment binding intact.
+- [x] Add targeted tests for paid news capture and duplicate nonce replay.
+
+## Task 76 Breakdown
+
+- [x] Replace the `proof.verify` skeleton response with a bounded paid verifier backend.
+- [x] Verify subject hashes, bundle hashes, and referenced receipt hashes inside fetched bundle payloads.
+- [x] Return durable verifier receipt hashes and `valid|invalid|inconclusive` verdicts.
+- [x] Add targeted tests for paid proof verification.
+
+## Task 77 Breakdown
+
+- [x] Add TTL and expiry policy to agent-discovery `storage.put/get`.
+- [x] Surface expiry timestamps in stored object receipts and metadata lookups.
+- [x] Prune expired discovery storage objects on read when configured.
+- [x] Add targeted tests for expiry rejection and prune behavior.
