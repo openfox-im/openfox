@@ -70,6 +70,17 @@ export interface HealthSnapshot {
   paymasterPolicyExpired: boolean;
   paymasterSponsorFunded: boolean | null;
   paymasterSignerParityAligned: boolean;
+  newsFetchProviderEnabled: boolean;
+  newsFetchBackendMode?: string;
+  newsFetchSkillStages: string[];
+  proofVerifyProviderEnabled: boolean;
+  proofVerifyBackendMode?: string;
+  proofVerifySkillStages: string[];
+  discoveryStorageProviderEnabled: boolean;
+  discoveryStoragePutBackendMode?: string;
+  discoveryStorageGetBackendMode?: string;
+  discoveryStoragePutSkillStages: string[];
+  discoveryStorageGetSkillStages: string[];
   bountyEnabled: boolean;
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
@@ -212,6 +223,17 @@ async function buildConfigSnapshot(
   paymasterPolicyExpired: boolean;
   paymasterSponsorFunded: boolean | null;
   paymasterSignerParityAligned: boolean;
+  newsFetchProviderEnabled: boolean;
+  newsFetchBackendMode?: string;
+  newsFetchSkillStages: string[];
+  proofVerifyProviderEnabled: boolean;
+  proofVerifyBackendMode?: string;
+  proofVerifySkillStages: string[];
+  discoveryStorageProviderEnabled: boolean;
+  discoveryStoragePutBackendMode?: string;
+  discoveryStorageGetBackendMode?: string;
+  discoveryStoragePutSkillStages: string[];
+  discoveryStorageGetSkillStages: string[];
   bountyEnabled: boolean;
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
@@ -410,6 +432,41 @@ async function buildConfigSnapshot(
     paymasterSignerParityAligned: Boolean(
       !config.paymasterProvider?.enabled || config.rpcUrl,
     ),
+    newsFetchProviderEnabled: config.agentDiscovery?.newsFetchServer?.enabled === true,
+    newsFetchBackendMode: config.agentDiscovery?.newsFetchServer?.enabled
+      ? config.agentDiscovery.newsFetchServer.backendMode
+      : undefined,
+    newsFetchSkillStages: config.agentDiscovery?.newsFetchServer?.enabled
+      ? config.agentDiscovery.newsFetchServer.skillStages.map(
+          (stage) => `${stage.skill}.${stage.backend}`,
+        )
+      : [],
+    proofVerifyProviderEnabled: config.agentDiscovery?.proofVerifyServer?.enabled === true,
+    proofVerifyBackendMode: config.agentDiscovery?.proofVerifyServer?.enabled
+      ? config.agentDiscovery.proofVerifyServer.backendMode
+      : undefined,
+    proofVerifySkillStages: config.agentDiscovery?.proofVerifyServer?.enabled
+      ? config.agentDiscovery.proofVerifyServer.skillStages.map(
+          (stage) => `${stage.skill}.${stage.backend}`,
+        )
+      : [],
+    discoveryStorageProviderEnabled: config.agentDiscovery?.storageServer?.enabled === true,
+    discoveryStoragePutBackendMode: config.agentDiscovery?.storageServer?.enabled
+      ? config.agentDiscovery.storageServer.putBackendMode
+      : undefined,
+    discoveryStorageGetBackendMode: config.agentDiscovery?.storageServer?.enabled
+      ? config.agentDiscovery.storageServer.getBackendMode
+      : undefined,
+    discoveryStoragePutSkillStages: config.agentDiscovery?.storageServer?.enabled
+      ? config.agentDiscovery.storageServer.putSkillStages.map(
+          (stage) => `${stage.skill}.${stage.backend}`,
+        )
+      : [],
+    discoveryStorageGetSkillStages: config.agentDiscovery?.storageServer?.enabled
+      ? config.agentDiscovery.storageServer.getSkillStages.map(
+          (stage) => `${stage.skill}.${stage.backend}`,
+        )
+      : [],
     bountyEnabled: config.bounty?.enabled === true,
     bountyRole: config.bounty?.enabled ? config.bounty.role : undefined,
     bountyAutoEnabled: Boolean(
@@ -880,6 +937,101 @@ function collectFindings(
     });
   }
 
+  if (snapshot.newsFetchProviderEnabled) {
+    if (
+      snapshot.newsFetchBackendMode !== "builtin_only" &&
+      snapshot.newsFetchSkillStages.length === 0
+    ) {
+      findings.push({
+        id: "news-fetch-backend-invalid",
+        severity: "error",
+        summary: "news.fetch is enabled without any configured skill backend stages.",
+        recommendation:
+          "Set agentDiscovery.newsFetchServer.skillStages or switch backendMode to builtin_only.",
+      });
+    } else if (snapshot.newsFetchBackendMode === "builtin_only") {
+      findings.push({
+        id: "news-fetch-backend-builtin-only",
+        severity: "warn",
+        summary: "news.fetch is running in builtin_only mode.",
+        recommendation:
+          "Switch agentDiscovery.newsFetchServer.backendMode to skills_first to follow the provider backend policy.",
+      });
+    } else {
+      findings.push({
+        id: "news-fetch-backend-skills",
+        severity: "ok",
+        summary: `news.fetch is using ${snapshot.newsFetchBackendMode} with ${snapshot.newsFetchSkillStages.join(" -> ")}.`,
+      });
+    }
+  }
+
+  if (snapshot.proofVerifyProviderEnabled) {
+    if (
+      snapshot.proofVerifyBackendMode !== "builtin_only" &&
+      snapshot.proofVerifySkillStages.length === 0
+    ) {
+      findings.push({
+        id: "proof-verify-backend-invalid",
+        severity: "error",
+        summary: "proof.verify is enabled without any configured skill backend stages.",
+        recommendation:
+          "Set agentDiscovery.proofVerifyServer.skillStages or switch backendMode to builtin_only.",
+      });
+    } else if (snapshot.proofVerifyBackendMode === "builtin_only") {
+      findings.push({
+        id: "proof-verify-backend-builtin-only",
+        severity: "warn",
+        summary: "proof.verify is running in builtin_only mode.",
+        recommendation:
+          "Switch agentDiscovery.proofVerifyServer.backendMode to skills_first to follow the provider backend policy.",
+      });
+    } else {
+      findings.push({
+        id: "proof-verify-backend-skills",
+        severity: "ok",
+        summary: `proof.verify is using ${snapshot.proofVerifyBackendMode} with ${snapshot.proofVerifySkillStages.join(" -> ")}.`,
+      });
+    }
+  }
+
+  if (snapshot.discoveryStorageProviderEnabled) {
+    const missingPutStages =
+      snapshot.discoveryStoragePutBackendMode !== "builtin_only" &&
+      snapshot.discoveryStoragePutSkillStages.length === 0;
+    const missingGetStages =
+      snapshot.discoveryStorageGetBackendMode !== "builtin_only" &&
+      snapshot.discoveryStorageGetSkillStages.length === 0;
+    if (missingPutStages || missingGetStages) {
+      findings.push({
+        id: "discovery-storage-backend-invalid",
+        severity: "error",
+        summary:
+          "discovery storage is enabled without configured skill backend stages for one or more paths.",
+        recommendation:
+          "Set agentDiscovery.storageServer.putSkillStages/getSkillStages or switch the affected backend mode to builtin_only.",
+      });
+    } else if (
+      snapshot.discoveryStoragePutBackendMode === "builtin_only" ||
+      snapshot.discoveryStorageGetBackendMode === "builtin_only"
+    ) {
+      findings.push({
+        id: "discovery-storage-backend-builtin-only",
+        severity: "warn",
+        summary:
+          "discovery storage is partially or fully running in builtin_only mode.",
+        recommendation:
+          "Prefer skills_first for storage.put/get preparation while keeping canonical persistence in the provider shell.",
+      });
+    } else {
+      findings.push({
+        id: "discovery-storage-backend-skills",
+        severity: "ok",
+        summary: `discovery storage uses put=${snapshot.discoveryStoragePutBackendMode} (${snapshot.discoveryStoragePutSkillStages.join(" -> ")}) and get=${snapshot.discoveryStorageGetBackendMode} (${snapshot.discoveryStorageGetSkillStages.join(" -> ")}).`,
+      });
+    }
+  }
+
   if (snapshot.paymasterProviderEnabled) {
     findings.push({
       id: "paymaster-provider-enabled",
@@ -1247,6 +1399,17 @@ export async function buildHealthSnapshot(
       paymasterPolicyExpired: false,
       paymasterSponsorFunded: null,
       paymasterSignerParityAligned: true,
+      newsFetchProviderEnabled: false,
+      newsFetchBackendMode: undefined,
+      newsFetchSkillStages: [],
+      proofVerifyProviderEnabled: false,
+      proofVerifyBackendMode: undefined,
+      proofVerifySkillStages: [],
+      discoveryStorageProviderEnabled: false,
+      discoveryStoragePutBackendMode: undefined,
+      discoveryStorageGetBackendMode: undefined,
+      discoveryStoragePutSkillStages: [],
+      discoveryStorageGetSkillStages: [],
       bountyEnabled: false,
       bountyRole: undefined,
       bountyAutoEnabled: false,
@@ -1371,6 +1534,9 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Provider enabled: ${yesNo(snapshot.providerEnabled)}`,
     `Signer provider enabled: ${yesNo(snapshot.signerProviderEnabled)}${snapshot.signerProviderEnabled ? ` (${snapshot.signerRecentQuotes} quotes, ${snapshot.signerRecentExecutions} executions, ${snapshot.signerPendingExecutions} pending)` : ""}`,
     `Paymaster provider enabled: ${yesNo(snapshot.paymasterProviderEnabled)}${snapshot.paymasterProviderEnabled ? ` (${snapshot.paymasterRecentQuotes} quotes, ${snapshot.paymasterRecentAuthorizations} authorizations, ${snapshot.paymasterPendingAuthorizations} pending, sponsor funded=${snapshot.paymasterSponsorFunded === null ? "unknown" : yesNo(snapshot.paymasterSponsorFunded)}, signer parity=${snapshot.paymasterSignerParityAligned ? "aligned" : "limited"})` : ""}`,
+    `news.fetch backend: ${snapshot.newsFetchProviderEnabled ? `${snapshot.newsFetchBackendMode} (${snapshot.newsFetchSkillStages.join(" -> ") || "(none)"})` : "disabled"}`,
+    `proof.verify backend: ${snapshot.proofVerifyProviderEnabled ? `${snapshot.proofVerifyBackendMode} (${snapshot.proofVerifySkillStages.join(" -> ") || "(none)"})` : "disabled"}`,
+    `discovery storage backend: ${snapshot.discoveryStorageProviderEnabled ? `put=${snapshot.discoveryStoragePutBackendMode} (${snapshot.discoveryStoragePutSkillStages.join(" -> ") || "(none)"}), get=${snapshot.discoveryStorageGetBackendMode} (${snapshot.discoveryStorageGetSkillStages.join(" -> ") || "(none)"})` : "disabled"}`,
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,

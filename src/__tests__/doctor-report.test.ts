@@ -45,6 +45,17 @@ describe("doctor report formatting", () => {
       paymasterPolicyExpired: false,
       paymasterSponsorFunded: true,
       paymasterSignerParityAligned: true,
+      newsFetchProviderEnabled: true,
+      newsFetchBackendMode: "skills_first",
+      newsFetchSkillStages: ["newsfetch.capture", "zktls.bundle"],
+      proofVerifyProviderEnabled: true,
+      proofVerifyBackendMode: "skills_first",
+      proofVerifySkillStages: ["proofverify.verify"],
+      discoveryStorageProviderEnabled: true,
+      discoveryStoragePutBackendMode: "skills_first",
+      discoveryStorageGetBackendMode: "skills_first",
+      discoveryStoragePutSkillStages: ["storage-object.put"],
+      discoveryStorageGetSkillStages: ["storage-object.get"],
       bountyEnabled: true,
       bountyRole: "host" as const,
       bountyAutoEnabled: true,
@@ -146,6 +157,12 @@ describe("doctor report formatting", () => {
           summary: "Chain RPC probe succeeded.",
         },
         {
+          id: "news-fetch-backend-skills",
+          severity: "ok" as const,
+          summary:
+            "news.fetch is using skills_first with newsfetch.capture -> zktls.bundle.",
+        },
+        {
           id: "artifacts-enabled",
           severity: "ok" as const,
           summary: "Artifact pipeline is enabled (2 recent artifacts, 1 anchored).",
@@ -165,6 +182,15 @@ describe("doctor report formatting", () => {
     ).toContain(
       "Paymaster provider enabled: yes (3 quotes, 2 authorizations, 1 pending, sponsor funded=yes, signer parity=aligned)",
     );
+    expect(health).toContain(
+      "news.fetch backend: skills_first (newsfetch.capture -> zktls.bundle)",
+    );
+    expect(health).toContain(
+      "proof.verify backend: skills_first (proofverify.verify)",
+    );
+    expect(health).toContain(
+      "discovery storage backend: put=skills_first (storage-object.put), get=skills_first (storage-object.get)",
+    );
     expect(health).toContain("Bounty enabled: yes (host)");
     expect(health).toContain(
       "Owner reports enabled: yes (2 recent, 1 deliveries, 1 pending, alerts=3 recent/2 unread, actions=2 recent/1 queued/1 follow-up, executions=2 recent/1 running/1 follow-up, web=on, email=off)",
@@ -182,6 +208,9 @@ describe("doctor report formatting", () => {
     expect(doctor).toContain("Warnings: 2");
     expect(doctor).toContain("Run `openfox service install`.");
     expect(doctor).toContain("Artifact pipeline is enabled (2 recent artifacts, 1 anchored).");
+    expect(doctor).toContain(
+      "news.fetch is using skills_first with newsfetch.capture -> zktls.bundle.",
+    );
     expect(health).toContain("alerts=3 recent/2 unread");
 
     db.close();
@@ -294,6 +323,64 @@ describe("doctor report formatting", () => {
       snapshot.findings.some(
         (finding) =>
           finding.id === "owner-reports-enabled" && finding.severity === "error",
+      ),
+    ).toBe(true);
+  });
+
+  it("warns when evidence providers are left in builtin_only mode", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        agentDiscovery: {
+          enabled: true,
+          publishCard: true,
+          cardTtlSeconds: 3600,
+          endpoints: [],
+          capabilities: [],
+          newsFetchServer: {
+            enabled: true,
+            bindHost: "127.0.0.1",
+            port: 4881,
+            path: "/agent-discovery/news-fetch",
+            capability: "news.fetch",
+            priceWei: "1000",
+            maxSourceUrlChars: 2048,
+            requestTimeoutMs: 10000,
+            maxResponseBytes: 262144,
+            allowPrivateTargets: false,
+            maxArticleChars: 12000,
+            backendMode: "builtin_only",
+            skillStages: [],
+          },
+          proofVerifyServer: {
+            enabled: true,
+            bindHost: "127.0.0.1",
+            port: 4882,
+            path: "/agent-discovery/proof-verify",
+            capability: "proof.verify",
+            priceWei: "1000",
+            maxPayloadChars: 16384,
+            requestTimeoutMs: 10000,
+            maxFetchBytes: 262144,
+            allowPrivateTargets: false,
+            backendMode: "builtin_only",
+            skillStages: [],
+          },
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "news-fetch-backend-builtin-only" &&
+          finding.severity === "warn",
+      ),
+    ).toBe(true);
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "proof-verify-backend-builtin-only" &&
+          finding.severity === "warn",
       ),
     ).toBe(true);
   });

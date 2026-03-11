@@ -1050,3 +1050,10 @@ building OpenFox into a TOS-native agent platform.
 - [x] Persist evidence workflow runs, source-level verification outcomes, and multi-recipient payment records in durable local state.
 - [x] Add `openfox evidence run|list|get` so operators can execute and inspect bounded evidence workflows directly.
 - [x] Add targeted end-to-end tests for `news.fetch -> proof.verify x N -> storage.put` with real paid provider surfaces.
+
+## Task 79 Breakdown
+
+- [x] Move `news.fetch`, `proof.verify`, and `storage.put/get` behind versioned provider backend interfaces.
+- [x] Add bundled skill-composed backend stages and machine-readable contracts for `newsfetch.capture`, `zktls.bundle`, `proofverify.verify`, and `storage-object.put/get`.
+- [x] Keep built-in execution available as a bounded fallback while making `skills_first` the default provider mode.
+- [x] Surface provider backend mode and stage chains through service status, health, and doctor output.

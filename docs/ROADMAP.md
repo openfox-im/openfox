@@ -1659,3 +1659,45 @@ Acceptance criteria:
 - one operator command can execute a bounded multi-source evidence workflow
 - the workflow stores per-source verification outcomes and payment tx hashes
 - successful quorum produces one stored aggregate bundle and durable result URL
+
+### Phase 35: Skill-First Provider Backends
+
+Status: completed
+
+Goal:
+
+- make `news.fetch`, `proof.verify`, and `storage.put/get` follow the provider
+  backend policy in `AGENTS.md` by separating the stable provider shell from
+  versioned business-logic backends
+
+Delivered surface:
+
+- versioned provider backend mode selection for:
+  - `news.fetch`
+  - `proof.verify`
+  - `storage.put/get`
+- bundled skill-composed backend stages and contracts for:
+  - `newsfetch.capture`
+  - `zktls.bundle`
+  - `proofverify.verify`
+  - `storage-object.put`
+  - `storage-object.get`
+- provider-side skill backend runner with bounded stage loading
+- operator-visible backend mode and stage-chain reporting through:
+  - `openfox service status`
+  - `openfox health`
+  - `openfox doctor`
+
+Implementation tasks:
+
+- add backend interface selection with `skills_first|skills_only|builtin_first|builtin_only`
+- ship bundled skill-composed backend stages with machine-readable contracts
+- keep built-in bounded implementations as fallback compatibility paths
+- surface backend mode and configured stage chains in service/operator diagnostics
+
+Acceptance criteria:
+
+- provider business logic is no longer hardwired only inside server files
+- `news.fetch`, `proof.verify`, and `storage.put/get` default to
+  `skills_first`
+- service status and doctor output show which backend mode and stages are active

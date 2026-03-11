@@ -57,12 +57,16 @@ export interface ServiceStatusSnapshot {
       | {
           url: string;
           capability: string;
+          backendMode: string;
+          skillStages: string[];
         }
       | null;
     proofVerify:
       | {
           url: string;
           capability: string;
+          backendMode: string;
+          skillStages: string[];
         }
       | null;
     discoveryStorage:
@@ -70,6 +74,10 @@ export interface ServiceStatusSnapshot {
           url: string;
           putCapability: string;
           getCapability: string;
+          putBackendMode: string;
+          getBackendMode: string;
+          putSkillStages: string[];
+          getSkillStages: string[];
         }
       | null;
     signer:
@@ -509,17 +517,17 @@ export function buildServiceStatusReport(
   }
   if (snapshot.providerSurfaces.newsFetch) {
     lines.push(
-      `  - news.fetch: ${snapshot.providerSurfaces.newsFetch.url}  capability=${snapshot.providerSurfaces.newsFetch.capability}`,
+      `  - news.fetch: ${snapshot.providerSurfaces.newsFetch.url}  capability=${snapshot.providerSurfaces.newsFetch.capability}  backend_mode=${snapshot.providerSurfaces.newsFetch.backendMode}  stages=${snapshot.providerSurfaces.newsFetch.skillStages.join(" -> ") || "(none)"}`,
     );
   }
   if (snapshot.providerSurfaces.proofVerify) {
     lines.push(
-      `  - proof.verify: ${snapshot.providerSurfaces.proofVerify.url}  capability=${snapshot.providerSurfaces.proofVerify.capability}`,
+      `  - proof.verify: ${snapshot.providerSurfaces.proofVerify.url}  capability=${snapshot.providerSurfaces.proofVerify.capability}  backend_mode=${snapshot.providerSurfaces.proofVerify.backendMode}  stages=${snapshot.providerSurfaces.proofVerify.skillStages.join(" -> ") || "(none)"}`,
     );
   }
   if (snapshot.providerSurfaces.discoveryStorage) {
     lines.push(
-      `  - discovery storage: ${snapshot.providerSurfaces.discoveryStorage.url}  put=${snapshot.providerSurfaces.discoveryStorage.putCapability}  get=${snapshot.providerSurfaces.discoveryStorage.getCapability}`,
+      `  - discovery storage: ${snapshot.providerSurfaces.discoveryStorage.url}  put=${snapshot.providerSurfaces.discoveryStorage.putCapability}  get=${snapshot.providerSurfaces.discoveryStorage.getCapability}  put_backend=${snapshot.providerSurfaces.discoveryStorage.putBackendMode}  get_backend=${snapshot.providerSurfaces.discoveryStorage.getBackendMode}  put_stages=${snapshot.providerSurfaces.discoveryStorage.putSkillStages.join(" -> ") || "(none)"}  get_stages=${snapshot.providerSurfaces.discoveryStorage.getSkillStages.join(" -> ") || "(none)"}`,
     );
   }
   if (snapshot.providerSurfaces.signer) {
@@ -666,6 +674,8 @@ export function buildServiceStatusSnapshot(
           ? {
               url: buildLocalHttpUrl(newsFetch.bindHost, newsFetch.port, newsFetch.path),
               capability: newsFetch.capability,
+              backendMode: newsFetch.backendMode,
+              skillStages: newsFetch.skillStages.map((stage) => `${stage.skill}.${stage.backend}`),
             }
           : null,
       proofVerify:
@@ -677,6 +687,8 @@ export function buildServiceStatusSnapshot(
                 proofVerify.path,
               ),
               capability: proofVerify.capability,
+              backendMode: proofVerify.backendMode,
+              skillStages: proofVerify.skillStages.map((stage) => `${stage.skill}.${stage.backend}`),
             }
           : null,
       discoveryStorage:
@@ -689,6 +701,14 @@ export function buildServiceStatusSnapshot(
               ),
               putCapability: discoveryStorage.putCapability,
               getCapability: discoveryStorage.getCapability,
+              putBackendMode: discoveryStorage.putBackendMode,
+              getBackendMode: discoveryStorage.getBackendMode,
+              putSkillStages: discoveryStorage.putSkillStages.map(
+                (stage) => `${stage.skill}.${stage.backend}`,
+              ),
+              getSkillStages: discoveryStorage.getSkillStages.map(
+                (stage) => `${stage.skill}.${stage.backend}`,
+              ),
             }
           : null,
       signer:

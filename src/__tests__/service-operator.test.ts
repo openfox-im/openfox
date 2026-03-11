@@ -13,6 +13,12 @@ import {
   runServiceHealthChecks,
 } from "../service/operator.js";
 import { canonicalizeGatewayBootnodeListPayload } from "../agent-gateway/bootnodes.js";
+import {
+  DEFAULT_NEWS_FETCH_SKILL_STAGES,
+  DEFAULT_PROOF_VERIFY_SKILL_STAGES,
+  DEFAULT_STORAGE_GET_SKILL_STAGES,
+  DEFAULT_STORAGE_PUT_SKILL_STAGES,
+} from "../agent-discovery/provider-skill-spec.js";
 
 const servers: http.Server[] = [];
 
@@ -67,6 +73,54 @@ describe("service operator", () => {
         cardTtlSeconds: 3600,
         endpoints: [],
         capabilities: [],
+        newsFetchServer: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4881,
+          path: "/agent-discovery/news-fetch",
+          capability: "news.fetch",
+          priceWei: "1000",
+          maxSourceUrlChars: 2048,
+          requestTimeoutMs: 10000,
+          maxResponseBytes: 262144,
+          allowPrivateTargets: false,
+          maxArticleChars: 12000,
+          backendMode: "skills_first",
+          skillStages: DEFAULT_NEWS_FETCH_SKILL_STAGES.map((stage) => ({ ...stage })),
+        },
+        proofVerifyServer: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4882,
+          path: "/agent-discovery/proof-verify",
+          capability: "proof.verify",
+          priceWei: "1000",
+          maxPayloadChars: 16384,
+          requestTimeoutMs: 10000,
+          maxFetchBytes: 262144,
+          allowPrivateTargets: false,
+          backendMode: "skills_first",
+          skillStages: DEFAULT_PROOF_VERIFY_SKILL_STAGES.map((stage) => ({ ...stage })),
+        },
+        storageServer: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4883,
+          path: "/agent-discovery/storage",
+          putCapability: "storage.put",
+          getCapability: "storage.get",
+          putPriceWei: "1000",
+          getPriceWei: "1000",
+          maxObjectBytes: 262144,
+          storageDir: "/tmp/openfox-discovery-storage",
+          defaultTtlSeconds: 86400,
+          maxTtlSeconds: 2592000,
+          pruneExpiredOnRead: true,
+          putBackendMode: "skills_first",
+          getBackendMode: "skills_first",
+          putSkillStages: DEFAULT_STORAGE_PUT_SKILL_STAGES.map((stage) => ({ ...stage })),
+          getSkillStages: DEFAULT_STORAGE_GET_SKILL_STAGES.map((stage) => ({ ...stage })),
+        },
         faucetServer: {
           enabled: true,
           bindHost: "127.0.0.1",
@@ -210,6 +264,16 @@ describe("service operator", () => {
 
     const snapshot = buildServiceStatusSnapshot(config, db.raw);
     expect(snapshot.roles).toEqual(["requester", "provider", "gateway"]);
+    expect(snapshot.providerSurfaces.newsFetch?.backendMode).toBe("skills_first");
+    expect(snapshot.providerSurfaces.newsFetch?.skillStages).toEqual([
+      "newsfetch.capture",
+      "zktls.bundle",
+    ]);
+    expect(snapshot.providerSurfaces.proofVerify?.backendMode).toBe("skills_first");
+    expect(snapshot.providerSurfaces.discoveryStorage?.putBackendMode).toBe("skills_first");
+    expect(snapshot.providerSurfaces.discoveryStorage?.getSkillStages).toEqual([
+      "storage-object.get",
+    ]);
     expect(snapshot.providerSurfaces.signer?.capabilityPrefix).toBe("signer");
     expect(snapshot.providerSurfaces.paymaster?.capabilityPrefix).toBe("paymaster");
     expect(snapshot.providerSurfaces.storage?.capabilityPrefix).toBe("storage.ipfs");
@@ -221,6 +285,9 @@ describe("service operator", () => {
     const report = buildServiceStatusReport(config, db.raw);
     expect(report).toContain("Roles: requester, provider, gateway");
     expect(report).toContain("x402 server:");
+    expect(report).toContain("news.fetch:");
+    expect(report).toContain("backend_mode=skills_first");
+    expect(report).toContain("put_backend=skills_first");
     expect(report).toContain("signer:");
     expect(report).toContain("paymaster:");
     expect(report).toContain("capability_prefix=storage.ipfs");

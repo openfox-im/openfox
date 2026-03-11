@@ -150,6 +150,7 @@ It supports:
 - a bounded paid `news.fetch` capability for canonical HTTP capture receipts, content hashes, and bundle hashes
 - a bounded paid `proof.verify` capability for subject-hash, bundle-hash, and referenced-receipt verification
 - bounded `storage.put` and `storage.get` capabilities with immutable local object storage, TTL, and expiry enforcement
+- skill-first provider backends for `news.fetch`, `proof.verify`, and `storage.put/get`, with versioned stage contracts and built-in bounded fallback paths
 - a coordinator-side `M-of-N` evidence workflow with `openfox evidence run|list|get`
 - a built-in paid storage market with `POST /storage/quote`, `POST /storage/put`, `POST /storage/renew`, `GET /storage/head/:cid`, `GET /storage/get/:cid`, and `POST /storage/audit`
 - a verifiable public-artifact pipeline with `openfox artifacts capture-news`, `oracle-evidence`, `committee-vote`, `oracle-aggregate`, `verify`, and `anchor`
