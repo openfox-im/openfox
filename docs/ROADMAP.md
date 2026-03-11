@@ -656,11 +656,14 @@ Suggested priority order:
   - added authenticated remote maintenance for storage and artifact nodes
   - added `openfox storage maintain` and `openfox artifacts maintain`
   - added `openfox fleet repair <storage|artifacts>` for batch fleet remediation
+  - replaced the `news.fetch` skeleton with a bounded paid HTTP capture backend
+  - replaced the `proof.verify` skeleton with a bounded paid verifier backend
+  - added TTL and expiry policy for `storage.put` and `storage.get`
 - next:
   - wire a real zkTLS backend behind `news.fetch`
   - wire a real verifier backend behind `proof.verify`
   - define coordinator-side `M-of-N` tally and multi-recipient payout rules
-  - define storage retention, retrieval, and replication policy for `storage.put` and `storage.get`
+  - externalize or replicate the bounded storage lane beyond the local immutable object provider
 
 ### P2: Do Later
 
@@ -1575,3 +1578,47 @@ Acceptance criteria:
 
 - owner reports can lead to queued and executed bounded follow-up work without
   manual runtime rewrites
+
+### Phase 33: Bounded Evidence Capture and Verification Lane
+
+Status: completed
+
+Goal:
+
+- turn the drafted `news.fetch`, `proof.verify`, and `storage.put/get`
+  protocol skeleton into a real bounded workflow lane with persistent receipts,
+  payment binding, and expiry enforcement
+
+Delivered surface:
+
+- a real paid `news.fetch` backend that performs bounded HTTP capture and
+  returns:
+  - canonical URL
+  - content hash
+  - bounded article text
+  - bundle hash
+- a real paid `proof.verify` backend that performs bounded verification of:
+  - subject hash
+  - bundle hash
+  - referenced receipt hash inside fetched bundle payloads
+- a real paid `storage.put/get` backend with:
+  - explicit TTL
+  - expiry timestamps
+  - expiry pruning on read
+- capability publication updated so these surfaces are no longer described as
+  draft-only skeletons
+
+Implementation tasks:
+
+- replace `integration_required` placeholder paths in `news.fetch` with bounded
+  capture logic
+- replace `integration_required` placeholder paths in `proof.verify` with
+  bounded receipt/hash verification logic
+- add TTL and expiry policy to agent-discovery storage objects
+- add targeted tests for capture, verification, and expiry/prune behavior
+
+Acceptance criteria:
+
+- `news.fetch` returns a real capture receipt instead of a skeleton response
+- `proof.verify` returns `valid|invalid|inconclusive` based on real checks
+- expired discovery storage objects are rejected and pruned on read
