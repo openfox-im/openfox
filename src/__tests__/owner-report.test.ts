@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_TASKS } from "../heartbeat/tasks.js";
-import { generateOwnerReport } from "../reports/generation.js";
+import { generateOwnerReport, buildOwnerReportInput } from "../reports/generation.js";
 import {
   DEFAULT_OWNER_REPORTS_CONFIG,
   type HeartbeatLegacyContext,
   type TickContext,
+  type OpportunityItem,
 } from "../types.js";
 import {
   MockInferenceClient,
@@ -14,6 +15,8 @@ import {
   createTestIdentity,
   noToolResponse,
 } from "./mocks.js";
+import { upsertStrategyProfile } from "../opportunity/strategy.js";
+import * as scoutModule from "../opportunity/scout.js";
 
 function createTickContext(db: ReturnType<typeof createTestDb>): TickContext {
   return {
@@ -71,6 +74,128 @@ describe("owner reports", () => {
       expect(db.getLatestOwnerFinanceSnapshot("daily")?.snapshotId).toBe(
         report.financeSnapshotId,
       );
+    } finally {
+      db.close();
+    }
+  });
+
+  it("carries execution-capable opportunity templates and execution summary into report input", async () => {
+    const db = createTestDb();
+    try {
+      upsertStrategyProfile(db, {
+        profileId: "default",
+        name: "default",
+        revenueTargetWei: "1000000000000000000",
+        maxSpendPerOpportunityWei: "100000000000000000",
+        minMarginBps: 100,
+        enabledOpportunityKinds: ["campaign", "provider"],
+        enabledProviderClasses: ["oracle", "task_market"],
+        allowedTrustTiers: ["org_trusted", "public_low_trust", "unknown"],
+        automationLevel: "bounded_auto",
+        reportCadence: "daily",
+        maxDeadlineHours: 168,
+      });
+      const config = createTestConfig({
+        ownerReports: {
+          ...DEFAULT_OWNER_REPORTS_CONFIG,
+          enabled: true,
+          actionExecution: {
+            ...DEFAULT_OWNER_REPORTS_CONFIG.actionExecution!,
+            enabled: true,
+            autoExecutePursue: true,
+            autoQueueFollowUps: true,
+            maxFollowUpDepth: 2,
+            maxFollowUpsPerRun: 1,
+          },
+        },
+      });
+      const campaignOpportunity: OpportunityItem = {
+        kind: "campaign",
+        providerClass: "task_market",
+        trustTier: "org_trusted",
+        title: "Campaign: solve the best open macro bounty",
+        description: "Pick one bounded bounty inside the campaign.",
+        capability: "campaign.solve",
+        baseUrl: "https://host.example.com",
+        campaignId: "campaign-1",
+        providerAgentId: "host-agent-1",
+        providerAddress:
+          "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        grossValueWei: "50000000000000000",
+        estimatedCostWei: "1000000000000000",
+        marginWei: "49000000000000000",
+        marginBps: 9800,
+        rawScore: 10,
+      };
+      db.upsertOwnerOpportunityAction({
+        actionId: "owner-action:followup-1",
+        alertId: "owner-followup-alert:1",
+        requestId: "owner-followup-request:1",
+        kind: "pursue",
+        title: "Follow up: another campaign bounty",
+        summary: "Auto-queued follow-up action.",
+        capability: "campaign.solve",
+        baseUrl: "https://host.example.com",
+        requestedBy: "owner-test",
+        approvedBy: "openfox-follow-up",
+        approvedAt: "2026-03-11T18:00:00.000Z",
+        decisionNote: "auto follow-up",
+        payload: {
+          followUpDepth: 1,
+          parentActionId: "owner-action:root",
+        },
+        status: "queued",
+        resolutionKind: null,
+        resolutionRef: null,
+        resolutionNote: null,
+        queuedAt: "2026-03-11T18:00:00.000Z",
+        createdAt: "2026-03-11T18:00:00.000Z",
+        updatedAt: "2026-03-11T18:00:00.000Z",
+        completedAt: null,
+        cancelledAt: null,
+      });
+      db.upsertOwnerOpportunityActionExecution({
+        executionId: "owner-action-exec:followup-1",
+        actionId: "owner-action:followup-1",
+        kind: "remote_campaign_solve",
+        targetKind: "campaign",
+        targetRef: "campaign-1",
+        remoteBaseUrl: "https://host.example.com",
+        status: "completed",
+        requestPayload: { followUpDepth: 1 },
+        resultPayload: {
+          followUpDepth: 1,
+          followUp: { queuedCount: 0 },
+        },
+        executionRef: "submission-1",
+        errorMessage: null,
+        createdAt: "2026-03-11T18:00:05.000Z",
+        updatedAt: "2026-03-11T18:00:05.000Z",
+        completedAt: "2026-03-11T18:00:05.000Z",
+        failedAt: null,
+      });
+
+      const collectSpy = vi
+        .spyOn(scoutModule, "collectOpportunityItems")
+        .mockResolvedValue([campaignOpportunity]);
+      const { input } = await buildOwnerReportInput({
+        config,
+        db,
+        periodKind: "daily",
+        nowMs: Date.parse("2026-03-11T18:30:00.000Z"),
+      });
+      collectSpy.mockRestore();
+
+      expect(input.opportunities).toHaveLength(1);
+      expect(input.opportunities[0]?.executionTemplate).toMatchObject({
+        executionCapable: true,
+        executionKind: "remote_campaign_solve",
+        followUpEligible: true,
+      });
+      expect(input.strategyExecution.autoQueueFollowUps).toBe(true);
+      expect(input.strategyExecution.maxFollowUpDepth).toBe(2);
+      expect(input.strategyExecution.queuedFollowUpActions).toBe(1);
+      expect(input.strategyExecution.recentFollowUpExecutions).toBe(1);
     } finally {
       db.close();
     }

@@ -18,6 +18,10 @@ import {
   rankOpportunityItems,
 } from "../opportunity/scout.js";
 import {
+  buildOpportunityExecutionTemplate,
+  buildOwnerStrategyExecutionSummary,
+} from "./opportunity-execution.js";
+import {
   buildOwnerFinanceSnapshot,
   persistOwnerFinanceSnapshot,
 } from "./finance.js";
@@ -160,7 +164,19 @@ export async function buildOwnerReportInput(params: {
     strategyScore: item.strategyScore ?? null,
     strategyMatched: item.strategyMatched ?? null,
     strategyReasons: item.strategyReasons ?? [],
+    executionTemplate: buildOpportunityExecutionTemplate(item),
   }));
+  const actionExecution = params.config.ownerReports?.actionExecution;
+  const strategyExecution = buildOwnerStrategyExecutionSummary({
+    db: params.db,
+    config: {
+      autoExecutePursue: actionExecution?.autoExecutePursue === true,
+      autoExecuteDelegate: actionExecution?.autoExecuteDelegate === true,
+      autoQueueFollowUps: actionExecution?.autoQueueFollowUps === true,
+      maxFollowUpDepth: actionExecution?.maxFollowUpDepth ?? 0,
+      maxFollowUpsPerRun: actionExecution?.maxFollowUpsPerRun ?? 0,
+    },
+  });
 
   return {
     financeSnapshot,
@@ -169,6 +185,7 @@ export async function buildOwnerReportInput(params: {
       periodKind: params.periodKind,
       finance: financeSnapshot.payload,
       strategy: strategy ?? null,
+      strategyExecution,
       opportunities,
     },
   };

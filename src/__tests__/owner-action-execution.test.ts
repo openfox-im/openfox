@@ -1,11 +1,12 @@
 import http from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBountyEngine } from "../bounty/engine.js";
 import { startBountyHttpServer } from "../bounty/http.js";
 import {
   executeOwnerOpportunityAction,
   executeQueuedOwnerOpportunityActions,
 } from "../reports/action-execution.js";
+import * as bountyClientModule from "../bounty/client.js";
 import {
   createOperatorApprovalRequest,
   decideOperatorApprovalRequest,
@@ -229,6 +230,153 @@ describe("owner action execution", () => {
       expect(db.listOwnerOpportunityActionExecutions(10, { actionId: action.actionId })).toHaveLength(1);
     } finally {
       db.close();
+    }
+  });
+
+  it("queues one bounded follow-up action after a successful remote campaign execution", async () => {
+    const hostDb = createTestDb();
+    const ownerDb = createTestDb();
+    const hostIdentity = createTestIdentity();
+    const ownerIdentity = createTestIdentity();
+
+    try {
+      const hostInference = new MockInferenceClient([
+        noToolResponse('{"decision":"accepted","confidence":0.98,"reason":"Correct."}'),
+      ]);
+      const hostEngine = createBountyEngine({
+        identity: hostIdentity,
+        db: hostDb,
+        inference: hostInference,
+        bountyConfig: {
+          ...DEFAULT_BOUNTY_CONFIG,
+          enabled: true,
+          role: "host",
+          bindHost: "127.0.0.1",
+          port: 0,
+        },
+      });
+      const campaign = hostEngine.createCampaign({
+        title: "Macro campaign",
+        description: "Solve one bounded bounty at a time.",
+        budgetWei: "5000",
+        maxOpenBounties: 4,
+        allowedKinds: ["question"],
+      });
+      const bountyOne = hostEngine.openQuestionBounty({
+        question: "Capital of Italy?",
+        referenceAnswer: "Rome",
+        rewardWei: "1000",
+        submissionDeadline: "2026-03-12T00:00:00.000Z",
+        campaignId: campaign.campaignId,
+      });
+      const bountyTwo = hostEngine.openQuestionBounty({
+        question: "Capital of Spain?",
+        referenceAnswer: "Madrid",
+        rewardWei: "900",
+        submissionDeadline: "2026-03-12T00:00:00.000Z",
+        campaignId: campaign.campaignId,
+      });
+      const bountyServer = await startBountyHttpServer({
+        bountyConfig: {
+          ...DEFAULT_BOUNTY_CONFIG,
+          enabled: true,
+          role: "host",
+          bindHost: "127.0.0.1",
+          port: 0,
+        },
+        engine: hostEngine,
+      });
+      servers.push(bountyServer);
+
+      ownerDb.upsertSkill({
+        name: "question-bounty-solver",
+        description: "solver",
+        autoActivate: false,
+        instructions: "Answer with the shortest canonical answer only.",
+        source: "bundled",
+        path: "skills/question-bounty-solver/SKILL.md",
+        enabled: true,
+        installedAt: "2026-03-11T18:00:00.000Z",
+      });
+      ownerDb.upsertOwnerOpportunityAction({
+        actionId: "owner-action:campaign-root",
+        alertId: "owner-alert:campaign-root",
+        requestId: "owner-request:campaign-root",
+        kind: "pursue",
+        title: "Solve campaign macro bounties",
+        summary: "Execute one bounded campaign solve and queue a follow-up if possible.",
+        capability: "campaign.solve",
+        baseUrl: bountyServer.url,
+        requestedBy: "owner-test",
+        approvedBy: "owner-test",
+        approvedAt: "2026-03-11T18:00:00.000Z",
+        decisionNote: "auto pursue",
+        payload: {
+          baseUrl: bountyServer.url,
+          campaignId: campaign.campaignId,
+          followUpDepth: 0,
+        },
+        status: "queued",
+        resolutionKind: null,
+        resolutionRef: null,
+        resolutionNote: null,
+        queuedAt: "2026-03-11T18:00:00.000Z",
+        createdAt: "2026-03-11T18:00:00.000Z",
+        updatedAt: "2026-03-11T18:00:00.000Z",
+        completedAt: null,
+        cancelledAt: null,
+      });
+      const fetchCampaignSpy = vi
+        .spyOn(bountyClientModule, "fetchRemoteCampaign")
+        .mockResolvedValue({
+          campaign,
+          progress: {
+            openBountyCount: 2,
+            totalBountyCount: 2,
+            allocatedWei: "1900",
+            remainingWei: "3100",
+          },
+          bounties: [bountyOne, bountyTwo],
+        });
+
+      const result = await executeOwnerOpportunityAction({
+        identity: ownerIdentity,
+        config: createTestConfig({
+          walletAddress: ownerIdentity.address,
+          ownerReports: {
+            ...DEFAULT_OWNER_REPORTS_CONFIG,
+            enabled: true,
+            actionExecution: {
+              ...DEFAULT_OWNER_REPORTS_CONFIG.actionExecution!,
+              enabled: true,
+              autoExecutePursue: true,
+              autoQueueFollowUps: true,
+              maxFollowUpDepth: 2,
+              maxFollowUpsPerRun: 1,
+            },
+          },
+        }),
+        db: ownerDb,
+        inference: new MockInferenceClient([noToolResponse("Rome")]),
+        actionId: "owner-action:campaign-root",
+      });
+      fetchCampaignSpy.mockRestore();
+
+      expect(result.execution.status).toBe("completed");
+      expect(result.execution.kind).toBe("remote_campaign_solve");
+      expect(result.action.status).toBe("completed");
+      const queued = ownerDb.listOwnerOpportunityActions(10, { status: "queued" });
+      expect(queued).toHaveLength(1);
+      expect(queued[0]?.payload.parentActionId).toBe("owner-action:campaign-root");
+      expect(queued[0]?.payload.followUpDepth).toBe(1);
+      expect(queued[0]?.payload.bountyId).toBe(bountyTwo.bountyId);
+      expect(result.execution.resultPayload?.followUp).toMatchObject({
+        queuedCount: 1,
+      });
+      expect(result.execution.resultPayload?.selectedBountyId).toBe(bountyOne.bountyId);
+    } finally {
+      hostDb.close();
+      ownerDb.close();
     }
   });
 

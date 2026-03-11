@@ -1528,7 +1528,7 @@ Acceptance criteria:
 
 ### Phase 32: Opportunity Strategy Execution Loops
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -1541,6 +1541,9 @@ Delivered surface:
 - richer owner action planning
 - bounded automatic execution loops for selected opportunity classes
 - stronger result journaling and recommendation carry-forward
+- execution-capable templates embedded into owner opportunity alerts and report inputs
+- bounded automatic follow-up queueing for remote campaign pursuit actions
+- follow-up visibility through status, health, doctor, and owner report surfaces
 
 Implementation tasks:
 

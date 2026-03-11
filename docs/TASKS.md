@@ -347,8 +347,8 @@ building OpenFox into a TOS-native agent platform.
   - Status: Complete
   - Goal: Make `tosdk` and OpenFox provider surfaces easier for third-party
     builders to consume without reading runtime internals.
-- [ ] Task 74: Add opportunity strategy execution loops
-  - Status: Planned
+- [x] Task 74: Add opportunity strategy execution loops
+  - Status: Complete
   - Goal: Turn owner opportunity reporting from passive reporting into bounded
     execution loops that can queue, execute, and journal follow-up work across
     multiple opportunity classes.
@@ -1018,7 +1018,7 @@ building OpenFox into a TOS-native agent platform.
 
 ## Task 74 Breakdown
 
-- [ ] Connect owner opportunity reports and alerts to additional execution-capable opportunity classes.
-- [ ] Add bounded automatic follow-up loops for approved opportunity actions beyond the first queued execution.
-- [ ] Keep strategy execution state auditable and visible through existing status, health, doctor, and owner-report surfaces.
-- [ ] Add targeted tests for recommendation carry-forward and bounded follow-up execution loops.
+- [x] Connect owner opportunity reports and alerts to additional execution-capable opportunity classes.
+- [x] Add bounded automatic follow-up loops for approved opportunity actions beyond the first queued execution.
+- [x] Keep strategy execution state auditable and visible through existing status, health, doctor, and owner-report surfaces.
+- [x] Add targeted tests for recommendation carry-forward and bounded follow-up execution loops.

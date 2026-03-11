@@ -76,6 +76,12 @@ describe("owner opportunity alerts", () => {
       expect(first.created).toBe(1);
       expect(first.skipped).toBe(0);
       expect(db.listOwnerOpportunityAlerts(10).length).toBe(1);
+      expect(first.items[0]?.payload.executionTemplate).toMatchObject({
+        executionCapable: true,
+        actionKind: "pursue",
+        executionKind: "remote_bounty_solve",
+        followUpEligible: false,
+      });
 
       const second = await generateOwnerOpportunityAlerts({
         config,
@@ -86,6 +92,76 @@ describe("owner opportunity alerts", () => {
       expect(second.created).toBe(0);
       expect(second.skipped).toBe(1);
       expect(db.listOwnerOpportunityAlerts(10).length).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("marks oracle provider opportunities as execution-capable delegated actions", async () => {
+    const db = createTestDb();
+    try {
+      upsertStrategyProfile(db, {
+        profileId: "default",
+        name: "default",
+        revenueTargetWei: "1000000000000000000",
+        maxSpendPerOpportunityWei: "100000000000000000",
+        minMarginBps: 100,
+        enabledOpportunityKinds: ["provider"],
+        enabledProviderClasses: ["oracle"],
+        allowedTrustTiers: ["org_trusted", "public_low_trust", "unknown"],
+        automationLevel: "bounded_auto",
+        reportCadence: "daily",
+        maxDeadlineHours: 168,
+      });
+      const config = createTestConfig({
+        ownerReports: {
+          ...DEFAULT_OWNER_REPORTS_CONFIG,
+          enabled: true,
+          alerts: {
+            ...DEFAULT_OWNER_REPORTS_CONFIG.alerts,
+            enabled: true,
+            minStrategyScore: 100,
+            minMarginBps: 100,
+          },
+        },
+      });
+      const items: OpportunityItem[] = [
+        {
+          kind: "provider",
+          providerClass: "oracle",
+          trustTier: "org_trusted",
+          title: "Will CPI print above 3% next month?",
+          description: "Ask one bounded oracle question and persist the result.",
+          capability: "oracle.resolve",
+          baseUrl: "https://oracle.example.com/resolve",
+          providerAgentId: "oracle-agent-1",
+          providerAddress:
+            "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          grossValueWei: "20000000000000000",
+          estimatedCostWei: "1000000000000000",
+          marginWei: "19000000000000000",
+          marginBps: 9500,
+          rawScore: 10,
+          strategyScore: 1600,
+          strategyMatched: true,
+          strategyReasons: [],
+        },
+      ];
+      const result = await generateOwnerOpportunityAlerts({
+        config,
+        db,
+        nowMs: Date.parse("2026-03-11T20:00:00.000Z"),
+        items,
+      });
+      expect(result.created).toBe(1);
+      expect(result.items[0]?.payload.executionTemplate).toMatchObject({
+        executionCapable: true,
+        ready: true,
+        actionKind: "delegate",
+        executionKind: "remote_oracle_request",
+      });
+      expect(result.items[0]?.payload.query).toBe(items[0].title);
+      expect(result.items[0]?.payload.context).toBe(items[0].description);
     } finally {
       db.close();
     }

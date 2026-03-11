@@ -9,6 +9,10 @@ import { buildProviderReputationSnapshot } from "./provider-reputation.js";
 import { buildStorageLeaseHealthSnapshot } from "./storage-health.js";
 import { buildOperatorControlSnapshot } from "./control.js";
 import { buildOperatorAutopilotSnapshot } from "./autopilot.js";
+import {
+  isFollowUpAction,
+  isFollowUpExecution,
+} from "../reports/opportunity-execution.js";
 
 export interface RuntimeStatusSnapshot {
   configured: true;
@@ -126,10 +130,16 @@ export function buildRuntimeStatusSnapshot(
   const queuedOwnerOpportunityActions = db.listOwnerOpportunityActions(100, {
     status: "queued",
   }).length;
+  const queuedFollowUpActions = db
+    .listOwnerOpportunityActions(100, { status: "queued" })
+    .filter((item) => isFollowUpAction(item)).length;
   const ownerOpportunityActionExecutions =
     db.listOwnerOpportunityActionExecutions(5);
   const runningOwnerOpportunityActionExecutions =
     db.listOwnerOpportunityActionExecutions(100, { status: "running" }).length;
+  const recentFollowUpActionExecutions = ownerOpportunityActionExecutions.filter((item) =>
+    isFollowUpExecution(item),
+  ).length;
   const storageLeases = db.listStorageLeases(5);
   const storageRenewals = db.listStorageRenewals(5);
   const activeStorageLeaseCount = db.listStorageLeases(100, { status: "active" }).length;
@@ -342,6 +352,12 @@ export function buildRuntimeStatusSnapshot(
             config.ownerReports.actionExecution?.autoExecutePursue === true,
           actionExecutionAutoDelegate:
             config.ownerReports.actionExecution?.autoExecuteDelegate === true,
+          actionExecutionAutoFollowUps:
+            config.ownerReports.actionExecution?.autoQueueFollowUps === true,
+          actionExecutionMaxFollowUpDepth:
+            config.ownerReports.actionExecution?.maxFollowUpDepth ?? 0,
+          actionExecutionMaxFollowUpsPerRun:
+            config.ownerReports.actionExecution?.maxFollowUpsPerRun ?? 0,
           actionExecutionCooldownSeconds:
             config.ownerReports.actionExecution?.executionCooldownSeconds ?? 0,
           recentAlerts: ownerOpportunityAlerts.map((item) => ({
@@ -360,9 +376,14 @@ export function buildRuntimeStatusSnapshot(
             title: item.title,
             resolutionKind: item.resolutionKind,
             resolutionRef: item.resolutionRef,
+            followUpDepth:
+              typeof item.payload.followUpDepth === "number"
+                ? item.payload.followUpDepth
+                : 0,
             queuedAt: item.queuedAt,
           })),
           queuedActions: queuedOwnerOpportunityActions,
+          queuedFollowUpActions,
           recentActionExecutions: ownerOpportunityActionExecutions.map(
             (item) => ({
               executionId: item.executionId,
@@ -370,10 +391,12 @@ export function buildRuntimeStatusSnapshot(
               kind: item.kind,
               status: item.status,
               executionRef: item.executionRef,
+              followUp: isFollowUpExecution(item),
               updatedAt: item.updatedAt,
             }),
           ),
           runningActionExecutions: runningOwnerOpportunityActionExecutions,
+          recentFollowUpActionExecutions,
         }
       : null,
     providerReputation: {
@@ -626,8 +649,12 @@ export function buildRuntimeStatusReport(snapshot: RuntimeStatusSnapshot): strin
         webEnabled: boolean;
         emailEnabled: boolean;
         queuedActions: number;
+        queuedFollowUpActions: number;
         actionExecutionAutoDelegate: boolean;
+        actionExecutionAutoFollowUps: boolean;
+        actionExecutionMaxFollowUpDepth: number;
         recentActionExecutions: unknown[];
+        recentFollowUpActionExecutions: number;
         runningActionExecutions: number;
       }
     | null;
@@ -656,7 +683,7 @@ Artifacts:  ${artifacts?.enabled ? `enabled (${artifacts.recentArtifacts.length}
 x402:       ${x402?.enabled ? `enabled (${x402.recentPayments.length} recent payment${x402.recentPayments.length === 1 ? "" : "s"}, ${x402.pendingCount} pending, ${x402.failedCount} failed)` : "disabled"}
 Signer:     ${signer?.enabled ? `enabled (${signer.recentQuotes.length} recent quote${signer.recentQuotes.length === 1 ? "" : "s"}, ${signer.recentExecutions.length} recent execution${signer.recentExecutions.length === 1 ? "" : "s"}, ${signer.pendingExecutions} pending)` : "disabled"}
 Paymaster:  ${paymaster?.enabled ? `enabled (${paymaster.recentQuotes.length} recent quote${paymaster.recentQuotes.length === 1 ? "" : "s"}, ${paymaster.recentAuthorizations.length} recent authorization${paymaster.recentAuthorizations.length === 1 ? "" : "s"}, ${paymaster.pendingAuthorizations} pending)` : "disabled"}
-Owner reports: ${ownerReports?.enabled ? `enabled (${ownerReports.recentReports.length} recent report${ownerReports.recentReports.length === 1 ? "" : "s"}, ${ownerReports.recentDeliveries.length} recent delivery${ownerReports.recentDeliveries.length === 1 ? "" : "s"}, ${ownerReports.pendingDeliveries} pending, actions=${ownerReports.queuedActions} queued, executions=${ownerReports.runningActionExecutions} running/${ownerReports.recentActionExecutions.length} recent${ownerReports.actionExecutionAutoDelegate ? ", delegate auto=on" : ""}, web=${ownerReports.webEnabled ? "on" : "off"}, email=${ownerReports.emailEnabled ? "on" : "off"})` : "disabled"}
+Owner reports: ${ownerReports?.enabled ? `enabled (${ownerReports.recentReports.length} recent report${ownerReports.recentReports.length === 1 ? "" : "s"}, ${ownerReports.recentDeliveries.length} recent delivery${ownerReports.recentDeliveries.length === 1 ? "" : "s"}, ${ownerReports.pendingDeliveries} pending, actions=${ownerReports.queuedActions} queued/${ownerReports.queuedFollowUpActions} follow-up, executions=${ownerReports.runningActionExecutions} running/${ownerReports.recentActionExecutions.length} recent/${ownerReports.recentFollowUpActionExecutions} follow-up${ownerReports.actionExecutionAutoDelegate ? ", delegate auto=on" : ""}${ownerReports.actionExecutionAutoFollowUps ? `, follow-ups auto=on depth<=${ownerReports.actionExecutionMaxFollowUpDepth}` : ""}, web=${ownerReports.webEnabled ? "on" : "off"}, email=${ownerReports.emailEnabled ? "on" : "off"})` : "disabled"}
 Providers:  ${providerReputation ? `${providerReputation.totalProviders} tracked (${providerReputation.weakProviders} weak)` : "none"}
 Settlement: ${settlement?.enabled ? `enabled (${settlement.receiptCount} recent receipt${settlement.receiptCount === 1 ? "" : "s"}, ${settlement.callbacks.pendingCount} pending callback${settlement.callbacks.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Market:     ${market?.enabled ? `enabled (${market.recentBindings.length} recent binding${market.recentBindings.length === 1 ? "" : "s"}, ${market.pendingCount} pending callback${market.pendingCount === 1 ? "" : "s"})` : "disabled"}

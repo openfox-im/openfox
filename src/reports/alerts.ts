@@ -6,6 +6,7 @@ import {
   rankOpportunityItems,
   type OpportunityItem,
 } from "../opportunity/scout.js";
+import { buildOpportunityExecutionTemplate } from "./opportunity-execution.js";
 import { getCurrentStrategyProfile } from "../opportunity/strategy.js";
 import type {
   OpenFoxConfig,
@@ -195,6 +196,7 @@ export async function generateOwnerOpportunityAlerts(params: {
       continue;
     }
     const nowIso = new Date(nowMs).toISOString();
+    const executionTemplate = buildOpportunityExecutionTemplate(item);
     const record: OwnerOpportunityAlertRecord = {
       alertId: `owner-alert:${ulid()}`,
       opportunityHash,
@@ -215,6 +217,13 @@ export async function generateOwnerOpportunityAlerts(params: {
       strategyReasons: item.strategyReasons ?? [],
       payload: {
         ...item,
+        executionTemplate,
+        ...(executionTemplate.executionKind === "remote_oracle_request"
+          ? {
+              query: item.title,
+              context: item.description,
+            }
+          : {}),
       },
       status: "unread",
       actionKind: null,

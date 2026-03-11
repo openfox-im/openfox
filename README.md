@@ -191,6 +191,9 @@ It supports:
   `openfox report action-executions` for bounded remote execution of queued
   owner pursue and delegate actions against bounty, campaign, observation,
   oracle, and provider hosts
+- execution-capable opportunity templates and bounded follow-up loops for owner
+  campaign/oracle work, visible through owner reports, status, health, and
+  doctor surfaces
 - a built-in owner report web surface for mobile-friendly review of the latest
   daily and weekly reports, owner opportunity alerts, queued owner actions,
   execution history, and persisted web/email delivery logs

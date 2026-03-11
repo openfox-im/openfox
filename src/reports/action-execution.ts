@@ -24,6 +24,7 @@ import type {
   OracleResolutionQueryKind,
 } from "../agent-discovery/types.js";
 import { x402Fetch } from "../runtime/x402.js";
+import { getActionFollowUpDepth } from "./opportunity-execution.js";
 
 type SupportedActionExecutionPlan =
   | {
@@ -318,6 +319,135 @@ function pickCampaignBounty(
   })[0] ?? null;
 }
 
+function pickNextCampaignBounty(
+  bounties: BountyRecord[],
+  excludedBountyIds: string[],
+): BountyRecord | null {
+  const excluded = new Set(excludedBountyIds);
+  const open = bounties.filter(
+    (bounty) => bounty.status === "open" && !excluded.has(bounty.bountyId),
+  );
+  if (!open.length) return null;
+  return pickCampaignBounty(open);
+}
+
+function countQueuedFollowUpsForParent(params: {
+  db: OpenFoxDatabase;
+  parentActionId: string;
+}): number {
+  return params.db
+    .listOwnerOpportunityActions(200, { status: "queued" })
+    .filter((item) => {
+      const payload = asRecord(item.payload);
+      return payload.parentActionId === params.parentActionId;
+    }).length;
+}
+
+function queueCampaignFollowUpAction(params: {
+  db: OpenFoxDatabase;
+  action: OwnerOpportunityActionRecord;
+  execution: OwnerOpportunityActionExecutionRecord;
+  nextBounty: BountyRecord;
+}): OwnerOpportunityActionRecord {
+  const nowIso = new Date().toISOString();
+  const payload = asRecord(params.action.payload);
+  const nextDepth = getActionFollowUpDepth(params.action) + 1;
+  const followUpAction: OwnerOpportunityActionRecord = {
+    actionId: `owner-action:${ulid()}`,
+    alertId: `owner-followup-alert:${ulid()}`,
+    requestId: `owner-followup-request:${ulid()}`,
+    kind: "pursue",
+    title: `Follow up: ${params.nextBounty.title.slice(0, 96)}`,
+    summary: `Auto-queued follow-up bounty from campaign ${params.execution.targetRef}.`,
+    capability: params.action.capability,
+    baseUrl: params.action.baseUrl,
+    requestedBy: params.action.requestedBy,
+    approvedBy: params.action.approvedBy ?? "openfox-follow-up",
+    approvedAt: nowIso,
+    decisionNote: `Auto-queued follow-up after ${params.execution.kind}`,
+    payload: {
+      ...payload,
+      bountyId: params.nextBounty.bountyId,
+      followUpDepth: nextDepth,
+      parentActionId: params.action.actionId,
+      parentExecutionId: params.execution.executionId,
+      parentCampaignId: params.execution.targetRef,
+      inheritedFromActionId: params.action.actionId,
+      inheritedFromExecutionId: params.execution.executionId,
+    },
+    status: "queued",
+    resolutionKind: null,
+    resolutionRef: null,
+    resolutionNote: null,
+    queuedAt: nowIso,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    completedAt: null,
+    cancelledAt: null,
+  };
+  params.db.upsertOwnerOpportunityAction(followUpAction);
+  return params.db.getOwnerOpportunityAction(followUpAction.actionId) ?? followUpAction;
+}
+
+async function maybeQueueFollowUp(params: {
+  config: OpenFoxConfig;
+  db: OpenFoxDatabase;
+  action: OwnerOpportunityActionRecord;
+  execution: OwnerOpportunityActionExecutionRecord;
+}): Promise<{
+  queued: OwnerOpportunityActionRecord[];
+  reason?: string;
+}> {
+  const executionConfig = params.config.ownerReports?.actionExecution;
+  if (!executionConfig?.enabled || executionConfig.autoQueueFollowUps !== true) {
+    return { queued: [], reason: "follow-up queueing disabled" };
+  }
+  if (params.execution.kind !== "remote_campaign_solve") {
+    return { queued: [], reason: "follow-up queueing is only enabled for campaign solves" };
+  }
+  const currentDepth = getActionFollowUpDepth(params.action);
+  if (currentDepth >= executionConfig.maxFollowUpDepth) {
+    return { queued: [], reason: "follow-up depth limit reached" };
+  }
+  const alreadyQueued = countQueuedFollowUpsForParent({
+    db: params.db,
+    parentActionId: params.action.actionId,
+  });
+  if (alreadyQueued >= executionConfig.maxFollowUpsPerRun) {
+    return { queued: [], reason: "follow-up run limit reached" };
+  }
+  const resultPayload = asRecord(params.execution.resultPayload);
+  const selectedBountyId = firstString(
+    resultPayload.selectedBountyId,
+    asRecord(params.execution.requestPayload).selectedBountyId,
+  );
+  const campaign = await fetchRemoteCampaign(
+    params.execution.remoteBaseUrl,
+    params.execution.targetRef,
+  );
+  const nextBounty = pickNextCampaignBounty(
+    campaign.bounties,
+    selectedBountyId ? [selectedBountyId] : [],
+  );
+  if (!nextBounty) {
+    return { queued: [], reason: "campaign has no additional open bounty" };
+  }
+  const queued: OwnerOpportunityActionRecord[] = [];
+  const remaining = executionConfig.maxFollowUpsPerRun - alreadyQueued;
+  if (remaining <= 0) {
+    return { queued, reason: "follow-up run limit reached" };
+  }
+  queued.push(
+    queueCampaignFollowUpAction({
+      db: params.db,
+      action: params.action,
+      execution: params.execution,
+      nextBounty,
+    }),
+  );
+  return { queued };
+}
+
 async function executePlan(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
@@ -540,14 +670,35 @@ export async function executeOwnerOpportunityAction(params: {
       failedAt: null,
       errorMessage: null,
     };
-    params.db.upsertOwnerOpportunityActionExecution(completed);
+    const followUp = await maybeQueueFollowUp({
+      config: params.config,
+      db: params.db,
+      action,
+      execution: completed,
+    });
+    const completedWithFollowUp = {
+      ...completed,
+      resultPayload: {
+        ...(completed.resultPayload ?? {}),
+        followUpDepth: getActionFollowUpDepth(action),
+        followUp: {
+          queuedActionIds: followUp.queued.map((item) => item.actionId),
+          queuedCount: followUp.queued.length,
+          reason: followUp.reason ?? null,
+        },
+      },
+    };
+    params.db.upsertOwnerOpportunityActionExecution(completedWithFollowUp);
     const updatedAction =
       params.db.updateOwnerOpportunityActionStatus(action.actionId, "completed", completedAt, {
         kind: executed.resolutionKind,
         ref: executed.resolutionRef,
-        note: `Executed automatically via ${plan.kind}`,
+        note:
+          followUp.queued.length > 0
+            ? `Executed automatically via ${plan.kind}; queued ${followUp.queued.length} follow-up action${followUp.queued.length === 1 ? "" : "s"}`
+            : `Executed automatically via ${plan.kind}`,
       }) ?? action;
-    return { action: updatedAction, execution: completed };
+    return { action: updatedAction, execution: completedWithFollowUp };
   } catch (error) {
     const failedAt = new Date().toISOString();
     const failed = {

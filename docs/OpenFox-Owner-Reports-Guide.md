@@ -335,6 +335,21 @@ When enabled, OpenFox runs the built-in heartbeat task:
 This keeps the owner alert queue updated while OpenFox runs as a managed
 service.
 
+Owner alerts and report inputs now also carry execution-capable templates for
+bounded opportunity classes:
+
+- `bounty` opportunities can map directly to `pursue -> remote_bounty_solve`
+- `campaign` opportunities can map directly to `pursue -> remote_campaign_solve`
+- `oracle` provider opportunities can map directly to
+  `delegate -> remote_oracle_request`
+- `observation` provider opportunities are marked as execution-capable but
+  require an explicit `targetUrl` before auto-execution
+
+When `ownerReports.actionExecution.autoQueueFollowUps = true`, successful
+remote campaign execution can automatically queue one bounded follow-up action
+for another open campaign bounty. Follow-up depth is capped by
+`maxFollowUpDepth`, and each run is capped by `maxFollowUpsPerRun`.
+
 ## 8. Email Delivery
 
 Email delivery supports two modes:

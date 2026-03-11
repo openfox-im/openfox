@@ -741,6 +741,7 @@ export interface OwnerReportInput {
   periodKind: OwnerReportPeriodKind;
   finance: OwnerFinanceSnapshotData;
   strategy: OpportunityStrategyProfile | null;
+  strategyExecution: OwnerStrategyExecutionSummary;
   opportunities: Array<Record<string, unknown>>;
 }
 
@@ -848,6 +849,21 @@ export type OwnerOpportunityActionResolutionKind =
   | "report"
   | "other";
 
+export interface OwnerOpportunityExecutionTemplate {
+  executionCapable: boolean;
+  ready: boolean;
+  actionKind: OwnerOpportunityActionKind;
+  executionKind?: OwnerOpportunityActionExecutionKind;
+  targetKind?: "bounty" | "campaign" | "provider";
+  targetRef?: string | null;
+  capability?: string | null;
+  remoteBaseUrl?: string | null;
+  reason?: string | null;
+  followUpEligible: boolean;
+  requiresOperatorInput: boolean;
+  inputHint?: string | null;
+}
+
 export interface OwnerOpportunityActionRecord {
   actionId: string;
   alertId: string;
@@ -891,6 +907,21 @@ export interface OwnerOpportunityActionExecutionRecord {
   failedAt?: string | null;
 }
 
+export interface OwnerStrategyExecutionSummary {
+  autoExecutePursue: boolean;
+  autoExecuteDelegate: boolean;
+  autoQueueFollowUps: boolean;
+  maxFollowUpDepth: number;
+  maxFollowUpsPerRun: number;
+  queuedActions: number;
+  runningExecutions: number;
+  recentActions: Array<Record<string, unknown>>;
+  recentExecutions: Array<Record<string, unknown>>;
+  recentFollowUpActions: number;
+  queuedFollowUpActions: number;
+  recentFollowUpExecutions: number;
+}
+
 export interface OwnerReportWebConfig {
   enabled: boolean;
   bindHost: string;
@@ -931,6 +962,9 @@ export interface OwnerOpportunityActionExecutionConfig {
   enabled: boolean;
   autoExecutePursue: boolean;
   autoExecuteDelegate: boolean;
+  autoQueueFollowUps: boolean;
+  maxFollowUpDepth: number;
+  maxFollowUpsPerRun: number;
   maxExecutionsPerRun: number;
   executionCooldownSeconds: number;
 }
@@ -1840,6 +1874,9 @@ export const DEFAULT_OWNER_REPORTS_CONFIG: OwnerReportsConfig = {
     enabled: false,
     autoExecutePursue: true,
     autoExecuteDelegate: false,
+    autoQueueFollowUps: false,
+    maxFollowUpDepth: 2,
+    maxFollowUpsPerRun: 1,
     maxExecutionsPerRun: 2,
     executionCooldownSeconds: 300,
   },
