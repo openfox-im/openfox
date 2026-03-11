@@ -70,6 +70,15 @@ export interface HealthSnapshot {
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
   bountyRemoteConfigured: boolean;
+  ownerReportsEnabled: boolean;
+  ownerReportsInferenceEnabled: boolean;
+  ownerReportsWebEnabled: boolean;
+  ownerReportsEmailEnabled: boolean;
+  ownerReportsRecentReports: number;
+  ownerReportsRecentDeliveries: number;
+  ownerReportsPendingDeliveries: number;
+  ownerReportsWebReady: boolean;
+  ownerReportsEmailReady: boolean;
   storageEnabled: boolean;
   storageReady: boolean;
   storageAnonymousGet: boolean;
@@ -184,6 +193,15 @@ async function buildConfigSnapshot(
   bountyRole?: "host" | "solver";
   bountyAutoEnabled: boolean;
   bountyRemoteConfigured: boolean;
+  ownerReportsEnabled: boolean;
+  ownerReportsInferenceEnabled: boolean;
+  ownerReportsWebEnabled: boolean;
+  ownerReportsEmailEnabled: boolean;
+  ownerReportsRecentReports: number;
+  ownerReportsRecentDeliveries: number;
+  ownerReportsPendingDeliveries: number;
+  ownerReportsWebReady: boolean;
+  ownerReportsEmailReady: boolean;
   storageEnabled: boolean;
   storageReady: boolean;
   storageAnonymousGet: boolean;
@@ -363,6 +381,41 @@ async function buildConfigSnapshot(
           config.bounty.autoSolveEnabled),
     ),
     bountyRemoteConfigured: Boolean(config.bounty?.remoteBaseUrl),
+    ownerReportsEnabled: config.ownerReports?.enabled === true,
+    ownerReportsInferenceEnabled:
+      config.ownerReports?.enabled === true &&
+      config.ownerReports.generateWithInference === true,
+    ownerReportsWebEnabled:
+      config.ownerReports?.enabled === true &&
+      config.ownerReports.web.enabled === true,
+    ownerReportsEmailEnabled:
+      config.ownerReports?.enabled === true &&
+      config.ownerReports.email.enabled === true,
+    ownerReportsRecentReports: config.ownerReports?.enabled
+      ? db.listOwnerReports(20).length
+      : 0,
+    ownerReportsRecentDeliveries: config.ownerReports?.enabled
+      ? db.listOwnerReportDeliveries(20).length
+      : 0,
+    ownerReportsPendingDeliveries: config.ownerReports?.enabled
+      ? db.listOwnerReportDeliveries(100, { status: "pending" }).length
+      : 0,
+    ownerReportsWebReady: Boolean(
+      !config.ownerReports?.enabled ||
+        !config.ownerReports.web.enabled ||
+        (config.ownerReports.web.pathPrefix &&
+          config.ownerReports.web.outputDir &&
+          config.ownerReports.web.bindHost &&
+          config.ownerReports.web.port > 0),
+    ),
+    ownerReportsEmailReady: Boolean(
+      !config.ownerReports?.enabled ||
+        !config.ownerReports.email.enabled ||
+        (config.ownerReports.email.to &&
+          config.ownerReports.email.outboxDir &&
+          (config.ownerReports.email.mode !== "sendmail" ||
+            config.ownerReports.email.sendmailPath)),
+    ),
     storageEnabled: config.storage?.enabled === true,
     storageReady: Boolean(
       !config.storage?.enabled || !config.storage.anchor.enabled || config.rpcUrl,
@@ -806,6 +859,36 @@ function collectFindings(
     }
   }
 
+  if (snapshot.ownerReportsEnabled) {
+    findings.push({
+      id: "owner-reports-enabled",
+      severity:
+        !snapshot.ownerReportsWebReady ||
+        !snapshot.ownerReportsEmailReady ||
+        (snapshot.ownerReportsInferenceEnabled && !snapshot.inferenceConfigured)
+          ? "error"
+          : "ok",
+      summary:
+        !snapshot.ownerReportsWebReady
+          ? "Owner reports are enabled but the web surface is misconfigured."
+          : !snapshot.ownerReportsEmailReady
+            ? "Owner reports are enabled but the email surface is misconfigured."
+            : snapshot.ownerReportsInferenceEnabled && !snapshot.inferenceConfigured
+              ? "Owner reports are configured to use inference, but no inference provider is available."
+              : `Owner reports are enabled (${snapshot.ownerReportsRecentReports} recent report${snapshot.ownerReportsRecentReports === 1 ? "" : "s"}, ${snapshot.ownerReportsRecentDeliveries} recent ${snapshot.ownerReportsRecentDeliveries === 1 ? "delivery" : "deliveries"}).`,
+      recommendation:
+        !snapshot.ownerReportsWebReady
+          ? "Set `ownerReports.web.bindHost`, `ownerReports.web.port`, `ownerReports.web.pathPrefix`, and `ownerReports.web.outputDir`."
+          : !snapshot.ownerReportsEmailReady
+            ? "Set `ownerReports.email.to`, `ownerReports.email.outboxDir`, and `ownerReports.email.sendmailPath` when using sendmail mode."
+            : snapshot.ownerReportsInferenceEnabled && !snapshot.inferenceConfigured
+              ? "Configure OpenAI, Anthropic, Ollama, or another supported inference backend."
+              : snapshot.ownerReportsPendingDeliveries > 0
+                ? "Run `openfox report deliveries --status pending --json` to inspect pending owner report deliveries."
+                : undefined,
+    });
+  }
+
   if (snapshot.storageEnabled) {
     findings.push({
       id: "storage-enabled",
@@ -1038,6 +1121,15 @@ export async function buildHealthSnapshot(
       bountyRole: undefined,
       bountyAutoEnabled: false,
       bountyRemoteConfigured: false,
+      ownerReportsEnabled: false,
+      ownerReportsInferenceEnabled: false,
+      ownerReportsWebEnabled: false,
+      ownerReportsEmailEnabled: false,
+      ownerReportsRecentReports: 0,
+      ownerReportsRecentDeliveries: 0,
+      ownerReportsPendingDeliveries: 0,
+      ownerReportsWebReady: false,
+      ownerReportsEmailReady: false,
       storageEnabled: false,
       storageReady: false,
       storageAnonymousGet: false,
@@ -1136,6 +1228,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `Gateway enabled: ${yesNo(snapshot.gatewayEnabled)}`,
     `Bounty enabled: ${yesNo(snapshot.bountyEnabled)}${snapshot.bountyRole ? ` (${snapshot.bountyRole})` : ""}`,
     `Bounty auto mode: ${yesNo(snapshot.bountyAutoEnabled)}`,
+    `Owner reports enabled: ${yesNo(snapshot.ownerReportsEnabled)}${snapshot.ownerReportsEnabled ? ` (${snapshot.ownerReportsRecentReports} recent, ${snapshot.ownerReportsRecentDeliveries} deliveries, ${snapshot.ownerReportsPendingDeliveries} pending, web=${snapshot.ownerReportsWebEnabled ? "on" : "off"}, email=${snapshot.ownerReportsEmailEnabled ? "on" : "off"})` : ""}`,
     `Storage enabled: ${yesNo(snapshot.storageEnabled)}${snapshot.storageEnabled ? ` (${snapshot.storageActiveLeases} active, ${snapshot.storageRecentRenewals} renewals, ${snapshot.storageRecentAudits} audits, ${snapshot.storageRecentAnchors} anchors, ${snapshot.storageUnderReplicatedBundles} under-replicated)` : ""}`,
     `Artifacts enabled: ${yesNo(snapshot.artifactsEnabled)}${snapshot.artifactsEnabled ? ` (${snapshot.artifactsRecentCount} recent, ${snapshot.artifactsVerifiedCount} verified, ${snapshot.artifactsAnchoredCount} anchored)` : ""}`,
     `x402 server: ${yesNo(snapshot.x402ServerEnabled)}${snapshot.x402ServerEnabled ? ` (${snapshot.x402RecentPayments} recent, ${snapshot.x402PendingPayments} pending, ${snapshot.x402FailedPayments} failed)` : ""}`,

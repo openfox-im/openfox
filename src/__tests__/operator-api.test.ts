@@ -4,6 +4,9 @@ import { startOperatorApiServer } from "../operator/api.js";
 import { isHeartbeatPaused, isOperatorDrained } from "../state/database.js";
 import {
   DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
+  type OwnerFinanceSnapshotRecord,
+  type OwnerReportDeliveryRecord,
+  type OwnerReportRecord,
   type PaymasterAuthorizationRecord,
 } from "../types.js";
 
@@ -77,6 +80,116 @@ describe("operator api", () => {
         },
       },
     });
+  }
+
+  function createOwnerFinanceSnapshotRecord(
+    snapshotId: string,
+  ): OwnerFinanceSnapshotRecord {
+    const now = new Date().toISOString();
+    return {
+      snapshotId,
+      periodKind: "daily",
+      periodStart: now,
+      periodEnd: now,
+      createdAt: now,
+      updatedAt: now,
+      payload: {
+        snapshotId,
+        periodKind: "daily",
+        periodStart: now,
+        periodEnd: now,
+        generatedAt: now,
+        address:
+          "0x1111111111111111111111111111111111111111111111111111111111111111",
+        realizedRevenueWei: "1200",
+        realizedCostWei: "300",
+        realizedNetWei: "900",
+        pendingReceivablesWei: "500",
+        pendingPayablesWei: "100",
+        pendingNetWei: "400",
+        revenueEvents: 2,
+        costEvents: 1,
+        inferenceCostCents: 12,
+        spendCostCents: 34,
+        operatingCostCents: 56,
+        retryableFailedItems: 0,
+        pendingOnchainTransactions: 1,
+        failedOnchainTransactions: 0,
+        majorCategories: {
+          x402RevenueWei: "1200",
+          bountySolverRewardsWei: "0",
+          x402CostWei: "300",
+          bountyHostPayoutsWei: "0",
+        },
+        topGains: [],
+        topLosses: [],
+        anomalies: ["pending settlement"],
+        summary: "Daily owner finance snapshot",
+      },
+    };
+  }
+
+  function createOwnerReportRecord(
+    reportId: string,
+    financeSnapshotId: string,
+  ): OwnerReportRecord {
+    const now = new Date().toISOString();
+    return {
+      reportId,
+      periodKind: "daily",
+      financeSnapshotId,
+      provider: "mock-provider",
+      model: "mock-model",
+      inputHash: toHexId(reportId),
+      generationStatus: "generated",
+      createdAt: now,
+      updatedAt: now,
+      payload: {
+        reportId,
+        periodKind: "daily",
+        financeSnapshotId,
+        generatedAt: now,
+        generationStatus: "generated",
+        inputHash: toHexId(reportId),
+        provider: "mock-provider",
+        model: "mock-model",
+        input: {
+          generatedAt: now,
+          periodKind: "daily",
+          finance: createOwnerFinanceSnapshotRecord(financeSnapshotId).payload,
+          strategy: null,
+          opportunities: [],
+        },
+        narrative: {
+          overview: "Overview",
+          gains: "Gains",
+          losses: "Losses",
+          opportunityDigest: "Digest",
+          anomalies: "Anomalies",
+          recommendations: ["Do more of what works."],
+        },
+      },
+    };
+  }
+
+  function createOwnerReportDeliveryRecord(
+    deliveryId: string,
+    reportId: string,
+  ): OwnerReportDeliveryRecord {
+    const now = new Date().toISOString();
+    return {
+      deliveryId,
+      reportId,
+      channel: "web",
+      status: "delivered",
+      target: "/owner/reports/latest/daily",
+      renderedPath: "/tmp/owner.html",
+      metadata: { format: "html" },
+      lastError: null,
+      deliveredAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 
   function createFailedPaymasterAuthorization(
@@ -529,6 +642,99 @@ describe("operator api", () => {
       summary: expect.any(String),
       entries: expect.any(Array),
     });
+
+    db.close();
+  });
+
+  it("serves owner report and delivery operator endpoints", async () => {
+    const db = createTestDb();
+    const config = createTestConfig({
+      operatorApi: {
+        enabled: true,
+        bindHost: "127.0.0.1",
+        port: 0,
+        pathPrefix: "/operator",
+        authToken: "secret-token",
+        exposeDoctor: true,
+        exposeServiceStatus: true,
+      },
+      ownerReports: {
+        enabled: true,
+        generateWithInference: true,
+        persistSnapshots: true,
+        autoDeliverChannels: ["web"],
+        web: {
+          enabled: true,
+          bindHost: "127.0.0.1",
+          port: 4894,
+          pathPrefix: "/owner",
+          authToken: "owner-secret",
+          outputDir: "~/.openfox/reports/web",
+        },
+        email: {
+          enabled: false,
+          mode: "outbox",
+          from: "openfox@localhost",
+          to: "owner@localhost",
+          outboxDir: "~/.openfox/reports/outbox",
+          sendmailPath: "/usr/sbin/sendmail",
+        },
+        schedule: {
+          enabled: true,
+          morningHourUtc: 8,
+          endOfDayHourUtc: 22,
+          weeklyDayUtc: 1,
+          weeklyHourUtc: 9,
+          anomalyDeliveryEnabled: true,
+        },
+      },
+    });
+    const snapshot = createOwnerFinanceSnapshotRecord("snapshot-1");
+    const report = createOwnerReportRecord("report-1", snapshot.snapshotId);
+    const delivery = createOwnerReportDeliveryRecord("delivery-1", report.reportId);
+    db.upsertOwnerFinanceSnapshot(snapshot);
+    db.upsertOwnerReport(report);
+    db.upsertOwnerReportDelivery(delivery);
+
+    const server = await startOperatorApiServer({ config, db });
+    expect(server).not.toBeNull();
+    if (!server) {
+      db.close();
+      return;
+    }
+    servers.push(server);
+
+    const headers = { Authorization: "Bearer secret-token" };
+
+    const reportsResponse = await fetch(
+      `${server.url}/owner/reports?period=daily&limit=5`,
+      { headers },
+    );
+    expect(reportsResponse.status).toBe(200);
+    const reportsJson = (await reportsResponse.json()) as {
+      items: OwnerReportRecord[];
+    };
+    expect(reportsJson.items).toHaveLength(1);
+    expect(reportsJson.items[0]?.reportId).toBe(report.reportId);
+
+    const latestResponse = await fetch(
+      `${server.url}/owner/reports/latest?period=daily`,
+      { headers },
+    );
+    expect(latestResponse.status).toBe(200);
+    const latestJson = (await latestResponse.json()) as OwnerReportRecord;
+    expect(latestJson.reportId).toBe(report.reportId);
+
+    const deliveriesResponse = await fetch(
+      `${server.url}/owner/report-deliveries?channel=web&status=delivered&limit=5`,
+      { headers },
+    );
+    expect(deliveriesResponse.status).toBe(200);
+    const deliveriesJson = (await deliveriesResponse.json()) as {
+      items: OwnerReportDeliveryRecord[];
+    };
+    expect(deliveriesJson.items).toHaveLength(1);
+    expect(deliveriesJson.items[0]?.deliveryId).toBe(delivery.deliveryId);
 
     db.close();
   });

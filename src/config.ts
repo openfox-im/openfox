@@ -18,6 +18,7 @@ import type {
   BountyConfig,
   ArtifactPipelineConfig,
   MarketContractConfig,
+  OwnerReportsConfig,
   OpportunityScoutConfig,
   OperatorApiConfig,
   OperatorAutopilotConfig,
@@ -46,6 +47,7 @@ import {
   DEFAULT_ARTIFACT_PIPELINE_CONFIG,
   DEFAULT_BOUNTY_POLICY,
   DEFAULT_MARKET_CONTRACT_CONFIG,
+  DEFAULT_OWNER_REPORTS_CONFIG,
   DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
   DEFAULT_OPERATOR_API_CONFIG,
   DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
@@ -533,6 +535,35 @@ export function loadConfig(): OpenFoxConfig | null {
     ...((raw?.opportunityScout as JsonRecord | undefined) ?? {}),
   };
 
+  const ownerReports: OwnerReportsConfig = {
+    ...DEFAULT_OWNER_REPORTS_CONFIG,
+    ...((raw?.ownerReports as JsonRecord | undefined) ?? {}),
+    autoDeliverChannels: Array.isArray(
+      (raw?.ownerReports as JsonRecord | undefined)?.autoDeliverChannels,
+    )
+      ? (((raw?.ownerReports as JsonRecord | undefined)
+          ?.autoDeliverChannels as unknown[]).filter(
+          (value): value is "web" | "email" =>
+            value === "web" || value === "email",
+        ))
+      : DEFAULT_OWNER_REPORTS_CONFIG.autoDeliverChannels,
+    web: {
+      ...DEFAULT_OWNER_REPORTS_CONFIG.web,
+      ...(((raw?.ownerReports as JsonRecord | undefined)?.web as JsonRecord | undefined) ??
+        {}),
+    },
+    email: {
+      ...DEFAULT_OWNER_REPORTS_CONFIG.email,
+      ...(((raw?.ownerReports as JsonRecord | undefined)?.email as JsonRecord | undefined) ??
+        {}),
+    },
+    schedule: {
+      ...DEFAULT_OWNER_REPORTS_CONFIG.schedule,
+      ...(((raw?.ownerReports as JsonRecord | undefined)?.schedule as JsonRecord | undefined) ??
+        {}),
+    },
+  };
+
   const operatorApi: OperatorApiConfig = {
     ...DEFAULT_OPERATOR_API_CONFIG,
     ...((raw?.operatorApi as JsonRecord | undefined) ?? {}),
@@ -867,6 +898,7 @@ export function loadConfig(): OpenFoxConfig | null {
     agentDiscovery,
     bounty,
     opportunityScout,
+    ownerReports,
     operatorApi,
     operatorAutopilot,
     settlement,

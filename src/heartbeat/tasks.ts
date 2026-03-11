@@ -23,11 +23,19 @@ import { getMetrics } from "../observability/metrics.js";
 import { AlertEngine, createDefaultAlertRules } from "../observability/alerts.js";
 import { propagateExecutionTrailsForSubject } from "../audit/execution-trails.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
+import { ModelRegistry } from "../inference/registry.js";
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import { createMarketContractDispatcher } from "../market/contracts.js";
 import { createX402PaymentManager } from "../tos/x402-server.js";
+import { createInferenceClient } from "../runtime/inference.js";
 import { metricsInsertSnapshot, metricsPruneOld } from "../state/database.js";
 import { getWallet } from "../identity/wallet.js";
+import {
+  deliverOwnerReportChannels,
+} from "../reports/delivery.js";
+import {
+  generateOwnerReport,
+} from "../reports/generation.js";
 import {
   auditLocalStorageLease,
   replicateTrackedLease,
@@ -45,6 +53,47 @@ let _alertEngine: AlertEngine | null = null;
 function getAlertEngine(): AlertEngine {
   if (!_alertEngine) _alertEngine = new AlertEngine(createDefaultAlertRules());
   return _alertEngine;
+}
+
+function utcDayKey(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+function utcWeekKey(now: Date): string {
+  const value = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const day = value.getUTCDay() || 7;
+  value.setUTCDate(value.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((value.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${value.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function hasInferenceConfigured(taskCtx: HeartbeatLegacyContext): boolean {
+  return Boolean(
+    taskCtx.config.openaiApiKey ||
+      taskCtx.config.anthropicApiKey ||
+      taskCtx.config.ollamaBaseUrl ||
+      taskCtx.config.runtimeApiKey,
+  );
+}
+
+function createOwnerReportInference(taskCtx: HeartbeatLegacyContext) {
+  if (!hasInferenceConfigured(taskCtx)) return undefined;
+  const modelRegistry = new ModelRegistry(taskCtx.db.raw);
+  modelRegistry.initialize();
+  return createInferenceClient({
+    apiUrl: taskCtx.config.runtimeApiUrl || "",
+    apiKey: taskCtx.config.runtimeApiKey,
+    defaultModel:
+      taskCtx.config.inferenceModelRef || taskCtx.config.inferenceModel,
+    maxTokens: taskCtx.config.maxTokensPerTurn,
+    lowComputeModel:
+      taskCtx.config.modelStrategy?.lowComputeModel || "gpt-5-mini",
+    openaiApiKey: taskCtx.config.openaiApiKey,
+    anthropicApiKey: taskCtx.config.anthropicApiKey,
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL || taskCtx.config.ollamaBaseUrl,
+    getModelProvider: (modelId) => modelRegistry.get(modelId)?.provider,
+  });
 }
 
 export const COLONY_TASK_INTERVALS_MS = {
@@ -483,6 +532,176 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       message:
         failed > 0
           ? `Storage replication has ${failed} failed item(s).`
+          : undefined,
+    };
+  },
+
+  generate_owner_reports: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const reportsConfig = taskCtx.config.ownerReports;
+    if (!reportsConfig?.enabled || !reportsConfig.schedule.enabled) {
+      return { shouldWake: false };
+    }
+
+    const now = new Date();
+    const hour = now.getUTCHours();
+    const dayKey = utcDayKey(now);
+    const weekKey = utcWeekKey(now);
+    const generated: string[] = [];
+    let failed = 0;
+    const inference = createOwnerReportInference(taskCtx);
+
+    if (
+      hour === reportsConfig.schedule.endOfDayHourUtc &&
+      taskCtx.db.getKV(`owner_reports:last_generated:daily:${dayKey}`) !== "1"
+    ) {
+      try {
+        const report = await generateOwnerReport({
+          config: taskCtx.config,
+          db: taskCtx.db,
+          inference,
+          periodKind: "daily",
+        });
+        taskCtx.db.setKV(`owner_reports:last_generated:daily:${dayKey}`, "1");
+        generated.push(report.reportId);
+      } catch (error) {
+        failed += 1;
+        logger.warn(
+          `Failed to generate daily owner report: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    if (
+      now.getUTCDay() === reportsConfig.schedule.weeklyDayUtc &&
+      hour === reportsConfig.schedule.weeklyHourUtc &&
+      taskCtx.db.getKV(`owner_reports:last_generated:weekly:${weekKey}`) !== "1"
+    ) {
+      try {
+        const report = await generateOwnerReport({
+          config: taskCtx.config,
+          db: taskCtx.db,
+          inference,
+          periodKind: "weekly",
+        });
+        taskCtx.db.setKV(`owner_reports:last_generated:weekly:${weekKey}`, "1");
+        generated.push(report.reportId);
+      } catch (error) {
+        failed += 1;
+        logger.warn(
+          `Failed to generate weekly owner report: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    taskCtx.db.setKV(
+      "last_owner_report_generation",
+      JSON.stringify({
+        generated,
+        failed,
+        at: now.toISOString(),
+      }),
+    );
+
+    return {
+      shouldWake: failed > 0,
+      message:
+        failed > 0
+          ? `Owner report generation has ${failed} failed item(s).`
+          : undefined,
+    };
+  },
+
+  deliver_owner_reports: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const reportsConfig = taskCtx.config.ownerReports;
+    if (!reportsConfig?.enabled || !reportsConfig.schedule.enabled) {
+      return { shouldWake: false };
+    }
+
+    const channels = reportsConfig.autoDeliverChannels.filter((channel) =>
+      channel === "web"
+        ? reportsConfig.web.enabled
+        : reportsConfig.email.enabled,
+    );
+    if (!channels.length) {
+      return { shouldWake: false };
+    }
+
+    const now = new Date();
+    const hour = now.getUTCHours();
+    const dayKey = utcDayKey(now);
+    const weekKey = utcWeekKey(now);
+    const delivered: string[] = [];
+    let failed = 0;
+
+    const deliver = async (recordKey: string, reportId: string) => {
+      const report = taskCtx.db.getOwnerReport(reportId);
+      if (!report || taskCtx.db.getKV(recordKey) === reportId) return;
+      try {
+        await deliverOwnerReportChannels({
+          config: taskCtx.config,
+          db: taskCtx.db,
+          report,
+          channels,
+        });
+        taskCtx.db.setKV(recordKey, reportId);
+        delivered.push(reportId);
+      } catch (error) {
+        failed += 1;
+        logger.warn(
+          `Failed to deliver owner report ${reportId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    };
+
+    if (hour === reportsConfig.schedule.endOfDayHourUtc) {
+      const latestDaily = taskCtx.db.getLatestOwnerReport("daily");
+      if (latestDaily) {
+        await deliver(`owner_reports:last_delivered:eod:${dayKey}`, latestDaily.reportId);
+      }
+    }
+
+    if (hour === reportsConfig.schedule.morningHourUtc) {
+      const latestDaily = taskCtx.db.getLatestOwnerReport("daily");
+      if (latestDaily) {
+        await deliver(`owner_reports:last_delivered:morning:${dayKey}`, latestDaily.reportId);
+      }
+    }
+
+    if (
+      now.getUTCDay() === reportsConfig.schedule.weeklyDayUtc &&
+      hour === reportsConfig.schedule.weeklyHourUtc
+    ) {
+      const latestWeekly = taskCtx.db.getLatestOwnerReport("weekly");
+      if (latestWeekly) {
+        await deliver(`owner_reports:last_delivered:weekly:${weekKey}`, latestWeekly.reportId);
+      }
+    }
+
+    if (reportsConfig.schedule.anomalyDeliveryEnabled) {
+      const latestDaily = taskCtx.db.getLatestOwnerReport("daily");
+      const hasAnomaly = Boolean(
+        latestDaily?.payload.input.finance.anomalies.length ||
+          latestDaily?.payload.narrative?.anomalies?.trim(),
+      );
+      if (latestDaily && hasAnomaly) {
+        await deliver(`owner_reports:last_delivered:anomaly`, latestDaily.reportId);
+      }
+    }
+
+    taskCtx.db.setKV(
+      "last_owner_report_delivery",
+      JSON.stringify({
+        delivered,
+        failed,
+        at: now.toISOString(),
+      }),
+    );
+
+    return {
+      shouldWake: failed > 0,
+      message:
+        failed > 0
+          ? `Owner report delivery has ${failed} failed item(s).`
           : undefined,
     };
   },

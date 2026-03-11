@@ -1092,7 +1092,7 @@ Acceptance criteria:
 
 ### Phase 20: Owner Finance Ledger and Daily Snapshots
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -1106,6 +1106,9 @@ Delivered surface:
 - weekly finance snapshot schema
 - `openfox report daily --json`
 - `openfox report weekly --json`
+- deterministic owner finance snapshots with realized and pending value splits
+- persisted owner finance snapshot records in local state
+- top gains, top losses, anomaly detection, and category attribution
 
 Implementation tasks:
 
@@ -1125,7 +1128,7 @@ Acceptance criteria:
 
 ### Phase 21: LLM-Generated Reports and Recommendations
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -1140,6 +1143,8 @@ Delivered surface:
 - opportunity digest summaries
 - anomaly and recommendation summaries
 - report-generation audit metadata
+- deterministic fallback report generation when no inference backend is configured
+- persisted report-generation audit records with provider, model, and input hash
 
 Implementation tasks:
 
@@ -1162,7 +1167,7 @@ Acceptance criteria:
 
 ### Phase 22: Owner Delivery Surfaces
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -1175,6 +1180,9 @@ Delivered surface:
 - owner report email digest
 - report delivery logs
 - `openfox report send --channel <email|web>`
+- `openfox report list|get|deliveries`
+- embedded owner report web server with latest daily and weekly views
+- scheduler-driven morning, end-of-day, weekly, and anomaly-triggered delivery hooks
 
 Implementation tasks:
 

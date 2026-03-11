@@ -435,6 +435,7 @@ export interface OpenFoxConfig {
   agentDiscovery?: AgentDiscoveryConfig;
   bounty?: BountyConfig;
   opportunityScout?: OpportunityScoutConfig;
+  ownerReports?: OwnerReportsConfig;
   settlement?: SettlementConfig;
   marketContracts?: MarketContractConfig;
   x402Server?: X402ServerConfig;
@@ -662,6 +663,169 @@ export interface OpportunityStrategyProfile {
   maxDeadlineHours: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export type OwnerReportPeriodKind = "daily" | "weekly";
+export type OwnerReportChannel = "web" | "email";
+export type OwnerReportGenerationStatus = "generated" | "deterministic_only";
+export type OwnerReportDeliveryStatus =
+  | "pending"
+  | "delivered"
+  | "failed";
+export type OwnerFinanceAttributionKind =
+  | "x402_revenue"
+  | "x402_cost"
+  | "bounty_reward"
+  | "bounty_payout"
+  | "operating_cost";
+
+export interface OwnerFinanceAttributionEntry {
+  attributionId: string;
+  kind: OwnerFinanceAttributionKind;
+  title: string;
+  amountWei: string;
+  amountCents?: number;
+  sourceId?: string | null;
+  sourceKind?: string | null;
+  counterparty?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface OwnerFinanceSnapshotData {
+  snapshotId: string;
+  periodKind: OwnerReportPeriodKind;
+  periodStart: string;
+  periodEnd: string;
+  generatedAt: string;
+  address: Address;
+  realizedRevenueWei: string;
+  realizedCostWei: string;
+  realizedNetWei: string;
+  pendingReceivablesWei: string;
+  pendingPayablesWei: string;
+  pendingNetWei: string;
+  revenueEvents: number;
+  costEvents: number;
+  inferenceCostCents: number;
+  spendCostCents: number;
+  operatingCostCents: number;
+  retryableFailedItems: number;
+  pendingOnchainTransactions: number;
+  failedOnchainTransactions: number;
+  majorCategories: {
+    x402RevenueWei: string;
+    bountySolverRewardsWei: string;
+    x402CostWei: string;
+    bountyHostPayoutsWei: string;
+  };
+  topGains: OwnerFinanceAttributionEntry[];
+  topLosses: OwnerFinanceAttributionEntry[];
+  anomalies: string[];
+  summary: string;
+}
+
+export interface OwnerFinanceSnapshotRecord {
+  snapshotId: string;
+  periodKind: OwnerReportPeriodKind;
+  periodStart: string;
+  periodEnd: string;
+  payload: OwnerFinanceSnapshotData;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OwnerReportInput {
+  generatedAt: string;
+  periodKind: OwnerReportPeriodKind;
+  finance: OwnerFinanceSnapshotData;
+  strategy: OpportunityStrategyProfile | null;
+  opportunities: Array<Record<string, unknown>>;
+}
+
+export interface OwnerGeneratedNarrative {
+  overview: string;
+  gains: string;
+  losses: string;
+  opportunityDigest: string;
+  anomalies: string;
+  recommendations: string[];
+}
+
+export interface OwnerReportData {
+  reportId: string;
+  periodKind: OwnerReportPeriodKind;
+  financeSnapshotId: string;
+  generatedAt: string;
+  generationStatus: OwnerReportGenerationStatus;
+  inputHash: Hex;
+  provider: string | null;
+  model: string | null;
+  input: OwnerReportInput;
+  narrative: OwnerGeneratedNarrative | null;
+}
+
+export interface OwnerReportRecord {
+  reportId: string;
+  periodKind: OwnerReportPeriodKind;
+  financeSnapshotId: string;
+  provider?: string | null;
+  model?: string | null;
+  inputHash: Hex;
+  generationStatus: OwnerReportGenerationStatus;
+  payload: OwnerReportData;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OwnerReportDeliveryRecord {
+  deliveryId: string;
+  reportId: string;
+  channel: OwnerReportChannel;
+  status: OwnerReportDeliveryStatus;
+  target: string;
+  renderedPath?: string | null;
+  metadata?: Record<string, unknown> | null;
+  lastError?: string | null;
+  deliveredAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OwnerReportWebConfig {
+  enabled: boolean;
+  bindHost: string;
+  port: number;
+  pathPrefix: string;
+  authToken?: string;
+  outputDir: string;
+}
+
+export interface OwnerReportEmailConfig {
+  enabled: boolean;
+  mode: "outbox" | "sendmail";
+  from: string;
+  to: string;
+  outboxDir: string;
+  sendmailPath: string;
+}
+
+export interface OwnerReportScheduleConfig {
+  enabled: boolean;
+  morningHourUtc: number;
+  endOfDayHourUtc: number;
+  weeklyDayUtc: number;
+  weeklyHourUtc: number;
+  anomalyDeliveryEnabled: boolean;
+}
+
+export interface OwnerReportsConfig {
+  enabled: boolean;
+  generateWithInference: boolean;
+  persistSnapshots: boolean;
+  autoDeliverChannels: OwnerReportChannel[];
+  web: OwnerReportWebConfig;
+  email: OwnerReportEmailConfig;
+  schedule: OwnerReportScheduleConfig;
 }
 
 export interface OperatorApiConfig {
@@ -1515,6 +1679,37 @@ export const DEFAULT_OPPORTUNITY_SCOUT_CONFIG: OpportunityScoutConfig = {
   minRewardWei: "0",
 };
 
+export const DEFAULT_OWNER_REPORTS_CONFIG: OwnerReportsConfig = {
+  enabled: false,
+  generateWithInference: true,
+  persistSnapshots: true,
+  autoDeliverChannels: ["web"],
+  web: {
+    enabled: false,
+    bindHost: "127.0.0.1",
+    port: 4904,
+    pathPrefix: "/owner",
+    authToken: undefined,
+    outputDir: "~/.openfox/reports/web",
+  },
+  email: {
+    enabled: false,
+    mode: "outbox",
+    from: "openfox@localhost",
+    to: "owner@localhost",
+    outboxDir: "~/.openfox/reports/outbox",
+    sendmailPath: "/usr/sbin/sendmail",
+  },
+  schedule: {
+    enabled: false,
+    morningHourUtc: 8,
+    endOfDayHourUtc: 18,
+    weeklyDayUtc: 1,
+    weeklyHourUtc: 8,
+    anomalyDeliveryEnabled: true,
+  },
+};
+
 export const DEFAULT_OPERATOR_API_CONFIG: OperatorApiConfig = {
   enabled: false,
   bindHost: "127.0.0.1",
@@ -1745,6 +1940,7 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   agentDiscovery: DEFAULT_AGENT_DISCOVERY_CONFIG,
   bounty: DEFAULT_BOUNTY_CONFIG,
   opportunityScout: DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
+  ownerReports: DEFAULT_OWNER_REPORTS_CONFIG,
   operatorApi: DEFAULT_OPERATOR_API_CONFIG,
   operatorAutopilot: DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
   settlement: DEFAULT_SETTLEMENT_CONFIG,
@@ -2481,6 +2677,34 @@ export interface OpenFoxDatabase {
     },
   ): X402PaymentRecord[];
   listPendingX402Payments(limit: number, nowIso?: string): X402PaymentRecord[];
+
+  // Owner finance snapshots and reports
+  upsertOwnerFinanceSnapshot(record: OwnerFinanceSnapshotRecord): void;
+  getOwnerFinanceSnapshot(snapshotId: string): OwnerFinanceSnapshotRecord | undefined;
+  getLatestOwnerFinanceSnapshot(
+    periodKind: OwnerReportPeriodKind,
+  ): OwnerFinanceSnapshotRecord | undefined;
+  listOwnerFinanceSnapshots(
+    limit: number,
+    filters?: { periodKind?: OwnerReportPeriodKind },
+  ): OwnerFinanceSnapshotRecord[];
+  upsertOwnerReport(record: OwnerReportRecord): void;
+  getOwnerReport(reportId: string): OwnerReportRecord | undefined;
+  getLatestOwnerReport(periodKind: OwnerReportPeriodKind): OwnerReportRecord | undefined;
+  listOwnerReports(
+    limit: number,
+    filters?: { periodKind?: OwnerReportPeriodKind },
+  ): OwnerReportRecord[];
+  upsertOwnerReportDelivery(record: OwnerReportDeliveryRecord): void;
+  getOwnerReportDelivery(deliveryId: string): OwnerReportDeliveryRecord | undefined;
+  listOwnerReportDeliveries(
+    limit: number,
+    filters?: {
+      channel?: OwnerReportChannel;
+      status?: OwnerReportDeliveryStatus;
+      reportId?: string;
+    },
+  ): OwnerReportDeliveryRecord[];
 
   // Signer provider
   upsertSignerQuote(record: SignerQuoteRecord): void;

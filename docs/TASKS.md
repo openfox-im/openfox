@@ -296,6 +296,20 @@ building OpenFox into a TOS-native agent platform.
   - Status: Complete
   - Goal: Let owners persist a bounded earning strategy and rank discovered
     opportunities by value, cost, trust, deadline, and policy fit.
+- [x] Task 63: Add owner finance snapshots and ledger reporting
+  - Status: Complete
+  - Goal: Turn OpenFox activity into a deterministic owner-facing ledger with
+    daily and weekly finance snapshots, attribution, and anomaly summaries.
+- [x] Task 64: Add generated owner reports and recommendations
+  - Status: Complete
+  - Goal: Turn deterministic owner finance and opportunity inputs into readable
+    daily and weekly reports with audit metadata, while keeping machine totals
+    as the source of truth.
+- [x] Task 65: Add owner delivery surfaces for web and email
+  - Status: Complete
+  - Goal: Let operators review and deliver owner reports through CLI, a
+    phone-friendly web surface, scheduled delivery hooks, and persisted
+    delivery logs.
 
 ## Task 53 Breakdown
 
@@ -385,6 +399,35 @@ building OpenFox into a TOS-native agent platform.
   and policy fit.
 - [x] Add `openfox scout rank`.
 - [x] Add targeted tests for strategy persistence, validation, and ranking behavior.
+
+## Task 63 Breakdown
+
+- [x] Add owner finance snapshot types and persistence.
+- [x] Build deterministic daily and weekly owner finance projections.
+- [x] Separate realized and pending value in owner reports.
+- [x] Attribute gains and losses back to jobs, providers, and rewards.
+- [x] Add `openfox report daily --json` and `openfox report weekly --json`.
+- [x] Add targeted tests for finance snapshot generation and ledger correctness.
+
+## Task 64 Breakdown
+
+- [x] Define a structured owner report input object that combines finance,
+  strategy, and opportunity data.
+- [x] Add generated daily and weekly owner report records with audit metadata.
+- [x] Keep deterministic totals separate from generated narrative output.
+- [x] Add deterministic fallback generation when no inference backend is available.
+- [x] Add tests for generated report inputs, persistence, and recommendation output.
+
+## Task 65 Breakdown
+
+- [x] Add `openfox report list|get|deliveries|send`.
+- [x] Add a mobile-friendly owner report web server with latest daily and
+  weekly views.
+- [x] Add email and web delivery rendering plus persisted delivery logs.
+- [x] Add scheduler-driven generation and delivery hooks for morning,
+  end-of-day, weekly, and anomaly-triggered delivery.
+- [x] Add operator API surfaces for owner reports and deliveries.
+- [x] Add tests for web delivery, email delivery, operator API, and scheduled delivery.
 
 ## Task 1 Breakdown
 

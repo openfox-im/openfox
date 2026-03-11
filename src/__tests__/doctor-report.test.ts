@@ -49,6 +49,15 @@ describe("doctor report formatting", () => {
       bountyRole: "host" as const,
       bountyAutoEnabled: true,
       bountyRemoteConfigured: false,
+      ownerReportsEnabled: true,
+      ownerReportsInferenceEnabled: true,
+      ownerReportsWebEnabled: true,
+      ownerReportsEmailEnabled: false,
+      ownerReportsRecentReports: 2,
+      ownerReportsRecentDeliveries: 1,
+      ownerReportsPendingDeliveries: 1,
+      ownerReportsWebReady: true,
+      ownerReportsEmailReady: true,
       storageEnabled: true,
       storageReady: true,
       storageAnonymousGet: true,
@@ -142,6 +151,9 @@ describe("doctor report formatting", () => {
     );
     expect(health).toContain("Bounty enabled: yes (host)");
     expect(health).toContain(
+      "Owner reports enabled: yes (2 recent, 1 deliveries, 1 pending, web=on, email=off)",
+    );
+    expect(health).toContain(
       "Storage enabled: yes (1 active, 1 renewals, 1 audits, 1 anchors, 0 under-replicated)",
     );
     expect(health).toContain("x402 server: yes (2 recent, 1 pending, 0 failed)");
@@ -217,6 +229,54 @@ describe("doctor report formatting", () => {
         (finding) =>
           finding.id === "operator-api-misconfigured" &&
           finding.severity === "error",
+      ),
+    ).toBe(true);
+  });
+
+  it("flags owner reports when inference generation is enabled without an inference backend", async () => {
+    const snapshot = await buildHealthSnapshot(
+      createTestConfig({
+        runtimeApiKey: undefined,
+        inferenceModel: "",
+        openaiApiKey: undefined,
+        anthropicApiKey: undefined,
+        ollamaBaseUrl: undefined,
+        ownerReports: {
+          enabled: true,
+          generateWithInference: true,
+          persistSnapshots: true,
+          autoDeliverChannels: ["web"],
+          web: {
+            enabled: true,
+            bindHost: "127.0.0.1",
+            port: 4904,
+            pathPrefix: "/owner",
+            outputDir: "/tmp/openfox-owner-reports",
+          },
+          email: {
+            enabled: false,
+            mode: "outbox",
+            from: "openfox@localhost",
+            to: "owner@localhost",
+            outboxDir: "/tmp/openfox-owner-reports/outbox",
+            sendmailPath: "/usr/sbin/sendmail",
+          },
+          schedule: {
+            enabled: true,
+            morningHourUtc: 8,
+            endOfDayHourUtc: 18,
+            weeklyDayUtc: 1,
+            weeklyHourUtc: 8,
+            anomalyDeliveryEnabled: true,
+          },
+        },
+      }),
+    );
+
+    expect(
+      snapshot.findings.some(
+        (finding) =>
+          finding.id === "owner-reports-enabled" && finding.severity === "error",
       ),
     ).toBe(true);
   });

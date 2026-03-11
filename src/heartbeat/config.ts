@@ -101,6 +101,18 @@ const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
       task: "replicate_storage_leases",
       enabled: true,
     },
+    {
+      name: "generate_owner_reports",
+      schedule: "5 * * * *",
+      task: "generate_owner_reports",
+      enabled: true,
+    },
+    {
+      name: "deliver_owner_reports",
+      schedule: "10 * * * *",
+      task: "deliver_owner_reports",
+      enabled: true,
+    },
   ],
   defaultIntervalMs: 60_000,
   lowComputeMultiplier: 4,

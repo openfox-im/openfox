@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -397,6 +397,55 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_x402_payment_binding
     ON x402_payments(bound_kind, bound_subject_id);
+
+  CREATE TABLE IF NOT EXISTS owner_finance_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    period_kind TEXT NOT NULL CHECK(period_kind IN ('daily','weekly')),
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_owner_finance_snapshot_period
+    ON owner_finance_snapshots(period_kind, period_start);
+
+  CREATE TABLE IF NOT EXISTS owner_reports (
+    report_id TEXT PRIMARY KEY,
+    period_kind TEXT NOT NULL CHECK(period_kind IN ('daily','weekly')),
+    finance_snapshot_id TEXT NOT NULL,
+    provider TEXT,
+    model TEXT,
+    input_hash TEXT NOT NULL,
+    generation_status TEXT NOT NULL CHECK(generation_status IN ('generated','deterministic_only')),
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_owner_reports_period
+    ON owner_reports(period_kind, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS owner_report_deliveries (
+    delivery_id TEXT PRIMARY KEY,
+    report_id TEXT NOT NULL,
+    channel TEXT NOT NULL CHECK(channel IN ('web','email')),
+    status TEXT NOT NULL CHECK(status IN ('pending','delivered','failed')),
+    target TEXT NOT NULL,
+    rendered_path TEXT,
+    metadata_json TEXT,
+    last_error TEXT,
+    delivered_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_owner_report_deliveries_report
+    ON owner_report_deliveries(report_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_owner_report_deliveries_channel
+    ON owner_report_deliveries(channel, status, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS signer_quotes (
     quote_id TEXT PRIMARY KEY,
@@ -1568,6 +1617,57 @@ export const MIGRATION_V29 = `
 
   CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_kind
     ON operator_approval_requests(kind, created_at DESC);
+`;
+
+export const MIGRATION_V30 = `
+  CREATE TABLE IF NOT EXISTS owner_finance_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    period_kind TEXT NOT NULL CHECK(period_kind IN ('daily','weekly')),
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_owner_finance_snapshot_period
+    ON owner_finance_snapshots(period_kind, period_start);
+
+  CREATE TABLE IF NOT EXISTS owner_reports (
+    report_id TEXT PRIMARY KEY,
+    period_kind TEXT NOT NULL CHECK(period_kind IN ('daily','weekly')),
+    finance_snapshot_id TEXT NOT NULL,
+    provider TEXT,
+    model TEXT,
+    input_hash TEXT NOT NULL,
+    generation_status TEXT NOT NULL CHECK(generation_status IN ('generated','deterministic_only')),
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_owner_reports_period
+    ON owner_reports(period_kind, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS owner_report_deliveries (
+    delivery_id TEXT PRIMARY KEY,
+    report_id TEXT NOT NULL,
+    channel TEXT NOT NULL CHECK(channel IN ('web','email')),
+    status TEXT NOT NULL CHECK(status IN ('pending','delivered','failed')),
+    target TEXT NOT NULL,
+    rendered_path TEXT,
+    metadata_json TEXT,
+    last_error TEXT,
+    delivered_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_owner_report_deliveries_report
+    ON owner_report_deliveries(report_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_owner_report_deliveries_channel
+    ON owner_report_deliveries(channel, status, created_at DESC);
 `;
 
 export const MIGRATION_V3 = `

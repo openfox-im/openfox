@@ -50,6 +50,12 @@ import type {
   CampaignStatus,
   BountySubmissionRecord,
   BountySubmissionStatus,
+  OwnerFinanceSnapshotRecord,
+  OwnerReportChannel,
+  OwnerReportDeliveryRecord,
+  OwnerReportDeliveryStatus,
+  OwnerReportPeriodKind,
+  OwnerReportRecord,
   X402PaymentRecord,
   X402PaymentServiceKind,
   X402PaymentStatus,
@@ -111,6 +117,7 @@ import {
   MIGRATION_V27,
   MIGRATION_V28,
   MIGRATION_V29,
+  MIGRATION_V30,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -1344,6 +1351,214 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     return rows.map(deserializeX402PaymentRecord);
   };
 
+  const upsertOwnerFinanceSnapshot = (
+    record: OwnerFinanceSnapshotRecord,
+  ): void => {
+    db.prepare(
+      `INSERT INTO owner_finance_snapshots (
+        snapshot_id, period_kind, period_start, period_end, payload_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(snapshot_id) DO UPDATE SET
+        period_kind = excluded.period_kind,
+        period_start = excluded.period_start,
+        period_end = excluded.period_end,
+        payload_json = excluded.payload_json,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.snapshotId,
+      record.periodKind,
+      record.periodStart,
+      record.periodEnd,
+      JSON.stringify(record.payload),
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getOwnerFinanceSnapshot = (
+    snapshotId: string,
+  ): OwnerFinanceSnapshotRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM owner_finance_snapshots WHERE snapshot_id = ?")
+      .get(snapshotId) as any | undefined;
+    return row ? deserializeOwnerFinanceSnapshotRecord(row) : undefined;
+  };
+
+  const getLatestOwnerFinanceSnapshot = (
+    periodKind: OwnerReportPeriodKind,
+  ): OwnerFinanceSnapshotRecord | undefined => {
+    const row = db
+      .prepare(
+        `SELECT * FROM owner_finance_snapshots
+         WHERE period_kind = ?
+         ORDER BY period_start DESC, updated_at DESC
+         LIMIT 1`,
+      )
+      .get(periodKind) as any | undefined;
+    return row ? deserializeOwnerFinanceSnapshotRecord(row) : undefined;
+  };
+
+  const listOwnerFinanceSnapshots = (
+    limit: number,
+    filters?: { periodKind?: OwnerReportPeriodKind },
+  ): OwnerFinanceSnapshotRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.periodKind) {
+      clauses.push("period_kind = ?");
+      params.push(filters.periodKind);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM owner_finance_snapshots ${where} ORDER BY period_start DESC, updated_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeOwnerFinanceSnapshotRecord);
+  };
+
+  const upsertOwnerReport = (record: OwnerReportRecord): void => {
+    db.prepare(
+      `INSERT INTO owner_reports (
+        report_id, period_kind, finance_snapshot_id, provider, model, input_hash,
+        generation_status, payload_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(report_id) DO UPDATE SET
+        period_kind = excluded.period_kind,
+        finance_snapshot_id = excluded.finance_snapshot_id,
+        provider = excluded.provider,
+        model = excluded.model,
+        input_hash = excluded.input_hash,
+        generation_status = excluded.generation_status,
+        payload_json = excluded.payload_json,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.reportId,
+      record.periodKind,
+      record.financeSnapshotId,
+      record.provider ?? null,
+      record.model ?? null,
+      record.inputHash,
+      record.generationStatus,
+      JSON.stringify(record.payload),
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getOwnerReport = (reportId: string): OwnerReportRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM owner_reports WHERE report_id = ?")
+      .get(reportId) as any | undefined;
+    return row ? deserializeOwnerReportRecord(row) : undefined;
+  };
+
+  const getLatestOwnerReport = (
+    periodKind: OwnerReportPeriodKind,
+  ): OwnerReportRecord | undefined => {
+    const row = db
+      .prepare(
+        `SELECT * FROM owner_reports
+         WHERE period_kind = ?
+         ORDER BY created_at DESC, updated_at DESC
+         LIMIT 1`,
+      )
+      .get(periodKind) as any | undefined;
+    return row ? deserializeOwnerReportRecord(row) : undefined;
+  };
+
+  const listOwnerReports = (
+    limit: number,
+    filters?: { periodKind?: OwnerReportPeriodKind },
+  ): OwnerReportRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.periodKind) {
+      clauses.push("period_kind = ?");
+      params.push(filters.periodKind);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM owner_reports ${where} ORDER BY created_at DESC, updated_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeOwnerReportRecord);
+  };
+
+  const upsertOwnerReportDelivery = (
+    record: OwnerReportDeliveryRecord,
+  ): void => {
+    db.prepare(
+      `INSERT INTO owner_report_deliveries (
+        delivery_id, report_id, channel, status, target, rendered_path,
+        metadata_json, last_error, delivered_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(delivery_id) DO UPDATE SET
+        report_id = excluded.report_id,
+        channel = excluded.channel,
+        status = excluded.status,
+        target = excluded.target,
+        rendered_path = excluded.rendered_path,
+        metadata_json = excluded.metadata_json,
+        last_error = excluded.last_error,
+        delivered_at = excluded.delivered_at,
+        updated_at = excluded.updated_at`,
+    ).run(
+      record.deliveryId,
+      record.reportId,
+      record.channel,
+      record.status,
+      record.target,
+      record.renderedPath ?? null,
+      record.metadata ? JSON.stringify(record.metadata) : null,
+      record.lastError ?? null,
+      record.deliveredAt ?? null,
+      record.createdAt,
+      record.updatedAt,
+    );
+  };
+
+  const getOwnerReportDelivery = (
+    deliveryId: string,
+  ): OwnerReportDeliveryRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM owner_report_deliveries WHERE delivery_id = ?")
+      .get(deliveryId) as any | undefined;
+    return row ? deserializeOwnerReportDeliveryRecord(row) : undefined;
+  };
+
+  const listOwnerReportDeliveries = (
+    limit: number,
+    filters?: {
+      channel?: OwnerReportChannel;
+      status?: OwnerReportDeliveryStatus;
+      reportId?: string;
+    },
+  ): OwnerReportDeliveryRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.channel) {
+      clauses.push("channel = ?");
+      params.push(filters.channel);
+    }
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    if (filters?.reportId) {
+      clauses.push("report_id = ?");
+      params.push(filters.reportId);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM owner_report_deliveries ${where} ORDER BY created_at DESC, updated_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeOwnerReportDeliveryRecord);
+  };
+
   const upsertSignerQuote = (record: SignerQuoteRecord): void => {
     db.prepare(
       `INSERT INTO signer_quotes (
@@ -2561,6 +2776,17 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getLatestX402PaymentByRequestKey,
     listX402Payments,
     listPendingX402Payments,
+    upsertOwnerFinanceSnapshot,
+    getOwnerFinanceSnapshot,
+    getLatestOwnerFinanceSnapshot,
+    listOwnerFinanceSnapshots,
+    upsertOwnerReport,
+    getOwnerReport,
+    getLatestOwnerReport,
+    listOwnerReports,
+    upsertOwnerReportDelivery,
+    getOwnerReportDelivery,
+    listOwnerReportDeliveries,
     upsertSignerQuote,
     getSignerQuote,
     listSignerQuotes,
@@ -2869,6 +3095,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 29,
       apply: () => db.exec(MIGRATION_V29),
+    },
+    {
+      version: 30,
+      apply: () => db.exec(MIGRATION_V30),
     },
   ];
 
@@ -4171,6 +4401,53 @@ function deserializeMarketContractCallbackRecord(
       : null,
     lastError: row.last_error ?? null,
     nextAttemptAt: row.next_attempt_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeOwnerFinanceSnapshotRecord(
+  row: any,
+): OwnerFinanceSnapshotRecord {
+  return {
+    snapshotId: row.snapshot_id,
+    periodKind: row.period_kind,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    payload: JSON.parse(row.payload_json),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeOwnerReportRecord(row: any): OwnerReportRecord {
+  return {
+    reportId: row.report_id,
+    periodKind: row.period_kind,
+    financeSnapshotId: row.finance_snapshot_id,
+    provider: row.provider ?? null,
+    model: row.model ?? null,
+    inputHash: row.input_hash,
+    generationStatus: row.generation_status,
+    payload: JSON.parse(row.payload_json),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function deserializeOwnerReportDeliveryRecord(
+  row: any,
+): OwnerReportDeliveryRecord {
+  return {
+    deliveryId: row.delivery_id,
+    reportId: row.report_id,
+    channel: row.channel,
+    status: row.status,
+    target: row.target,
+    renderedPath: row.rendered_path ?? null,
+    metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null,
+    lastError: row.last_error ?? null,
+    deliveredAt: row.delivered_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

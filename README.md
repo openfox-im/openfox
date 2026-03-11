@@ -177,6 +177,10 @@ It supports:
 - `openfox dashboard show|export` for reusable JSON and HTML fleet dashboards with role margin, capability, counterparty, and delayed-queue finance sections
   plus bundle-ready `control-events.json`, `autopilot.json`, and `approvals.json` audit exports
 - `openfox wallet report` and `openfox finance report` for single-node operator snapshots
+- `openfox report daily|weekly|list|get|deliveries|send` for owner-facing
+  daily and weekly finance, opportunity, and recommendation reports
+- a built-in owner report web surface for mobile-friendly review of the latest
+  daily and weekly reports, plus persisted web/email delivery logs
 - a paid signer-provider surface for bounded delegated execution with:
   - `openfox signer discover`
   - `openfox signer quote`
@@ -733,7 +737,24 @@ openfox service status --json
 openfox gateway status --json
 openfox wallet report --json
 openfox finance report --json
+openfox report daily --json
+openfox report weekly --json
 ```
+
+Owner-facing delivery surface:
+
+```bash
+openfox report list --period daily
+openfox report get --report-id <report-id> --json
+openfox report deliveries --channel web --json
+openfox report send --channel web --period daily
+openfox report send --channel email --period weekly
+```
+
+When `ownerReports.enabled` is set in `openfox.json`, OpenFox can also start a
+small authenticated owner-report web server during `openfox --run`. That web
+surface serves the latest daily and weekly reports, recent delivery records,
+and the same report objects used for CLI and email delivery.
 
 ---
 

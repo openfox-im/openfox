@@ -225,6 +225,19 @@ import {
   buildOperatorFinanceSnapshot,
 } from "./operator/wallet-finance.js";
 import {
+  deliverOwnerReportChannels,
+} from "./reports/delivery.js";
+import {
+  buildOwnerReportInput,
+  generateOwnerReport,
+} from "./reports/generation.js";
+import {
+  renderOwnerReportText,
+} from "./reports/render.js";
+import {
+  startOwnerReportServer,
+} from "./reports/server.js";
+import {
   runArtifactMaintenance,
   runStorageMaintenance,
 } from "./operator/maintenance.js";
@@ -292,6 +305,38 @@ function resolveBountySkillName(config: {
   return config.skill || defaultHostSkill;
 }
 
+function createConfiguredInferenceClient(params: {
+  config: NonNullable<ReturnType<typeof loadConfig>>;
+  db: ReturnType<typeof createDatabase>;
+}): ReturnType<typeof createInferenceClient> {
+  const apiKey = params.config.runtimeApiKey || loadApiKeyFromConfig() || "";
+  const modelRegistry = new ModelRegistry(params.db.raw);
+  modelRegistry.initialize();
+  return createInferenceClient({
+    apiUrl: params.config.runtimeApiUrl || "",
+    apiKey,
+    defaultModel:
+      params.config.inferenceModelRef || params.config.inferenceModel,
+    maxTokens: params.config.maxTokensPerTurn,
+    lowComputeModel: params.config.modelStrategy?.lowComputeModel || "gpt-5-mini",
+    openaiApiKey: params.config.openaiApiKey,
+    anthropicApiKey: params.config.anthropicApiKey,
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL || params.config.ollamaBaseUrl,
+    getModelProvider: (modelId) => modelRegistry.get(modelId)?.provider,
+  });
+}
+
+function hasConfiguredInferenceProvider(
+  config: NonNullable<ReturnType<typeof loadConfig>>,
+): boolean {
+  return Boolean(
+    config.openaiApiKey ||
+      config.anthropicApiKey ||
+      config.ollamaBaseUrl ||
+      config.runtimeApiKey,
+  );
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -354,6 +399,11 @@ async function main(): Promise<void> {
 
   if (args[0] === "finance") {
     await handleFinanceCommand(args.slice(1));
+    process.exit(0);
+  }
+
+  if (args[0] === "report") {
+    await handleReportCommand(args.slice(1));
     process.exit(0);
   }
 
@@ -475,6 +525,7 @@ Usage:
   openfox onboard        Run setup and optionally install the managed service
   openfox wallet ...     Inspect, fund, and bootstrap the native wallet
   openfox finance ...    Inspect operator finance snapshots
+  openfox report ...     Generate, inspect, and deliver owner reports
   openfox templates ...  Inspect and export bundled third-party templates
   openfox logs           Show recent OpenFox service logs
   openfox campaign ...   Create and inspect sponsor-facing task campaigns
@@ -1877,6 +1928,172 @@ Usage:
       return;
     }
     logger.info(buildOperatorFinanceReport(snapshot));
+  } finally {
+    db.close();
+  }
+}
+
+async function handleReportCommand(args: string[]): Promise<void> {
+  const command = args[0] || "daily";
+  const asJson = args.includes("--json");
+  if (command === "--help" || command === "-h" || command === "help") {
+    logger.info(`
+OpenFox report
+
+Usage:
+  openfox report daily [--json]
+  openfox report weekly [--json]
+  openfox report list [--period <daily|weekly>] [--limit <n>] [--json]
+  openfox report get --report-id <id> [--json]
+  openfox report deliveries [--channel <web|email>] [--status <pending|delivered|failed>] [--limit <n>] [--json]
+  openfox report send --channel <web|email> [--period <daily|weekly> | --report-id <id>] [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    if (command === "list") {
+      const periodKindRaw = readOption(args, "--period");
+      const periodKind =
+        periodKindRaw === "daily" || periodKindRaw === "weekly"
+          ? periodKindRaw
+          : undefined;
+      const limit = readNumberOption(args, "--limit", 20);
+      const items = db.listOwnerReports(limit, { periodKind });
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No owner reports found.");
+        return;
+      }
+      logger.info("=== OPENFOX OWNER REPORTS ===");
+      for (const item of items) {
+        logger.info(
+          `${item.reportId}  [${item.periodKind}]  ${item.generationStatus}  ${item.createdAt}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "get") {
+      const reportId = readOption(args, "--report-id");
+      if (!reportId) {
+        throw new Error("Usage: openfox report get --report-id <id> [--json]");
+      }
+      const report = db.getOwnerReport(reportId);
+      if (!report) {
+        throw new Error(`Owner report not found: ${reportId}`);
+      }
+      if (asJson) {
+        logger.info(JSON.stringify(report, null, 2));
+        return;
+      }
+      logger.info(renderOwnerReportText(report));
+      return;
+    }
+
+    if (command === "deliveries") {
+      const channelRaw = readOption(args, "--channel");
+      const channel =
+        channelRaw === "web" || channelRaw === "email" ? channelRaw : undefined;
+      const statusRaw = readOption(args, "--status");
+      const status =
+        statusRaw === "pending" ||
+        statusRaw === "delivered" ||
+        statusRaw === "failed"
+          ? statusRaw
+          : undefined;
+      const limit = readNumberOption(args, "--limit", 20);
+      const items = db.listOwnerReportDeliveries(limit, { channel, status });
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No owner report deliveries found.");
+        return;
+      }
+      logger.info("=== OPENFOX OWNER REPORT DELIVERIES ===");
+      for (const item of items) {
+        logger.info(
+          `${item.deliveryId}  [${item.channel}]  ${item.status}  ${item.target}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "send") {
+      const channel = readOption(args, "--channel");
+      if (channel !== "web" && channel !== "email") {
+        throw new Error(
+          "Usage: openfox report send --channel <web|email> [--period <daily|weekly> | --report-id <id>] [--json]",
+        );
+      }
+      const reportId = readOption(args, "--report-id");
+      const periodRaw = readOption(args, "--period");
+      const periodKind =
+        periodRaw === "daily" || periodRaw === "weekly" ? periodRaw : "daily";
+      let report = reportId ? db.getOwnerReport(reportId) : db.getLatestOwnerReport(periodKind);
+      if (!report) {
+        const inference = hasConfiguredInferenceProvider(config)
+          ? createConfiguredInferenceClient({ config, db })
+          : undefined;
+        report = await generateOwnerReport({
+          config,
+          db,
+          inference,
+          periodKind,
+        });
+      }
+      const [result] = await deliverOwnerReportChannels({
+        config,
+        db,
+        report,
+        channels: [channel],
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+      logger.info(
+        [
+          "Owner report delivered.",
+          `Channel: ${result.channel}`,
+          `Status: ${result.status}`,
+          `Target: ${result.target}`,
+          `Report: ${report.reportId}`,
+          `Rendered path: ${result.renderedPath || "(none)"}`,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    if (command !== "daily" && command !== "weekly") {
+      throw new Error(`Unknown report command: ${command}`);
+    }
+
+    const inference = hasConfiguredInferenceProvider(config)
+      ? createConfiguredInferenceClient({ config, db })
+      : undefined;
+    const report = await generateOwnerReport({
+      config,
+      db,
+      inference,
+      periodKind: command,
+    });
+    if (asJson) {
+      logger.info(JSON.stringify(report, null, 2));
+      return;
+    }
+    logger.info(renderOwnerReportText(report));
   } finally {
     db.close();
   }
@@ -4167,6 +4384,9 @@ async function run(): Promise<void> {
   let operatorApiServer:
     | Awaited<ReturnType<typeof startOperatorApiServer>>
     | undefined;
+  let ownerReportServer:
+    | Awaited<ReturnType<typeof startOwnerReportServer>>
+    | undefined;
   let gatewayProviderSessions:
     | Awaited<ReturnType<typeof startAgentGatewayProviderSessions>>
     | undefined;
@@ -4997,6 +5217,22 @@ async function run(): Promise<void> {
     }
   }
 
+  if (config.ownerReports?.enabled && config.ownerReports.web.enabled) {
+    try {
+      ownerReportServer = await startOwnerReportServer({
+        config,
+        db,
+      });
+      if (ownerReportServer) {
+        logger.info(`Owner report server enabled at ${ownerReportServer.url}`);
+      }
+    } catch (error) {
+      logger.warn(
+        `Owner report server failed to start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   // Handle graceful shutdown
   const shutdown = () => {
     logger.info(`[${new Date().toISOString()}] Shutting down...`);
@@ -5012,6 +5248,7 @@ async function run(): Promise<void> {
       gatewayProviderSessions?.close(),
       gatewayServer?.close(),
       operatorApiServer?.close(),
+      ownerReportServer?.close(),
       faucetServer?.close(),
       observationServer?.close(),
       oracleServer?.close(),

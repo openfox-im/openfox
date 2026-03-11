@@ -130,6 +130,9 @@ export async function startOperatorApiServer(
   const providersPath = `${pathPrefix}/providers/reputation`;
   const walletPath = `${pathPrefix}/wallet/status`;
   const financePath = `${pathPrefix}/finance/status`;
+  const ownerReportsPath = `${pathPrefix}/owner/reports`;
+  const ownerReportLatestPath = `${pathPrefix}/owner/reports/latest`;
+  const ownerReportDeliveriesPath = `${pathPrefix}/owner/report-deliveries`;
   const paymentsPath = `${pathPrefix}/payments/status`;
   const settlementPath = `${pathPrefix}/settlement/status`;
   const marketPath = `${pathPrefix}/market/status`;
@@ -323,6 +326,62 @@ export async function startOperatorApiServer(
           200,
           await buildOperatorFinanceSnapshot(params.config, params.db),
         );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === ownerReportsPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        const periodParam = url.searchParams.get("period");
+        json(res, 200, {
+          items: params.db.listOwnerReports(limit, {
+            periodKind:
+              periodParam === "daily" || periodParam === "weekly"
+                ? periodParam
+                : undefined,
+          }),
+        });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === ownerReportLatestPath) {
+        const periodParam = url.searchParams.get("period");
+        const report = params.db.getLatestOwnerReport(
+          periodParam === "weekly" ? "weekly" : "daily",
+        );
+        if (!report) {
+          json(res, 404, { error: "owner report not found" });
+          return;
+        }
+        json(res, 200, report);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === ownerReportDeliveriesPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        const channelParam = url.searchParams.get("channel");
+        const statusParam = url.searchParams.get("status");
+        json(res, 200, {
+          items: params.db.listOwnerReportDeliveries(limit, {
+            channel:
+              channelParam === "web" || channelParam === "email"
+                ? channelParam
+                : undefined,
+            status:
+              statusParam === "pending" ||
+              statusParam === "delivered" ||
+              statusParam === "failed"
+                ? statusParam
+                : undefined,
+          }),
+        });
         return;
       }
 
