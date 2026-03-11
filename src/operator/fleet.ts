@@ -57,6 +57,29 @@ export interface FleetRepairSnapshot {
   nodes: FleetNodeResult[];
 }
 
+export interface FleetLintIssue {
+  node: string;
+  role: string | null;
+  severity: "error" | "warning";
+  code:
+    | "duplicate_name"
+    | "duplicate_base_url"
+    | "missing_auth_token"
+    | "placeholder_auth_token"
+    | "placeholder_base_url"
+    | "non_https_base_url"
+    | "missing_role";
+  message: string;
+}
+
+export interface FleetLintSnapshot {
+  manifestPath: string;
+  total: number;
+  errors: number;
+  warnings: number;
+  issues: FleetLintIssue[];
+}
+
 function getEndpointPath(endpoint: FleetEndpoint): string {
   switch (endpoint) {
     case "status":
@@ -317,6 +340,130 @@ export function buildFleetRepairReport(snapshot: FleetRepairSnapshot): string {
     if (summary) {
       lines.push(`  ${summary}`);
     }
+  }
+  return lines.join("\n");
+}
+
+function isPlaceholderValue(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes("replace-me") ||
+    normalized.includes("example.com") ||
+    normalized.includes("placeholder")
+  );
+}
+
+export function buildFleetLintSnapshot(params: {
+  manifestPath: string;
+}): FleetLintSnapshot {
+  const manifestPath = path.resolve(params.manifestPath);
+  const manifest = loadFleetManifest(manifestPath);
+  const issues: FleetLintIssue[] = [];
+  const seenNames = new Set<string>();
+  const seenBaseUrls = new Set<string>();
+
+  for (const node of manifest.nodes) {
+    const role = node.role || null;
+    const nameKey = node.name.toLowerCase();
+    const baseUrlKey = node.baseUrl.toLowerCase();
+
+    if (seenNames.has(nameKey)) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "error",
+        code: "duplicate_name",
+        message: `duplicate fleet node name: ${node.name}`,
+      });
+    } else {
+      seenNames.add(nameKey);
+    }
+
+    if (seenBaseUrls.has(baseUrlKey)) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "error",
+        code: "duplicate_base_url",
+        message: `duplicate fleet base URL: ${node.baseUrl}`,
+      });
+    } else {
+      seenBaseUrls.add(baseUrlKey);
+    }
+
+    if (!node.role) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "warning",
+        code: "missing_role",
+        message: "node has no declared role",
+      });
+    }
+
+    if (!node.authToken) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "warning",
+        code: "missing_auth_token",
+        message: "node has no operator auth token configured",
+      });
+    } else if (isPlaceholderValue(node.authToken)) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "error",
+        code: "placeholder_auth_token",
+        message: "node still uses a placeholder auth token",
+      });
+    }
+
+    if (isPlaceholderValue(node.baseUrl)) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "error",
+        code: "placeholder_base_url",
+        message: "node still uses a placeholder base URL",
+      });
+    } else if (!node.baseUrl.startsWith("https://") && !node.baseUrl.startsWith("http://127.0.0.1") && !node.baseUrl.startsWith("http://localhost")) {
+      issues.push({
+        node: node.name,
+        role,
+        severity: "warning",
+        code: "non_https_base_url",
+        message: "node base URL is not HTTPS",
+      });
+    }
+  }
+
+  return {
+    manifestPath,
+    total: manifest.nodes.length,
+    errors: issues.filter((issue) => issue.severity === "error").length,
+    warnings: issues.filter((issue) => issue.severity === "warning").length,
+    issues,
+  };
+}
+
+export function buildFleetLintReport(snapshot: FleetLintSnapshot): string {
+  const lines = [
+    "=== OPENFOX FLEET LINT ===",
+    `Manifest:  ${snapshot.manifestPath}`,
+    `Nodes:     ${snapshot.total}`,
+    `Errors:    ${snapshot.errors}`,
+    `Warnings:  ${snapshot.warnings}`,
+    "",
+  ];
+  if (snapshot.issues.length === 0) {
+    lines.push("No lint issues found.");
+    return lines.join("\n");
+  }
+  for (const issue of snapshot.issues) {
+    lines.push(
+      `${issue.node}${issue.role ? ` [${issue.role}]` : ""}: ${issue.severity} ${issue.code} -> ${issue.message}`,
+    );
   }
   return lines.join("\n");
 }

@@ -260,6 +260,7 @@ openfox storage renew --help
 openfox artifacts list
 openfox trails list --json
 openfox dashboard show --manifest ./fleet.yml
+openfox fleet lint --manifest ./fleet.yml
 ```
 
 If you are running directly from the source checkout and have not installed the binary globally yet, use:

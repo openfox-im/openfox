@@ -181,6 +181,8 @@ import {
 } from "./operator/status.js";
 import {
   buildFleetReport,
+  buildFleetLintReport,
+  buildFleetLintSnapshot,
   buildFleetRepairReport,
   buildFleetRepairSnapshot,
   buildFleetSnapshot,
@@ -1300,6 +1302,7 @@ OpenFox fleet
 
 Usage:
   openfox fleet status --manifest <path> [--json]
+  openfox fleet lint --manifest <path> [--json]
   openfox fleet health --manifest <path> [--json]
   openfox fleet doctor --manifest <path> [--json]
   openfox fleet service --manifest <path> [--json]
@@ -1337,6 +1340,16 @@ Usage:
       return;
     }
     logger.info(buildFleetRepairReport(snapshot));
+    return;
+  }
+
+  if (command === "lint") {
+    const snapshot = buildFleetLintSnapshot({ manifestPath });
+    if (asJson) {
+      logger.info(JSON.stringify(snapshot, null, 2));
+      return;
+    }
+    logger.info(buildFleetLintReport(snapshot));
     return;
   }
 

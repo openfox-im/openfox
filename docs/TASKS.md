@@ -258,6 +258,11 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Give third-party builders direct requester/provider/network examples
     for the native SDK so they do not need to read OpenFox runtime internals
     before integrating.
+- [x] Task 55: Add fleet manifest linting for public operator bundles
+  - Status: Complete
+  - Goal: Catch placeholder URLs, duplicate node definitions, missing auth
+    tokens, and non-HTTPS public endpoints before operators run public-fleet
+    actions against a bad manifest.
 
 ## Task 53 Breakdown
 
@@ -273,6 +278,14 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add provider-client examples for storage, artifact, signer, and paymaster flows.
 - [x] Add storage/artifact receipt hashing examples.
 - [x] Update `tosdk/README.md` and OpenFox SDK surface docs to point to the examples.
+
+## Task 55 Breakdown
+
+- [x] Add `openfox fleet lint --manifest <path>`.
+- [x] Detect placeholder URLs and placeholder auth tokens.
+- [x] Detect duplicate node names and duplicate base URLs.
+- [x] Warn on missing roles, missing auth tokens, and non-HTTPS public endpoints.
+- [x] Add tests and operator docs for manifest linting.
 
 ## Task 1 Breakdown
 

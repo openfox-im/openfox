@@ -715,6 +715,29 @@ Acceptance criteria:
 - third-party builders can find example code for storage/artifact/signer/paymaster requester clients
 - storage and artifact receipt hashing examples are part of the repository
 
+### Phase 12: Public Fleet Manifest Hardening
+
+Status: completed
+
+Goal:
+
+- catch common public-fleet operator mistakes before any status, doctor, repair,
+  or dashboard run touches a misconfigured manifest
+
+Delivered surface:
+
+- `openfox fleet lint --manifest <path>`
+- placeholder URL and placeholder auth-token detection
+- duplicate node-name and duplicate base-URL detection
+- warnings for missing roles, missing auth tokens, and non-HTTPS public endpoints
+- operator guide updates for preflight linting
+
+Acceptance criteria:
+
+- operators can lint a fleet manifest before running status or repair commands
+- lint findings are available in human-readable and JSON form
+- the public fleet operator template works with the new lint flow
+
 The current core roadmap phases are complete.
 
 The next work should not reopen the completed core phases. It should focus on:

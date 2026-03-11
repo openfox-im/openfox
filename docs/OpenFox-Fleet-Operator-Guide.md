@@ -82,6 +82,7 @@ Both JSON and YAML manifests are supported.
 ## 4. Audit the Fleet
 
 ```bash
+openfox fleet lint --manifest ./fleet.yml
 openfox fleet status --manifest ./fleet.yml
 openfox fleet health --manifest ./fleet.yml
 openfox fleet doctor --manifest ./fleet.yml --json
@@ -99,6 +100,7 @@ openfox fleet repair artifacts --manifest ./fleet.yml
 
 Use these to answer questions such as:
 
+- whether the manifest still contains placeholders or duplicate entries
 - which nodes are reachable
 - which nodes fail health checks
 - which public deployments have misconfigured operator auth

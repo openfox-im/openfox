@@ -5,6 +5,8 @@ import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildFleetReport,
+  buildFleetLintReport,
+  buildFleetLintSnapshot,
   buildFleetRepairReport,
   buildFleetRepairSnapshot,
   buildFleetSnapshot,
@@ -239,5 +241,46 @@ describe("operator fleet", () => {
     expect((artifactSnapshot.nodes[1]?.payload as { anchored?: number })?.anchored).toBe(1);
     const artifactReport = buildFleetRepairReport(artifactSnapshot);
     expect(artifactReport).toContain("Component: artifacts");
+  });
+
+  it("lint-detects placeholder urls, tokens, and duplicates", () => {
+    const manifestPath = createManifest(
+      JSON.stringify({
+        version: 1,
+        nodes: [
+          {
+            name: "gateway-1",
+            role: "gateway",
+            baseUrl: "https://gateway.example.com/operator",
+            authToken: "replace-me-token",
+          },
+          {
+            name: "gateway-1",
+            baseUrl: "http://provider.internal/operator",
+          },
+          {
+            name: "storage-1",
+            role: "storage",
+            baseUrl: "https://gateway.example.com/operator",
+            authToken: "token-real",
+          },
+        ],
+      }),
+    );
+
+    const snapshot = buildFleetLintSnapshot({ manifestPath });
+    expect(snapshot.total).toBe(3);
+    expect(snapshot.errors).toBeGreaterThanOrEqual(3);
+    expect(snapshot.warnings).toBeGreaterThanOrEqual(2);
+    expect(snapshot.issues.some((issue) => issue.code === "placeholder_auth_token")).toBe(true);
+    expect(snapshot.issues.some((issue) => issue.code === "duplicate_name")).toBe(true);
+    expect(snapshot.issues.some((issue) => issue.code === "duplicate_base_url")).toBe(true);
+    expect(snapshot.issues.some((issue) => issue.code === "missing_role")).toBe(true);
+    expect(snapshot.issues.some((issue) => issue.code === "non_https_base_url")).toBe(true);
+
+    const report = buildFleetLintReport(snapshot);
+    expect(report).toContain("=== OPENFOX FLEET LINT ===");
+    expect(report).toContain("placeholder_auth_token");
+    expect(report).toContain("duplicate_base_url");
   });
 });
