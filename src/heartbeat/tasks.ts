@@ -38,6 +38,7 @@ import {
 } from "../reports/generation.js";
 import { generateOwnerOpportunityAlerts } from "../reports/alerts.js";
 import { syncApprovedOwnerOpportunityActions } from "../reports/actions.js";
+import { executeQueuedOwnerOpportunityActions } from "../reports/action-execution.js";
 import {
   auditLocalStorageLease,
   replicateTrackedLease,
@@ -917,6 +918,77 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
         result.created > 0
           ? `Queued ${result.created} owner opportunity action(s).`
           : undefined,
+    };
+  },
+
+  execute_owner_opportunity_actions: async (
+    _ctx: TickContext,
+    taskCtx: HeartbeatLegacyContext,
+  ) => {
+    const reportsConfig = taskCtx.config.ownerReports;
+    const executionConfig = reportsConfig?.actionExecution;
+    if (
+      !reportsConfig?.enabled ||
+      !reportsConfig.alerts?.enabled ||
+      !executionConfig?.enabled ||
+      !executionConfig.autoExecutePursue
+    ) {
+      return { shouldWake: false };
+    }
+
+    const inference = createOwnerReportInference(taskCtx);
+    if (!inference) {
+      taskCtx.db.setKV(
+        "last_owner_opportunity_action_execution",
+        JSON.stringify({
+          attempted: 0,
+          completed: 0,
+          failed: 0,
+          skipped: 0,
+          status: "skipped",
+          reason: "inference_missing",
+          at: new Date().toISOString(),
+        }),
+      );
+      return { shouldWake: false };
+    }
+
+    const { account } = await getWallet();
+    const result = await executeQueuedOwnerOpportunityActions({
+      identity: {
+        name: taskCtx.config.name,
+        address: taskCtx.config.walletAddress,
+        account,
+        creatorAddress: taskCtx.config.creatorAddress,
+        sandboxId: taskCtx.config.sandboxId,
+        apiKey: taskCtx.identity.apiKey,
+        createdAt: taskCtx.identity.createdAt,
+      },
+      config: taskCtx.config,
+      db: taskCtx.db,
+      inference,
+      limit: executionConfig.maxExecutionsPerRun,
+      cooldownSeconds: executionConfig.executionCooldownSeconds,
+      autoExecutePursue: executionConfig.autoExecutePursue,
+    });
+    taskCtx.db.setKV(
+      "last_owner_opportunity_action_execution",
+      JSON.stringify({
+        attempted: result.attempted,
+        completed: result.completed,
+        failed: result.failed,
+        skipped: result.skipped,
+        at: new Date().toISOString(),
+      }),
+    );
+    return {
+      shouldWake: result.completed > 0 || result.failed > 0,
+      message:
+        result.completed > 0
+          ? `Executed ${result.completed} owner opportunity action(s).`
+          : result.failed > 0
+            ? `Owner opportunity execution failed for ${result.failed} action(s).`
+            : undefined,
     };
   },
 

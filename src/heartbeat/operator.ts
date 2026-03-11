@@ -81,6 +81,7 @@ const TASK_DESCRIPTIONS: Record<string, string> = {
   deliver_owner_reports: "Render and deliver owner reports to web and email surfaces on the configured schedule.",
   generate_owner_opportunity_alerts: "Generate bounded owner opportunity alerts from strategy-ranked scout results.",
   sync_owner_opportunity_actions: "Materialize approved owner opportunity actions into the bounded owner action queue.",
+  execute_owner_opportunity_actions: "Execute queued owner opportunity pursue actions against remote bounty and campaign hosts.",
   check_social_inbox: "Poll the social inbox and wake the agent for new inbound messages.",
   check_for_updates: "Check for upstream/runtime updates.",
   health_check: "Run local health checks and wake on degraded status.",

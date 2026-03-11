@@ -239,6 +239,9 @@ import {
   materializeApprovedOwnerOpportunityAction,
 } from "./reports/actions.js";
 import {
+  executeOwnerOpportunityAction,
+} from "./reports/action-execution.js";
+import {
   renderOwnerReportText,
 } from "./reports/render.js";
 import {
@@ -1959,6 +1962,8 @@ Usage:
   openfox report alert-dismiss <alert-id> [--json]
   openfox report alert-request-action <alert-id> [--action <review|pursue|delegate>] [--json]
   openfox report actions [--status <queued|completed|cancelled>] [--kind <review|pursue|delegate>] [--limit <n>] [--json]
+  openfox report action-executions [--action-id <id>] [--status <running|completed|failed|skipped>] [--limit <n>] [--json]
+  openfox report action-execute <action-id> [--json]
   openfox report action-complete <action-id> [--result-kind <note|bounty|campaign|provider_call|artifact|report|other>] [--result-ref <ref>] [--note <text>] [--json]
   openfox report action-cancel <action-id> [--result-kind <note|bounty|campaign|provider_call|artifact|report|other>] [--result-ref <ref>] [--note <text>] [--json]
   openfox report approvals [--status <pending|approved|rejected|expired>] [--limit <n>] [--json]
@@ -2136,6 +2141,37 @@ Usage:
       return;
     }
 
+    if (command === "action-executions") {
+      const statusRaw = readOption(args, "--status");
+      const status =
+        statusRaw === "running" ||
+        statusRaw === "completed" ||
+        statusRaw === "failed" ||
+        statusRaw === "skipped"
+          ? statusRaw
+          : undefined;
+      const limit = readNumberOption(args, "--limit", 20);
+      const items = db.listOwnerOpportunityActionExecutions(limit, {
+        actionId: readOption(args, "--action-id"),
+        status,
+      });
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No owner opportunity action executions found.");
+        return;
+      }
+      logger.info("=== OPENFOX OWNER OPPORTUNITY ACTION EXECUTIONS ===");
+      for (const item of items) {
+        logger.info(
+          `${item.executionId}  [${item.status}]  ${item.kind}  action=${item.actionId}  target=${item.targetRef}`,
+        );
+      }
+      return;
+    }
+
     if (command === "alerts-generate") {
       const result = await generateOwnerOpportunityAlerts({
         config,
@@ -2201,6 +2237,40 @@ Usage:
       }
       logger.info(
         `Queued ${action} action for ${result.alert.alertId} as approval request ${result.request.requestId}`,
+      );
+      return;
+    }
+
+    if (command === "action-execute") {
+      const actionId = args[1]?.trim();
+      if (!actionId) {
+        throw new Error("Usage: openfox report action-execute <action-id> [--json]");
+      }
+      const { account } = await getWallet();
+      const inference = hasConfiguredInferenceProvider(config)
+        ? createConfiguredInferenceClient({ config, db })
+        : new NoopInferenceClient();
+      const result = await executeOwnerOpportunityAction({
+        identity: {
+          name: config.name,
+          address: config.walletAddress,
+          account,
+          creatorAddress: config.creatorAddress,
+          sandboxId: config.sandboxId,
+          apiKey: config.runtimeApiKey || loadApiKeyFromConfig() || "",
+          createdAt: new Date().toISOString(),
+        },
+        config,
+        db,
+        inference,
+        actionId,
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+      logger.info(
+        `Executed ${result.action.actionId}: ${result.execution.status}${result.execution.executionRef ? ` (${result.execution.executionRef})` : ""}`,
       );
       return;
     }

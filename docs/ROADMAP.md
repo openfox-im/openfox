@@ -1386,3 +1386,51 @@ Acceptance criteria:
 - owner web and CLI completion flows preserve the same result metadata
 - operator dashboards can read and mutate owner action records without bypassing
   the owner-action journal
+
+### Phase 28: Owner Opportunity Action Execution
+
+Status: completed
+
+Goal:
+
+- let OpenFox automatically or manually execute bounded queued owner pursue
+  actions against remote bounty and campaign hosts, then persist execution
+  history and surface it through CLI, web, operator API, status, and diagnostics
+
+Delivered surface:
+
+- persistent owner-action execution records
+- `openfox report action-execute <action-id>`
+- `openfox report action-executions`
+- owner web `POST /owner/actions/:actionId/execute`
+- owner web `GET /owner/action-executions`
+- operator API `GET /operator/owner/action-executions`
+- operator API `POST /operator/owner/actions/:actionId/execute`
+- heartbeat-driven `execute_owner_opportunity_actions`
+- owner-action execution visibility in `openfox status`, `openfox health`, and
+  `openfox doctor`
+
+Implementation tasks:
+
+- define one bounded persistent owner-action execution record linked to the
+  owner action and remote target
+- execute queued pursue actions through the existing remote bounty and campaign
+  requester clients instead of inventing a second submission path
+- add owner-facing CLI and web surfaces for manual action execution and
+  execution-history inspection
+- add operator API listing and execute routes for dashboards and control planes
+- add heartbeat-driven automatic execution with bounded cooldown and per-run
+  limits
+- surface execution state through status, health, and diagnostics
+- add targeted tests for execution persistence, owner-web execution, and
+  operator API execution flows
+
+Acceptance criteria:
+
+- queued pursue actions can be executed into one bounded remote bounty or
+  campaign submission flow
+- execution records persist request/result/error state without replacing the
+  owner-action journal
+- owner and operator surfaces can both inspect execution history
+- heartbeat automation can execute queued pursue actions without human
+  intervention when owner action execution is enabled

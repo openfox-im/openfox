@@ -55,6 +55,8 @@ import type {
   OwnerReportDeliveryRecord,
   OwnerReportDeliveryStatus,
   OwnerOpportunityActionKind,
+  OwnerOpportunityActionExecutionRecord,
+  OwnerOpportunityActionExecutionStatus,
   OwnerOpportunityActionRecord,
   OwnerOpportunityActionResolutionKind,
   OwnerOpportunityActionStatus,
@@ -128,6 +130,7 @@ import {
   MIGRATION_V33,
   MIGRATION_V34,
   MIGRATION_V35,
+  MIGRATION_V36,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -1857,6 +1860,85 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     return getOwnerOpportunityAction(actionId);
   };
 
+  const upsertOwnerOpportunityActionExecution = (
+    record: OwnerOpportunityActionExecutionRecord,
+  ): void => {
+    db.prepare(
+      `INSERT INTO owner_opportunity_action_executions (
+        execution_id, action_id, kind, target_kind, target_ref, remote_base_url,
+        status, request_payload_json, result_payload_json, execution_ref,
+        error_message, created_at, updated_at, completed_at, failed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(execution_id) DO UPDATE SET
+        action_id = excluded.action_id,
+        kind = excluded.kind,
+        target_kind = excluded.target_kind,
+        target_ref = excluded.target_ref,
+        remote_base_url = excluded.remote_base_url,
+        status = excluded.status,
+        request_payload_json = excluded.request_payload_json,
+        result_payload_json = excluded.result_payload_json,
+        execution_ref = excluded.execution_ref,
+        error_message = excluded.error_message,
+        updated_at = excluded.updated_at,
+        completed_at = excluded.completed_at,
+        failed_at = excluded.failed_at`,
+    ).run(
+      record.executionId,
+      record.actionId,
+      record.kind,
+      record.targetKind,
+      record.targetRef,
+      record.remoteBaseUrl,
+      record.status,
+      JSON.stringify(record.requestPayload ?? {}),
+      record.resultPayload ? JSON.stringify(record.resultPayload) : null,
+      record.executionRef ?? null,
+      record.errorMessage ?? null,
+      record.createdAt,
+      record.updatedAt,
+      record.completedAt ?? null,
+      record.failedAt ?? null,
+    );
+  };
+
+  const getOwnerOpportunityActionExecution = (
+    executionId: string,
+  ): OwnerOpportunityActionExecutionRecord | undefined => {
+    const row = db
+      .prepare(
+        "SELECT * FROM owner_opportunity_action_executions WHERE execution_id = ?",
+      )
+      .get(executionId) as any | undefined;
+    return row ? deserializeOwnerOpportunityActionExecutionRecord(row) : undefined;
+  };
+
+  const listOwnerOpportunityActionExecutions = (
+    limit: number,
+    filters?: {
+      actionId?: string;
+      status?: OwnerOpportunityActionExecutionStatus;
+    },
+  ): OwnerOpportunityActionExecutionRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.actionId) {
+      clauses.push("action_id = ?");
+      params.push(filters.actionId);
+    }
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM owner_opportunity_action_executions ${where} ORDER BY created_at DESC, updated_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeOwnerOpportunityActionExecutionRecord);
+  };
+
   const upsertSignerQuote = (record: SignerQuoteRecord): void => {
     db.prepare(
       `INSERT INTO signer_quotes (
@@ -3096,6 +3178,9 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     getOwnerOpportunityActionByRequestId,
     listOwnerOpportunityActions,
     updateOwnerOpportunityActionStatus,
+    upsertOwnerOpportunityActionExecution,
+    getOwnerOpportunityActionExecution,
+    listOwnerOpportunityActionExecutions,
     upsertSignerQuote,
     getSignerQuote,
     listSignerQuotes,
@@ -3460,6 +3545,10 @@ function applyMigrations(db: DatabaseType): void {
           db.exec("ALTER TABLE owner_opportunity_actions ADD COLUMN resolution_note TEXT");
         }
       },
+    },
+    {
+      version: 36,
+      apply: () => db.exec(MIGRATION_V36),
     },
   ];
 
@@ -4876,6 +4965,32 @@ function deserializeOwnerOpportunityActionRecord(
     updatedAt: row.updated_at,
     completedAt: row.completed_at ?? null,
     cancelledAt: row.cancelled_at ?? null,
+  };
+}
+
+function deserializeOwnerOpportunityActionExecutionRecord(
+  row: any,
+): OwnerOpportunityActionExecutionRecord {
+  return {
+    executionId: row.execution_id,
+    actionId: row.action_id,
+    kind: row.kind,
+    targetKind: row.target_kind,
+    targetRef: row.target_ref,
+    remoteBaseUrl: row.remote_base_url,
+    status: row.status,
+    requestPayload: row.request_payload_json
+      ? JSON.parse(row.request_payload_json)
+      : {},
+    resultPayload: row.result_payload_json
+      ? JSON.parse(row.result_payload_json)
+      : null,
+    executionRef: row.execution_ref ?? null,
+    errorMessage: row.error_message ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at ?? null,
+    failedAt: row.failed_at ?? null,
   };
 }
 

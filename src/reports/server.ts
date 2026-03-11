@@ -3,6 +3,7 @@ import type {
   OpenFoxConfig,
   OpenFoxDatabase,
   OwnerOpportunityAlertRecord,
+  OwnerOpportunityActionExecutionRecord,
   OperatorApprovalRequestRecord,
   OwnerReportPeriodKind,
 } from "../types.js";
@@ -10,7 +11,11 @@ import { createLogger } from "../observability/logger.js";
 import { decideOperatorApprovalRequest } from "../operator/autopilot.js";
 import { queueOwnerOpportunityAlertAction } from "./alerts.js";
 import { materializeApprovedOwnerOpportunityAction } from "./actions.js";
+import { executeOwnerOpportunityAction } from "./action-execution.js";
 import { renderOwnerReportHtml } from "./render.js";
+import { getWallet } from "../identity/wallet.js";
+import { createInferenceClient } from "../runtime/inference.js";
+import { ModelRegistry } from "../inference/registry.js";
 
 const logger = createLogger("reports.server");
 
@@ -221,6 +226,7 @@ function renderOwnerAlertsHtml(params: {
 
 function renderOwnerActionsHtml(params: {
   actions: import("../types.js").OwnerOpportunityActionRecord[];
+  executions?: OwnerOpportunityActionExecutionRecord[];
   pathPrefix: string;
   token?: string;
   status?: string | null;
@@ -231,6 +237,10 @@ function renderOwnerActionsHtml(params: {
     .map((action) => {
       const completeAction = `${params.pathPrefix}/actions/${encodeURIComponent(action.actionId)}/complete${tokenQuery}`;
       const cancelAction = `${params.pathPrefix}/actions/${encodeURIComponent(action.actionId)}/cancel${tokenQuery}`;
+      const executeAction = `${params.pathPrefix}/actions/${encodeURIComponent(action.actionId)}/execute${tokenQuery}`;
+      const latestExecution = params.executions?.find(
+        (execution) => execution.actionId === action.actionId,
+      );
       const metadata = [
         `<p><strong>Status:</strong> ${action.status}</p>`,
         `<p><strong>Kind:</strong> ${action.kind}</p>`,
@@ -239,10 +249,16 @@ function renderOwnerActionsHtml(params: {
         action.capability ? `<p><strong>Capability:</strong> ${action.capability}</p>` : "",
         action.baseUrl ? `<p><strong>Base URL:</strong> ${action.baseUrl}</p>` : "",
         action.decisionNote ? `<p><strong>Decision note:</strong> ${action.decisionNote}</p>` : "",
+        latestExecution
+          ? `<p><strong>Latest execution:</strong> ${latestExecution.status}${latestExecution.executionRef ? ` (${latestExecution.executionRef})` : ""}</p>`
+          : "",
       ].join("");
       const controls =
         action.status === "queued"
           ? `
+        <form method="post" action="${executeAction}" style="display:inline-block;margin-right:8px;">
+          <button type="submit">Execute</button>
+        </form>
         <form method="post" action="${completeAction}" style="display:inline-block;margin-right:8px;">
           <button type="submit">Mark complete</button>
         </form>
@@ -366,16 +382,37 @@ export async function startOwnerReportServer(params: {
             json(res, 200, { items });
             return;
           }
+          const executions = params.db.listOwnerOpportunityActionExecutions(
+            limit * 3,
+          );
           html(
             res,
             200,
             renderOwnerActionsHtml({
               actions: items,
+              executions,
               pathPrefix,
               token: webConfig.authToken,
               status: statusRaw,
             }),
           );
+          return;
+        }
+
+        if (req.method === "GET" && url.pathname === `${pathPrefix}/action-executions`) {
+          const limit = Number.parseInt(url.searchParams.get("limit") || "20", 10);
+          const statusRaw = url.searchParams.get("status");
+          const items = params.db.listOwnerOpportunityActionExecutions(limit, {
+            actionId: url.searchParams.get("actionId") || undefined,
+            status:
+              statusRaw === "running" ||
+              statusRaw === "completed" ||
+              statusRaw === "failed" ||
+              statusRaw === "skipped"
+                ? statusRaw
+                : undefined,
+          });
+          json(res, 200, { items });
           return;
         }
 
@@ -435,6 +472,66 @@ export async function startOwnerReportServer(params: {
             return;
           }
           redirect(res, `${pathPrefix}/alerts${webConfig.authToken ? `?token=${encodeURIComponent(webConfig.authToken)}` : ""}`);
+          return;
+        }
+
+        if (
+          req.method === "POST" &&
+          /^\/?.*\/actions\/[^/]+\/execute$/.test(url.pathname)
+        ) {
+          const match = url.pathname.match(/\/actions\/([^/]+)\/execute$/);
+          const actionId = match?.[1] ? decodeURIComponent(match[1]) : undefined;
+          if (!actionId) {
+            json(res, 404, { error: "action route not found" });
+            return;
+          }
+          if (
+            !(
+              params.config.openaiApiKey ||
+              params.config.anthropicApiKey ||
+              params.config.ollamaBaseUrl ||
+              params.config.runtimeApiKey
+            )
+          ) {
+            json(res, 400, { error: "owner action execution requires an inference provider" });
+            return;
+          }
+          const modelRegistry = new ModelRegistry(params.db.raw);
+          modelRegistry.initialize();
+          const { account } = await getWallet();
+          const result = await executeOwnerOpportunityAction({
+            identity: {
+              name: params.config.name,
+              address: params.config.walletAddress,
+              account,
+              creatorAddress: params.config.creatorAddress,
+              sandboxId: params.config.sandboxId,
+              apiKey: params.config.runtimeApiKey || "",
+              createdAt: new Date().toISOString(),
+            },
+            config: params.config,
+            db: params.db,
+            inference: createInferenceClient({
+              apiUrl: params.config.runtimeApiUrl || "",
+              apiKey: params.config.runtimeApiKey,
+              defaultModel:
+                params.config.inferenceModelRef || params.config.inferenceModel,
+              maxTokens: params.config.maxTokensPerTurn,
+              lowComputeModel:
+                params.config.modelStrategy?.lowComputeModel || "gpt-5-mini",
+              openaiApiKey: params.config.openaiApiKey,
+              anthropicApiKey: params.config.anthropicApiKey,
+              ollamaBaseUrl:
+                process.env.OLLAMA_BASE_URL || params.config.ollamaBaseUrl,
+              getModelProvider: (modelId) => modelRegistry.get(modelId)?.provider,
+            }),
+            actionId,
+          });
+          if (url.searchParams.get("format") === "json") {
+            json(res, 200, result);
+            return;
+          }
+          redirect(res, `${pathPrefix}/actions${webConfig.authToken ? `?token=${encodeURIComponent(webConfig.authToken)}` : ""}`);
           return;
         }
 

@@ -827,6 +827,16 @@ export type OwnerOpportunityActionStatus =
   | "completed"
   | "cancelled";
 
+export type OwnerOpportunityActionExecutionStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export type OwnerOpportunityActionExecutionKind =
+  | "remote_bounty_solve"
+  | "remote_campaign_solve";
+
 export type OwnerOpportunityActionResolutionKind =
   | "note"
   | "bounty"
@@ -859,6 +869,24 @@ export interface OwnerOpportunityActionRecord {
   updatedAt: string;
   completedAt?: string | null;
   cancelledAt?: string | null;
+}
+
+export interface OwnerOpportunityActionExecutionRecord {
+  executionId: string;
+  actionId: string;
+  kind: OwnerOpportunityActionExecutionKind;
+  targetKind: "bounty" | "campaign";
+  targetRef: string;
+  remoteBaseUrl: string;
+  status: OwnerOpportunityActionExecutionStatus;
+  requestPayload: Record<string, unknown>;
+  resultPayload?: Record<string, unknown> | null;
+  executionRef?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+  failedAt?: string | null;
 }
 
 export interface OwnerReportWebConfig {
@@ -897,6 +925,13 @@ export interface OwnerOpportunityAlertsConfig {
   dedupeHours: number;
 }
 
+export interface OwnerOpportunityActionExecutionConfig {
+  enabled: boolean;
+  autoExecutePursue: boolean;
+  maxExecutionsPerRun: number;
+  executionCooldownSeconds: number;
+}
+
 export interface OwnerReportsConfig {
   enabled: boolean;
   generateWithInference: boolean;
@@ -906,6 +941,7 @@ export interface OwnerReportsConfig {
   email: OwnerReportEmailConfig;
   schedule: OwnerReportScheduleConfig;
   alerts?: OwnerOpportunityAlertsConfig;
+  actionExecution?: OwnerOpportunityActionExecutionConfig;
 }
 
 export interface OperatorApiConfig {
@@ -1796,6 +1832,12 @@ export const DEFAULT_OWNER_REPORTS_CONFIG: OwnerReportsConfig = {
     maxItemsPerRun: 5,
     requireStrategyMatched: true,
     dedupeHours: 24,
+  },
+  actionExecution: {
+    enabled: false,
+    autoExecutePursue: true,
+    maxExecutionsPerRun: 2,
+    executionCooldownSeconds: 300,
   },
 };
 
@@ -2843,6 +2885,19 @@ export interface OpenFoxDatabase {
       note?: string | null;
     },
   ): OwnerOpportunityActionRecord | undefined;
+  upsertOwnerOpportunityActionExecution(
+    record: OwnerOpportunityActionExecutionRecord,
+  ): void;
+  getOwnerOpportunityActionExecution(
+    executionId: string,
+  ): OwnerOpportunityActionExecutionRecord | undefined;
+  listOwnerOpportunityActionExecutions(
+    limit: number,
+    filters?: {
+      actionId?: string;
+      status?: OwnerOpportunityActionExecutionStatus;
+    },
+  ): OwnerOpportunityActionExecutionRecord[];
 
   // Signer provider
   upsertSignerQuote(record: SignerQuoteRecord): void;

@@ -567,6 +567,12 @@ export function loadConfig(): OpenFoxConfig | null {
       ...(((raw?.ownerReports as JsonRecord | undefined)?.alerts as JsonRecord | undefined) ??
         {}),
     } as NonNullable<OwnerReportsConfig["alerts"]>,
+    actionExecution: {
+      ...DEFAULT_OWNER_REPORTS_CONFIG.actionExecution,
+      ...(((raw?.ownerReports as JsonRecord | undefined)?.actionExecution as
+        | JsonRecord
+        | undefined) ?? {}),
+    } as NonNullable<OwnerReportsConfig["actionExecution"]>,
   };
 
   const operatorApi: OperatorApiConfig = {

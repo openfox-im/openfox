@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 36;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -515,6 +515,30 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_owner_opportunity_actions_status
     ON owner_opportunity_actions(status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS owner_opportunity_action_executions (
+    execution_id TEXT PRIMARY KEY,
+    action_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('remote_bounty_solve','remote_campaign_solve')),
+    target_kind TEXT NOT NULL CHECK(target_kind IN ('bounty','campaign')),
+    target_ref TEXT NOT NULL,
+    remote_base_url TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('running','completed','failed','skipped')),
+    request_payload_json TEXT NOT NULL DEFAULT '{}',
+    result_payload_json TEXT,
+    execution_ref TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    failed_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_owner_opportunity_action_executions_action
+    ON owner_opportunity_action_executions(action_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_owner_opportunity_action_executions_status
+    ON owner_opportunity_action_executions(status, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS signer_quotes (
     quote_id TEXT PRIMARY KEY,
@@ -1862,6 +1886,32 @@ export const MIGRATION_V35 = `
     CHECK(resolution_kind IN ('note','bounty','campaign','provider_call','artifact','report','other'));
   ALTER TABLE owner_opportunity_actions ADD COLUMN resolution_ref TEXT;
   ALTER TABLE owner_opportunity_actions ADD COLUMN resolution_note TEXT;
+`;
+
+export const MIGRATION_V36 = `
+  CREATE TABLE IF NOT EXISTS owner_opportunity_action_executions (
+    execution_id TEXT PRIMARY KEY,
+    action_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('remote_bounty_solve','remote_campaign_solve')),
+    target_kind TEXT NOT NULL CHECK(target_kind IN ('bounty','campaign')),
+    target_ref TEXT NOT NULL,
+    remote_base_url TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('running','completed','failed','skipped')),
+    request_payload_json TEXT NOT NULL DEFAULT '{}',
+    result_payload_json TEXT,
+    execution_ref TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    failed_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_owner_opportunity_action_executions_action
+    ON owner_opportunity_action_executions(action_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_owner_opportunity_action_executions_status
+    ON owner_opportunity_action_executions(status, created_at DESC);
 `;
 
 export const MIGRATION_V3 = `

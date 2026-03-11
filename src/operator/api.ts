@@ -42,6 +42,10 @@ import {
   runOperatorAutopilot,
 } from "./autopilot.js";
 import { materializeApprovedOwnerOpportunityAction } from "../reports/actions.js";
+import { executeOwnerOpportunityAction } from "../reports/action-execution.js";
+import { getWallet } from "../identity/wallet.js";
+import { createInferenceClient } from "../runtime/inference.js";
+import { ModelRegistry } from "../inference/registry.js";
 
 const logger = createLogger("operator.api");
 
@@ -136,6 +140,7 @@ export async function startOperatorApiServer(
   const ownerReportDeliveriesPath = `${pathPrefix}/owner/report-deliveries`;
   const ownerAlertsPath = `${pathPrefix}/owner/alerts`;
   const ownerActionsPath = `${pathPrefix}/owner/actions`;
+  const ownerActionExecutionsPath = `${pathPrefix}/owner/action-executions`;
   const paymentsPath = `${pathPrefix}/payments/status`;
   const settlementPath = `${pathPrefix}/settlement/status`;
   const marketPath = `${pathPrefix}/market/status`;
@@ -156,6 +161,32 @@ export async function startOperatorApiServer(
   const autopilotRunPath = `${pathPrefix}/autopilot/run`;
   const autopilotApprovalsPath = `${pathPrefix}/autopilot/approvals`;
   const healthzPath = `${pathPrefix}/healthz`;
+
+  const hasInferenceConfigured = Boolean(
+    params.config.openaiApiKey ||
+      params.config.anthropicApiKey ||
+      params.config.ollamaBaseUrl ||
+      params.config.runtimeApiKey,
+  );
+
+  const createOperatorInference = () => {
+    const modelRegistry = new ModelRegistry(params.db.raw);
+    modelRegistry.initialize();
+    return createInferenceClient({
+      apiUrl: params.config.runtimeApiUrl || "",
+      apiKey: params.config.runtimeApiKey,
+      defaultModel:
+        params.config.inferenceModelRef || params.config.inferenceModel,
+      maxTokens: params.config.maxTokensPerTurn,
+      lowComputeModel:
+        params.config.modelStrategy?.lowComputeModel || "gpt-5-mini",
+      openaiApiKey: params.config.openaiApiKey,
+      anthropicApiKey: params.config.anthropicApiKey,
+      ollamaBaseUrl:
+        process.env.OLLAMA_BASE_URL || params.config.ollamaBaseUrl,
+      getModelProvider: (modelId) => modelRegistry.get(modelId)?.provider,
+    });
+  };
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -440,6 +471,70 @@ export async function startOperatorApiServer(
                 : undefined,
           }),
         });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === ownerActionExecutionsPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        const statusParam = url.searchParams.get("status");
+        json(res, 200, {
+          items: params.db.listOwnerOpportunityActionExecutions(limit, {
+            actionId: url.searchParams.get("actionId") || undefined,
+            status:
+              statusParam === "running" ||
+              statusParam === "completed" ||
+              statusParam === "failed" ||
+              statusParam === "skipped"
+                ? statusParam
+                : undefined,
+          }),
+        });
+        return;
+      }
+
+      if (
+        req.method === "POST" &&
+        /^\/?.*\/owner\/actions\/[^/]+\/execute$/.test(url.pathname)
+      ) {
+        const match = url.pathname.match(/\/owner\/actions\/([^/]+)\/execute$/);
+        const actionId = match?.[1] ? decodeURIComponent(match[1]) : undefined;
+        if (!actionId) {
+          json(res, 404, { error: "owner action route not found" });
+          return;
+        }
+        if (!hasInferenceConfigured) {
+          json(res, 400, {
+            error: "owner action execution requires an inference provider",
+          });
+          return;
+        }
+        try {
+          const { account } = await getWallet();
+          const result = await executeOwnerOpportunityAction({
+            identity: {
+              name: params.config.name,
+              address: params.config.walletAddress,
+              account,
+              creatorAddress: params.config.creatorAddress,
+              sandboxId: params.config.sandboxId,
+              apiKey: params.config.runtimeApiKey || "",
+              createdAt: new Date().toISOString(),
+            },
+            config: params.config,
+            db: params.db,
+            inference: createOperatorInference(),
+            actionId,
+          });
+          json(res, 200, result);
+        } catch (error) {
+          json(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 

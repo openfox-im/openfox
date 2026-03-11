@@ -1,21 +1,67 @@
 import fs from "fs/promises";
+import http from "http";
 import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import { createOperatorApprovalRequest } from "../operator/autopilot.js";
+import { createBountyEngine } from "../bounty/engine.js";
 import { deliverOwnerReportChannels } from "../reports/delivery.js";
 import type { OwnerOpportunityAlertRecord } from "../types.js";
 import { generateOwnerReport } from "../reports/generation.js";
 import { startOwnerReportServer } from "../reports/server.js";
-import { DEFAULT_OWNER_REPORTS_CONFIG } from "../types.js";
+import { startBountyHttpServer } from "../bounty/http.js";
+import { DEFAULT_BOUNTY_CONFIG, DEFAULT_OWNER_REPORTS_CONFIG } from "../types.js";
 import {
   MockInferenceClient,
   createTestConfig,
   createTestDb,
+  createTestIdentity,
   noToolResponse,
 } from "./mocks.js";
 
 describe("owner report delivery", () => {
+  async function startMockInferenceServer(answer: string): Promise<{
+    url: string;
+    close(): Promise<void>;
+  }> {
+    const server = http.createServer((_req, res) => {
+      const payload = JSON.stringify({
+        id: "chatcmpl-test",
+        model: "ollama/test",
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { role: "assistant", content: answer },
+          },
+        ],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 2,
+          total_tokens: 12,
+        },
+      });
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      });
+      res.end(payload);
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("failed to resolve mock inference server address");
+    }
+    return {
+      url: `http://127.0.0.1:${address.port}`,
+      close: async () =>
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        ),
+    };
+  }
+
   function createAlert(alertId: string): OwnerOpportunityAlertRecord {
     const now = new Date().toISOString();
     return {
@@ -317,9 +363,50 @@ describe("owner report delivery", () => {
 
   it("serves and updates owner opportunity actions over the owner report web surface", async () => {
     const db = createTestDb();
+    const hostDb = createTestDb();
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "openfox-owner-action-server-"));
+    const previousHome = process.env.HOME;
+    process.env.HOME = rootDir;
     let server: Awaited<ReturnType<typeof startOwnerReportServer>> | null = null;
+    let bountyServer: Awaited<ReturnType<typeof startBountyHttpServer>> | null = null;
+    let inferenceServer: Awaited<ReturnType<typeof startMockInferenceServer>> | null = null;
     try {
+      const hostIdentity = createTestIdentity();
+      const hostEngine = createBountyEngine({
+        identity: hostIdentity,
+        db: hostDb,
+        inference: new MockInferenceClient([
+          noToolResponse('{"decision":"accepted","confidence":0.96,"reason":"Correct."}'),
+        ]),
+        bountyConfig: {
+          ...DEFAULT_BOUNTY_CONFIG,
+          enabled: true,
+          role: "host",
+          bindHost: "127.0.0.1",
+          port: 0,
+        },
+      });
+      const bounty = hostEngine.openQuestionBounty({
+        question: "Capital of Spain?",
+        referenceAnswer: "Madrid",
+        rewardWei: "1000",
+        submissionDeadline: "2026-03-12T00:00:00.000Z",
+      });
+      bountyServer = await startBountyHttpServer({
+        bountyConfig: {
+          ...DEFAULT_BOUNTY_CONFIG,
+          enabled: true,
+          role: "host",
+          bindHost: "127.0.0.1",
+          port: 0,
+        },
+        engine: hostEngine,
+      });
+      inferenceServer = await startMockInferenceServer("Madrid");
+
       const config = createTestConfig({
+        inferenceModel: "ollama/test",
+        ollamaBaseUrl: inferenceServer.url,
         ownerReports: {
           ...DEFAULT_OWNER_REPORTS_CONFIG,
           enabled: true,
@@ -345,11 +432,15 @@ describe("owner report delivery", () => {
         reason: "review this opportunity",
         payload: {
           alertId: alert.alertId,
-          actionKind: "review",
+          actionKind: "pursue",
           title: alert.title,
           summary: alert.summary,
           capability: alert.capability,
-          baseUrl: alert.baseUrl,
+          baseUrl: bountyServer.url,
+          payload: {
+            baseUrl: bountyServer.url,
+            bountyId: bounty.bountyId,
+          },
         },
       });
 
@@ -386,6 +477,41 @@ describe("owner report delivery", () => {
       };
       expect(actionsPayload.items[0]?.actionId).toBe(approvePayload.action.actionId);
 
+      const execute = await fetch(
+        `${server!.url}/actions/${encodeURIComponent(approvePayload.action.actionId)}/execute?format=json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer owner-secret",
+          },
+        },
+      );
+      expect(execute.status).toBe(200);
+      const executePayload = (await execute.json()) as {
+        action: { status: string; resolutionKind: string | null };
+        execution: { status: string; executionRef: string | null };
+      };
+      expect(executePayload.action.status).toBe("completed");
+      expect(executePayload.action.resolutionKind).toBe("bounty");
+      expect(executePayload.execution.status).toBe("completed");
+
+      const executionsJson = await fetch(
+        `${server!.url}/action-executions?format=json&actionId=${encodeURIComponent(
+          approvePayload.action.actionId,
+        )}`,
+        {
+          headers: {
+            Authorization: "Bearer owner-secret",
+          },
+        },
+      );
+      expect(executionsJson.status).toBe(200);
+      const executionsPayload = (await executionsJson.json()) as {
+        items: Array<{ actionId: string; status: string }>;
+      };
+      expect(executionsPayload.items[0]?.actionId).toBe(approvePayload.action.actionId);
+      expect(executionsPayload.items[0]?.status).toBe("completed");
+
       const actionsHtml = await fetch(`${server!.url}/actions?token=owner-secret`);
       expect(actionsHtml.status).toBe(200);
       expect(await actionsHtml.text()).toContain("OpenFox Opportunity Actions");
@@ -417,8 +543,13 @@ describe("owner report delivery", () => {
       expect(completePayload.resolutionKind).toBe("report");
       expect(completePayload.resolutionRef).toBe("report://owner/daily/latest");
     } finally {
+      process.env.HOME = previousHome;
       await server?.close?.();
+      await bountyServer?.close?.();
+      await inferenceServer?.close?.();
       db.close();
+      hostDb.close();
+      await fs.rm(rootDir, { recursive: true, force: true });
     }
   });
 });

@@ -1,8 +1,15 @@
+import fs from "fs/promises";
+import http from "http";
+import os from "os";
+import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestConfig, createTestDb } from "./mocks.js";
 import { startOperatorApiServer } from "../operator/api.js";
+import { createBountyEngine } from "../bounty/engine.js";
+import { startBountyHttpServer } from "../bounty/http.js";
 import { isHeartbeatPaused, isOperatorDrained } from "../state/database.js";
 import {
+  DEFAULT_BOUNTY_CONFIG,
   DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
   type OwnerFinanceSnapshotRecord,
   type OwnerOpportunityAlertRecord,
@@ -10,6 +17,7 @@ import {
   type OwnerReportRecord,
   type PaymasterAuthorizationRecord,
 } from "../types.js";
+import { MockInferenceClient, createTestIdentity, noToolResponse } from "./mocks.js";
 
 const servers: Array<{ close(): Promise<void> }> = [];
 
@@ -22,6 +30,48 @@ afterEach(async () => {
 });
 
 describe("operator api", () => {
+  async function startMockInferenceServer(answer: string): Promise<{
+    url: string;
+    close(): Promise<void>;
+  }> {
+    const server = http.createServer((_req, res) => {
+      const payload = JSON.stringify({
+        id: "chatcmpl-test",
+        model: "ollama/test",
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { role: "assistant", content: answer },
+          },
+        ],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 2,
+          total_tokens: 12,
+        },
+      });
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      });
+      res.end(payload);
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("failed to resolve mock inference server address");
+    }
+    return {
+      url: `http://127.0.0.1:${address.port}`,
+      close: async () =>
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        ),
+    };
+  }
+
   function toHexId(value: string): `0x${string}` {
     return `0x${Buffer.from(value, "utf8")
       .toString("hex")
@@ -893,139 +943,200 @@ describe("operator api", () => {
 
   it("serves autopilot status, approvals, and run surfaces", async () => {
     const db = createTestDb();
-    const config = createAutopilotConfig();
-    const providerAddress =
-      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
-    db.upsertPaymasterAuthorization(
-      createFailedPaymasterAuthorization("auto-1", providerAddress),
-    );
-    db.upsertPaymasterAuthorization(
-      createFailedPaymasterAuthorization("auto-2", providerAddress),
-    );
-    db.upsertPaymasterAuthorization(
-      createFailedPaymasterAuthorization("auto-3", providerAddress),
-    );
-    const server = await startOperatorApiServer({ config, db });
-    expect(server).not.toBeNull();
-    if (!server) {
-      db.close();
-      return;
-    }
-    servers.push(server);
-
-    const headers = {
-      Authorization: "Bearer secret-token",
-      "Content-Type": "application/json",
-    };
-
-    const status = await fetch(`${server.url}/autopilot/status`, {
-      headers: { Authorization: "Bearer secret-token" },
-    });
-    expect(status.status).toBe(200);
-    const statusJson = (await status.json()) as {
-      enabled: boolean;
-      approvals: { pending: number };
-    };
-    expect(statusJson.enabled).toBe(true);
-    expect(statusJson.approvals.pending).toBe(0);
-
-    const request = await fetch(`${server.url}/autopilot/approvals/request`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        kind: "opportunity_action",
-        scope: "owner-alert:alert-api-1:review",
-        reason: "review an opportunity",
-        payload: {
-          alertId: "alert-api-1",
-          actionKind: "review",
-          title: "Review one bounded opportunity",
-          summary: "A bounded owner opportunity action.",
+    const hostDb = createTestDb();
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "openfox-operator-action-"));
+    const previousHome = process.env.HOME;
+    process.env.HOME = rootDir;
+    let bountyServer: Awaited<ReturnType<typeof startBountyHttpServer>> | null = null;
+    let inferenceServer: Awaited<ReturnType<typeof startMockInferenceServer>> | null = null;
+    try {
+      const hostIdentity = createTestIdentity();
+      const hostEngine = createBountyEngine({
+        identity: hostIdentity,
+        db: hostDb,
+        inference: new MockInferenceClient([
+          noToolResponse('{"decision":"accepted","confidence":0.95,"reason":"Correct."}'),
+        ]),
+        bountyConfig: {
+          ...DEFAULT_BOUNTY_CONFIG,
+          enabled: true,
+          role: "host",
+          bindHost: "127.0.0.1",
+          port: 0,
         },
-      }),
-    });
-    expect(request.status).toBe(200);
-    const requestJson = (await request.json()) as { requestId: string; status: string };
-    expect(requestJson.status).toBe("pending");
+      });
+      const bounty = hostEngine.openQuestionBounty({
+        question: "Capital of Germany?",
+        referenceAnswer: "Berlin",
+        rewardWei: "1000",
+        submissionDeadline: "2026-03-12T00:00:00.000Z",
+      });
+      bountyServer = await startBountyHttpServer({
+        bountyConfig: {
+          ...DEFAULT_BOUNTY_CONFIG,
+          enabled: true,
+          role: "host",
+          bindHost: "127.0.0.1",
+          port: 0,
+        },
+        engine: hostEngine,
+      });
+      inferenceServer = await startMockInferenceServer("Berlin");
+      servers.push(bountyServer);
+      servers.push(inferenceServer);
+      const config = createAutopilotConfig();
+      config.inferenceModel = "ollama/test";
+      config.ollamaBaseUrl = inferenceServer.url;
+      const providerAddress =
+        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
+      db.upsertPaymasterAuthorization(
+        createFailedPaymasterAuthorization("auto-1", providerAddress),
+      );
+      db.upsertPaymasterAuthorization(
+        createFailedPaymasterAuthorization("auto-2", providerAddress),
+      );
+      db.upsertPaymasterAuthorization(
+        createFailedPaymasterAuthorization("auto-3", providerAddress),
+      );
+      const server = await startOperatorApiServer({ config, db });
+      expect(server).not.toBeNull();
+      if (!server) {
+        db.close();
+        return;
+      }
+      servers.push(server);
 
-    const approvals = await fetch(
-      `${server.url}/autopilot/approvals?status=pending&limit=10`,
-      {
+      const headers = {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json",
+      };
+
+      const status = await fetch(`${server.url}/autopilot/status`, {
         headers: { Authorization: "Bearer secret-token" },
-      },
-    );
-    expect(approvals.status).toBe(200);
-    const approvalsJson = (await approvals.json()) as {
-      items: Array<{ requestId: string; status: string }>;
-    };
-    expect(approvalsJson.items[0]?.requestId).toBe(requestJson.requestId);
+      });
+      expect(status.status).toBe(200);
+      const statusJson = (await status.json()) as {
+        enabled: boolean;
+        approvals: { pending: number };
+      };
+      expect(statusJson.enabled).toBe(true);
+      expect(statusJson.approvals.pending).toBe(0);
 
-    const approve = await fetch(
-      `${server.url}/autopilot/approvals/${requestJson.requestId}/approve`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ decisionNote: "approved by test" }),
-      },
-    );
-    expect(approve.status).toBe(200);
-    const approveJson = (await approve.json()) as {
-      request: { status: string; requestId: string };
-      action: { actionId: string; status: string; requestId: string };
-    };
-    expect(approveJson.request.status).toBe("approved");
-    expect(approveJson.action.status).toBe("queued");
-    expect(approveJson.action.requestId).toBe(requestJson.requestId);
-
-    const ownerActions = await fetch(
-      `${server.url}/owner/actions?status=queued&limit=10`,
-      {
-        headers: { Authorization: "Bearer secret-token" },
-      },
-    );
-    expect(ownerActions.status).toBe(200);
-    const ownerActionsJson = (await ownerActions.json()) as {
-      items: Array<{ actionId: string; status: string }>;
-    };
-    expect(ownerActionsJson.items[0]?.actionId).toBe(approveJson.action.actionId);
-
-    const complete = await fetch(
-      `${server.url}/owner/actions/${encodeURIComponent(approveJson.action.actionId)}/complete`,
-      {
+      const request = await fetch(`${server.url}/autopilot/approvals/request`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          resultKind: "bounty",
-          resultRef: "bounty://host/queued-1",
-          note: "queued into downstream bounty flow",
+          kind: "opportunity_action",
+          scope: "owner-alert:alert-api-1:review",
+          reason: "review an opportunity",
+          payload: {
+            alertId: "alert-api-1",
+            actionKind: "pursue",
+            title: "Solve one bounded bounty",
+            summary: "A bounded owner opportunity action.",
+            baseUrl: bountyServer.url,
+            payload: {
+              baseUrl: bountyServer.url,
+              bountyId: bounty.bountyId,
+            },
+          },
         }),
-      },
-    );
-    expect(complete.status).toBe(200);
-    const completeJson = (await complete.json()) as {
-      status: string;
-      resolutionKind: string;
-      resolutionRef: string;
-    };
-    expect(completeJson.status).toBe("completed");
-    expect(completeJson.resolutionKind).toBe("bounty");
-    expect(completeJson.resolutionRef).toBe("bounty://host/queued-1");
+      });
+      expect(request.status).toBe(200);
+      const requestJson = (await request.json()) as { requestId: string; status: string };
+      expect(requestJson.status).toBe("pending");
 
-    const run = await fetch(`${server.url}/autopilot/run`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ actor: "test-suite" }),
-    });
-    expect(run.status).toBe(200);
-    const runJson = (await run.json()) as {
-      enabled: boolean;
-      actions: Array<{ action: string; changed: boolean }>;
-    };
-    expect(runJson.enabled).toBe(true);
-    expect(
-      runJson.actions.find((item) => item.action === "quarantine_provider")?.changed,
-    ).toBe(true);
+      const approvals = await fetch(
+        `${server.url}/autopilot/approvals?status=pending&limit=10`,
+        {
+          headers: { Authorization: "Bearer secret-token" },
+        },
+      );
+      expect(approvals.status).toBe(200);
+      const approvalsJson = (await approvals.json()) as {
+        items: Array<{ requestId: string; status: string }>;
+      };
+      expect(approvalsJson.items[0]?.requestId).toBe(requestJson.requestId);
 
-    db.close();
+      const approve = await fetch(
+        `${server.url}/autopilot/approvals/${requestJson.requestId}/approve`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ decisionNote: "approved by test" }),
+        },
+      );
+      expect(approve.status).toBe(200);
+      const approveJson = (await approve.json()) as {
+        request: { status: string; requestId: string };
+        action: { actionId: string; status: string; requestId: string };
+      };
+      expect(approveJson.request.status).toBe("approved");
+      expect(approveJson.action.status).toBe("queued");
+      expect(approveJson.action.requestId).toBe(requestJson.requestId);
+
+      const ownerActions = await fetch(
+        `${server.url}/owner/actions?status=queued&limit=10`,
+        {
+          headers: { Authorization: "Bearer secret-token" },
+        },
+      );
+      expect(ownerActions.status).toBe(200);
+      const ownerActionsJson = (await ownerActions.json()) as {
+        items: Array<{ actionId: string; status: string }>;
+      };
+      expect(ownerActionsJson.items[0]?.actionId).toBe(approveJson.action.actionId);
+
+      const execute = await fetch(
+        `${server.url}/owner/actions/${encodeURIComponent(approveJson.action.actionId)}/execute`,
+        {
+          method: "POST",
+          headers,
+        },
+      );
+      expect(execute.status).toBe(200);
+      const executeJson = (await execute.json()) as {
+        action: { status: string; resolutionKind: string; resolutionRef: string };
+        execution: { status: string };
+      };
+      expect(executeJson.action.status).toBe("completed");
+      expect(executeJson.action.resolutionKind).toBe("bounty");
+      expect(executeJson.execution.status).toBe("completed");
+
+      const actionExecutions = await fetch(
+        `${server.url}/owner/action-executions?actionId=${encodeURIComponent(
+          approveJson.action.actionId,
+        )}&limit=10`,
+        {
+          headers: { Authorization: "Bearer secret-token" },
+        },
+      );
+      expect(actionExecutions.status).toBe(200);
+      const actionExecutionsJson = (await actionExecutions.json()) as {
+        items: Array<{ actionId: string; status: string }>;
+      };
+      expect(actionExecutionsJson.items[0]?.actionId).toBe(approveJson.action.actionId);
+      expect(actionExecutionsJson.items[0]?.status).toBe("completed");
+
+      const run = await fetch(`${server.url}/autopilot/run`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ actor: "test-suite" }),
+      });
+      expect(run.status).toBe(200);
+      const runJson = (await run.json()) as {
+        enabled: boolean;
+        actions: Array<{ action: string; changed: boolean }>;
+      };
+      expect(runJson.enabled).toBe(true);
+      expect(
+        runJson.actions.find((item) => item.action === "quarantine_provider")?.changed,
+      ).toBe(true);
+    } finally {
+      process.env.HOME = previousHome;
+      await fs.rm(rootDir, { recursive: true, force: true });
+      hostDb.close();
+      db.close();
+    }
   });
 });

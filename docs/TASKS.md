@@ -962,3 +962,14 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add `openfox fleet market --manifest <path> [--json]`.
 - [x] Extend fleet dashboard snapshots and HTML exports with finance attribution, delayed-queue warnings, and role/capability/counterparty breakdowns.
 - [x] Add tests for finops attribution, operator endpoints, fleet reports, and dashboard exports.
+
+## Task 60 Breakdown
+
+- [x] Add persistent owner-opportunity action execution records linked to queued owner actions.
+- [x] Reuse the existing remote bounty and campaign requester clients for queued `pursue` action execution instead of inventing a second submission path.
+- [x] Add `openfox report action-execute <action-id>` and `openfox report action-executions`.
+- [x] Add owner web execution routes and execution-history inspection for owner reports.
+- [x] Add operator API execution routes and execution-history listing for dashboards and control planes.
+- [x] Add heartbeat-driven automatic owner action execution with bounded cooldown and per-run limits.
+- [x] Surface owner-action execution state through `openfox status`, `openfox health`, and `openfox doctor`.
+- [x] Add targeted tests for execution persistence, owner-web execution, and operator API execution flows.

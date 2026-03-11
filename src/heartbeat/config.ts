@@ -125,6 +125,12 @@ const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
       task: "sync_owner_opportunity_actions",
       enabled: true,
     },
+    {
+      name: "execute_owner_opportunity_actions",
+      schedule: "30 * * * *",
+      task: "execute_owner_opportunity_actions",
+      enabled: true,
+    },
   ],
   defaultIntervalMs: 60_000,
   lowComputeMultiplier: 4,
