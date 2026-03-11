@@ -4,6 +4,15 @@ This guide describes the minimum operator surface for auditing multiple
 OpenFox nodes that expose public storage, artifact, signer, paymaster, gateway,
 or marketplace roles.
 
+Those nodes are not an end in themselves. They exist to support OpenFox's main
+product direction: an agent platform on `TOS.network` that can discover
+opportunities, take work, get paid, issue rewards, call other agents, and
+complete proof and settlement flows.
+
+`openfox fleet ...` is therefore a supporting operator surface for a
+revenue-generating agent network. It is not the main product loop, and it
+should not redefine OpenFox as a monitoring tool.
+
 ## 1. Enable the Operator API on Each Node
 
 Add this to `~/.openfox/openfox.json` on every node that should be visible to a
@@ -117,6 +126,7 @@ Use these to answer questions such as:
 Use fleet auditing for:
 
 - public gateway fleets
+- host and solver fleets that accept and execute paid work
 - storage and artifact capture fleets
 - signer and paymaster provider fleets
 
@@ -125,6 +135,14 @@ Use fleet repair for:
 - storage fleets with due renewals or overdue local audits
 - artifact fleets that need batch verification or anchoring catch-up
 - mixed public/private deployment topologies
+
+Use fleet visibility as the control surface around the actual business loop:
+
+- hosts that take jobs and open bounties
+- solvers that perform work and receive rewards
+- providers that accept paid requests
+- storage and artifact nodes that hold proofs and result bundles
+- signer and paymaster nodes that support bounded delegated execution
 
 Use provider and lease-health reporting for:
 

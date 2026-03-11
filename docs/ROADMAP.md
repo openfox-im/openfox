@@ -266,11 +266,11 @@ Delivered surface so far:
 - `GET /oracle/result/:id` for persisted result lookup
 - payment-bound oracle receipts with `result_id`, `result_url`, and `payment_tx_hash`
 
-Protocol extension now drafted on top of the paid-service surface:
+Protocol extension now active on top of the paid-service surface:
 
-- `news.fetch` request/response schema and provider skeleton are now drafted for zkTLS-oriented news capture jobs
-- `proof.verify` request/response schema and provider skeleton are now drafted for SNARK or receipt verification jobs
-- `storage.put` and `storage.get` request/response schema are now drafted, and OpenFox includes a minimal immutable local object storage provider for them
+- `news.fetch` now has a bounded paid HTTP capture backend that returns canonical capture receipts, content hashes, and bundle hashes
+- `proof.verify` now has a bounded paid verifier backend that checks subject hashes, bundle hashes, and referenced receipt hashes
+- `storage.put` and `storage.get` now support immutable local object storage with explicit TTL and expiry enforcement
 - the intended workflow is `news.fetch -> proof.verify x N -> M-of-N tally -> storage.put`, orchestrated by a coordinator agent rather than a single provider
 
 What is still missing before this becomes a real production lane:
