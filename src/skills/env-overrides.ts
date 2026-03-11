@@ -14,7 +14,7 @@
  */
 
 import type { Skill, SkillConfig, SkillsConfig } from "../types.js";
-import { resolveSkillConfig } from "./config.js";
+import { resolveSkillConfig, resolveSkillKey } from "./config.js";
 import { createLogger } from "../observability/logger.js";
 
 const logger = createLogger("skills.env-overrides");
@@ -240,7 +240,8 @@ export function applySkillEnvOverrides(
   const injectedKeys: string[] = [];
 
   for (const skill of skills) {
-    const skillConfig = resolveSkillConfig(skillsConfig, skill.name);
+    const key = resolveSkillKey(skill);
+    const skillConfig = resolveSkillConfig(skillsConfig, key);
     const pending = buildPendingOverrides(skill, skillConfig);
     if (Object.keys(pending).length === 0) continue;
 

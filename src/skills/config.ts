@@ -25,6 +25,14 @@ const DEFAULT_CONFIG_VALUES: Record<string, unknown> = {
   "browser.evaluateEnabled": true,
 };
 
+/**
+ * Resolve the config lookup key for a skill.
+ * Uses `skill.skillKey` if set, otherwise falls back to `skill.name`.
+ */
+export function resolveSkillKey(skill: Skill): string {
+  return skill.skillKey ?? skill.name;
+}
+
 export function resolveSkillConfig(
   skillsConfig: SkillsConfig | undefined,
   skillName: string,
@@ -74,7 +82,8 @@ export function shouldIncludeSkill(params: {
   skillsConfig?: SkillsConfig;
 }): boolean {
   const { skill, skillsConfig } = params;
-  const skillConfig = resolveSkillConfig(skillsConfig, skill.name);
+  const key = resolveSkillKey(skill);
+  const skillConfig = resolveSkillConfig(skillsConfig, key);
   const allowBundled = skillsConfig?.allowBundled;
 
   // Explicit disable

@@ -24,11 +24,15 @@ import type {
   SkillSnapshot,
   SkillStatusEntry,
   SkillSource,
+  SkillInstallSpec,
   SkillsConfig,
+  SkillsInstallConfig,
   SkillsLimitsConfig,
 } from "../types.js";
 import { parseSkillMd } from "./format.js";
-import { shouldIncludeSkill, hasBinary, resolveSkillConfig } from "./config.js";
+import { shouldIncludeSkill, hasBinary, resolveSkillConfig, resolveSkillKey } from "./config.js";
+import { normalizeSkillFilter } from "./filter.js";
+import { resolveBundledSkillsDir } from "./bundled-dir.js";
 import { sanitizeInput } from "../agent/injection-defense.js";
 import { createLogger } from "../observability/logger.js";
 
@@ -130,16 +134,23 @@ export function loadSkillCatalog(
 
 /**
  * Build a snapshot with prompt, entries, and version.
+ * Optionally applies a skill filter to restrict which skills appear.
  */
 export function buildSkillsSnapshot(
   skills: Skill[],
   skillsConfig?: SkillsConfig,
   version?: number,
+  skillFilter?: string[],
 ): SkillSnapshot {
-  // Filter out model-disabled skills from prompt
-  const promptSkills = skills.filter(
-    (s) => s.enabled && s.invocation?.disableModelInvocation !== true,
-  );
+  const normalized = normalizeSkillFilter(skillFilter);
+
+  // Filter out model-disabled skills from prompt, apply skill filter
+  const promptSkills = skills.filter((s) => {
+    if (!s.enabled) return false;
+    if (s.invocation?.disableModelInvocation === true) return false;
+    if (normalized && !normalized.includes(s.name.toLowerCase())) return false;
+    return true;
+  });
 
   const promptEntries = promptSkills.map((skill) => ({
     name: skill.name,
@@ -152,6 +163,7 @@ export function buildSkillsSnapshot(
     prompt: buildSkillsPrompt(promptEntries, skillsConfig),
     skills: promptEntries,
     resolvedSkills: skills.filter((skill) => skill.enabled),
+    skillFilter: normalized,
     version,
   };
 }
@@ -247,6 +259,7 @@ export function buildSkillStatusReport(
       missingEnv,
       missingConfig,
       install: skill.install ?? [],
+      preferredInstall: selectPreferredInstallSpec(skill.install ?? [], skillsConfig?.install),
       license: skill.license,
     };
   });
@@ -287,7 +300,8 @@ function resolveSkillLoadEntries(
 ): SkillLoadEntry[] {
   const managedDir = resolveHome(skillsDir);
   const workspaceDir = path.join(process.cwd(), "skills");
-  const bundledDir = resolveBundledSkillsDir();
+  const bundledDir = resolveBundledSkillsDir()
+    ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../skills");
   const agentsPersonalDir = path.join(os.homedir(), ".agents", "skills");
   const agentsProjectDir = path.join(process.cwd(), ".agents", "skills");
 
@@ -307,8 +321,25 @@ function resolveSkillLoadEntries(
   ];
 }
 
-function resolveBundledSkillsDir(): string {
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../skills");
+/**
+ * Heuristic: if `dir/skills/<name>/SKILL.md` exists, use `dir/skills` as root.
+ */
+function resolveNestedSkillsRoot(dir: string): string {
+  const nested = path.join(dir, "skills");
+  try {
+    if (!fs.existsSync(nested)) return dir;
+    const entries = fs.readdirSync(nested, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (fs.existsSync(path.join(nested, entry.name, "SKILL.md"))) {
+          return nested;
+        }
+      }
+    }
+  } catch {
+    // not readable
+  }
+  return dir;
 }
 
 // ─── Loading ─────────────────────────────────────────────────────
@@ -318,14 +349,16 @@ function loadSkillsFromRoot(
   source: SkillSource,
   limits: Required<SkillsLimitsConfig>,
 ): Skill[] {
-  if (!fs.existsSync(rootDir)) return [];
+  // Auto-detect nested skills/ subdirectory
+  const effectiveDir = resolveNestedSkillsRoot(rootDir);
+  if (!fs.existsSync(effectiveDir)) return [];
 
-  const rootRealPath = tryRealpath(rootDir);
+  const rootRealPath = tryRealpath(effectiveDir);
   if (!rootRealPath) return [];
 
   let entries: fs.Dirent[];
   try {
-    entries = fs.readdirSync(rootDir, { withFileTypes: true });
+    entries = fs.readdirSync(effectiveDir, { withFileTypes: true });
   } catch {
     return [];
   }
@@ -342,7 +375,7 @@ function loadSkillsFromRoot(
 
   if (dirs.length > limits.maxCandidatesPerRoot) {
     logger.warn(`Skills root looks suspiciously large, truncating discovery.`, {
-      dir: rootDir, count: dirs.length, max: limits.maxCandidatesPerRoot,
+      dir: effectiveDir, count: dirs.length, max: limits.maxCandidatesPerRoot,
     });
   }
 
@@ -350,7 +383,7 @@ function loadSkillsFromRoot(
   const skills: Skill[] = [];
 
   for (const name of toScan) {
-    const skillDir = path.join(rootDir, name);
+    const skillDir = path.join(effectiveDir, name);
     const skillMdPath = path.join(skillDir, "SKILL.md");
 
     // Symlink containment check
@@ -358,7 +391,7 @@ function loadSkillsFromRoot(
     if (!realDir || !isPathInside(rootRealPath, realDir)) {
       if (realDir) {
         logger.warn(`Skipping skill path that resolves outside its root.`, {
-          source, rootDir, path: skillDir, realPath: realDir,
+          source, rootDir: effectiveDir, path: skillDir, realPath: realDir,
         });
       }
       continue;
@@ -394,6 +427,44 @@ function loadSkillsFromRoot(
   return skills;
 }
 
+// ─── Install Preference ───────────────────────────────────────────
+
+/**
+ * Select the preferred install spec from a list.
+ * Preference chain: (prefer-brew if available) → uv → node → brew → go → download → first.
+ */
+export function selectPreferredInstallSpec(
+  specs: SkillInstallSpec[],
+  installConfig?: SkillsInstallConfig,
+): SkillInstallSpec | undefined {
+  if (specs.length === 0) return undefined;
+
+  // Filter by current OS
+  const platform = os.platform();
+  const eligible = specs.filter((s) => {
+    if (!s.os || s.os.length === 0) return true;
+    return s.os.some((o) => o === platform);
+  });
+  if (eligible.length === 0) return specs[0]; // fallback to first
+
+  const preferBrew = installConfig?.preferBrew === true;
+
+  // If prefer-brew, check brew first
+  if (preferBrew) {
+    const brew = eligible.find((s) => s.kind === "brew");
+    if (brew) return brew;
+  }
+
+  // uv → node → brew → go → download
+  const kindOrder: SkillInstallSpec["kind"][] = ["uv", "node", "brew", "go", "download"];
+  for (const kind of kindOrder) {
+    const found = eligible.find((s) => s.kind === kind);
+    if (found) return found;
+  }
+
+  return eligible[0];
+}
+
 // ─── Requirement resolution (for status report) ──────────────────
 
 function resolveMissingBins(bins?: string[]): string[] {
@@ -413,7 +484,8 @@ function resolveMissingEnv(
   skillsConfig?: SkillsConfig,
 ): string[] {
   if (!env || env.length === 0) return [];
-  const skillConfig = skill ? resolveSkillConfig(skillsConfig, skill.name) : undefined;
+  const key = skill ? resolveSkillKey(skill) : undefined;
+  const skillConfig = key ? resolveSkillConfig(skillsConfig, key) : undefined;
   return env.filter((name) => {
     if (process.env[name]) return false;
     if (skillConfig?.env?.[name]) return false;
@@ -428,7 +500,8 @@ function resolveMissingConfig(
   skillsConfig?: SkillsConfig,
 ): string[] {
   if (!config || config.length === 0) return [];
-  const skillConfig = skill ? resolveSkillConfig(skillsConfig, skill.name) : undefined;
+  const key = skill ? resolveSkillKey(skill) : undefined;
+  const skillConfig = key ? resolveSkillConfig(skillsConfig, key) : undefined;
   if (!skillConfig?.config) return [...config];
   return config.filter((pathStr) => {
     const parts = pathStr.split(".");

@@ -121,6 +121,7 @@ export function parseSkillMd(
 
   return {
     name,
+    skillKey: frontmatter["skill-key"] || undefined,
     description: frontmatter.description || "",
     autoActivate: frontmatter["auto-activate"] !== false,
     always: frontmatter.always === true,

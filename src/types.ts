@@ -3298,6 +3298,7 @@ export interface InferenceClient {
 
 export interface Skill {
   name: string;
+  skillKey?: string;
   description: string;
   autoActivate: boolean;
   always?: boolean;
@@ -3363,6 +3364,7 @@ export interface SkillSnapshot {
   prompt: string;
   skills: SkillPromptEntry[];
   resolvedSkills: Skill[];
+  skillFilter?: string[];
   version?: number;
 }
 
@@ -3382,6 +3384,7 @@ export interface SkillStatusEntry {
   missingEnv: string[];
   missingConfig: string[];
   install: SkillInstallSpec[];
+  preferredInstall?: SkillInstallSpec;
   license?: string;
 }
 
@@ -3409,6 +3412,7 @@ export interface SkillFrontmatter {
   "user-invocable"?: boolean;
   "disable-model-invocation"?: boolean;
   // Platform fields (top-level, per agentskills.io convention)
+  "skill-key"?: string;
   "auto-activate"?: boolean;
   always?: boolean;
   homepage?: string;

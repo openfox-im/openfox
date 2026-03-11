@@ -581,10 +581,10 @@ describe("Source code injection safety", () => {
     expect(source).toMatch(/fs\.rmSync\(/);
   });
 
-  it("loader.ts uses execFileSync('which', [bin]) not execSync('which ${bin}')", async () => {
+  it("config.ts uses execFileSync('which', [bin]) not execSync('which ${bin}')", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync(
-      new URL("../skills/loader.ts", import.meta.url).pathname.replace("/src/__tests__/../", "/src/"),
+      new URL("../skills/config.ts", import.meta.url).pathname.replace("/src/__tests__/../", "/src/"),
       "utf-8",
     );
     // Should NOT have: execSync(`which ${bin}`)
