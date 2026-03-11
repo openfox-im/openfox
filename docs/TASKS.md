@@ -287,6 +287,11 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Let operators pause, resume, drain, and selectively retry
     revenue-affecting queues across a fleet through authenticated control
     endpoints instead of logging into each node manually.
+- [x] Task 61: Add conservative operator autopilot policies
+  - Status: Complete
+  - Goal: Let operator boxes automate low-risk retries, maintenance, and
+    provider quarantine while forcing treasury and policy-expansion changes
+    through explicit approval requests and audit trails.
 
 ## Task 53 Breakdown
 
@@ -343,6 +348,25 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add runtime and doctor visibility for paused and drained nodes.
 - [x] Add `openfox fleet control ...` and `openfox fleet retry ...`.
 - [x] Add API and fleet tests for authorization, idempotency, and queue retry surfaces.
+
+## Task 61 Breakdown
+
+- [x] Add `operatorAutopilot` runtime config with bounded retry, maintenance,
+  and provider-quarantine thresholds.
+- [x] Add a built-in `operator_autopilot` heartbeat task.
+- [x] Add persistent operator approval request records and approval-state CRUD.
+- [x] Add `openfox autopilot status|run|approvals|request|approve|reject`.
+- [x] Add authenticated operator API surfaces for autopilot status, manual run,
+  approval creation, and approval decisions.
+- [x] Add low-risk direct control endpoints for storage maintenance, artifact
+  maintenance, and provider quarantine.
+- [x] Surface autopilot state through runtime status, doctor, and health.
+- [x] Extend dashboard bundles with:
+  - `control-events.json`
+  - `autopilot.json`
+  - `approvals.json`
+- [x] Add targeted tests for rule triggering, cooldown suppression, approval
+  flows, operator API endpoints, and dashboard bundle exports.
 
 ## Task 1 Breakdown
 

@@ -182,6 +182,13 @@ import {
   buildRuntimeStatusSnapshot,
 } from "./operator/status.js";
 import {
+  buildOperatorAutopilotReport,
+  buildOperatorAutopilotSnapshot,
+  createOperatorApprovalRequest,
+  decideOperatorApprovalRequest,
+  runOperatorAutopilot,
+} from "./operator/autopilot.js";
+import {
   buildFleetControlReport,
   buildFleetControlSnapshot,
   buildFleetReport,
@@ -415,6 +422,11 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "autopilot") {
+    await handleAutopilotCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "dashboard") {
     await handleDashboardCommand(args.slice(1));
     process.exit(0);
@@ -462,6 +474,7 @@ Usage:
   openfox signer ...     Use delegated signer-provider execution
   openfox paymaster ...  Use native sponsored execution through a paymaster-provider
   openfox fleet ...      Inspect multiple OpenFox nodes through operator APIs
+  openfox autopilot ...  Inspect and control bounded operator automation
   openfox dashboard ...  Build fleet dashboard snapshots and exports
   openfox status         Show the current runtime status
   openfox --version      Show version
@@ -1324,6 +1337,142 @@ Usage:
 
     throw new Error(`Unknown gateway command: ${command}`);
   });
+}
+
+async function handleAutopilotCommand(args: string[]): Promise<void> {
+  if (args.length === 0 || args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
+    logger.info(`
+OpenFox autopilot
+
+Usage:
+  openfox autopilot status [--json]
+  openfox autopilot run [--json]
+  openfox autopilot approvals [--json] [--status <status>] [--kind <kind>] [--limit <n>]
+  openfox autopilot request --kind <kind> --scope <scope> [--reason <text>] [--ttl-seconds <n>] [--json]
+  openfox autopilot approve <request-id> [--note <text>] [--json]
+  openfox autopilot reject <request-id> [--note <text>] [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    logger.error("OpenFox is not configured. Run openfox --setup first.");
+    process.exit(1);
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  const asJson = args.includes("--json");
+  const command = args[0] || "status";
+
+  try {
+    if (command === "status") {
+      const snapshot = buildOperatorAutopilotSnapshot(config, db);
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+      } else {
+        logger.info(buildOperatorAutopilotReport(snapshot));
+      }
+      return;
+    }
+
+    if (command === "run") {
+      const result = await runOperatorAutopilot({
+        config,
+        db,
+        actor: "cli",
+        reason: "manual operator run",
+      });
+      logger.info(asJson ? JSON.stringify(result, null, 2) : result.summary);
+      return;
+    }
+
+    if (command === "approvals") {
+      const limit = readNumberOption(args, "--limit", 50);
+      const status = readOption(args, "--status");
+      const kind = readOption(args, "--kind");
+      const items = db.listOperatorApprovalRequests(limit, {
+        status:
+          status === "pending" ||
+          status === "approved" ||
+          status === "rejected" ||
+          status === "expired"
+            ? status
+            : undefined,
+        kind:
+          kind === "treasury_policy_change" ||
+          kind === "spend_cap_change" ||
+          kind === "signer_policy_change" ||
+          kind === "paymaster_policy_change"
+            ? kind
+            : undefined,
+      });
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+      } else {
+        logger.info("=== OPENFOX AUTOPILOT APPROVALS ===");
+        for (const item of items) {
+          logger.info(
+            `${item.requestId}  [${item.status}]  ${item.kind}  scope=${item.scope}  requested_by=${item.requestedBy}`,
+          );
+        }
+        if (!items.length) logger.info("(none)");
+      }
+      return;
+    }
+
+    if (command === "request") {
+      const kind = readOption(args, "--kind");
+      const scope = readOption(args, "--scope");
+      if (
+        !scope ||
+        !(
+          kind === "treasury_policy_change" ||
+          kind === "spend_cap_change" ||
+          kind === "signer_policy_change" ||
+          kind === "paymaster_policy_change"
+        )
+      ) {
+        logger.error("Usage: openfox autopilot request --kind <kind> --scope <scope> [--reason <text>] [--ttl-seconds <n>] [--json]");
+        process.exit(1);
+      }
+      const record = createOperatorApprovalRequest({
+        db,
+        config,
+        kind,
+        scope,
+        requestedBy: "cli",
+        reason: readOption(args, "--reason"),
+        ttlSeconds: readOption(args, "--ttl-seconds")
+          ? readNumberOption(args, "--ttl-seconds", 0)
+          : undefined,
+      });
+      logger.info(asJson ? JSON.stringify(record, null, 2) : `Created approval request ${record.requestId}`);
+      return;
+    }
+
+    if (command === "approve" || command === "reject") {
+      const requestId = args[1]?.trim();
+      if (!requestId) {
+        logger.error(`Usage: openfox autopilot ${command} <request-id> [--note <text>] [--json]`);
+        process.exit(1);
+      }
+      const record = decideOperatorApprovalRequest({
+        db,
+        requestId,
+        status: command === "approve" ? "approved" : "rejected",
+        decidedBy: "cli",
+        decisionNote: readOption(args, "--note"),
+      });
+      logger.info(asJson ? JSON.stringify(record, null, 2) : `${command}d ${record.requestId}`);
+      return;
+    }
+
+    logger.error(`Unknown autopilot command: ${command}`);
+    process.exit(1);
+  } finally {
+    db.close();
+  }
 }
 
 async function handleFleetCommand(args: string[]): Promise<void> {

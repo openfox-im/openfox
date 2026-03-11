@@ -439,6 +439,7 @@ export interface OpenFoxConfig {
   marketContracts?: MarketContractConfig;
   x402Server?: X402ServerConfig;
   operatorApi?: OperatorApiConfig;
+  operatorAutopilot?: OperatorAutopilotConfig;
   signerProvider?: SignerProviderConfig;
   paymasterProvider?: PaymasterProviderConfig;
   storage?: StorageMarketConfig;
@@ -638,6 +639,9 @@ export type OperatorControlAction =
   | "pause"
   | "resume"
   | "drain"
+  | "maintain_storage"
+  | "maintain_artifacts"
+  | "quarantine_provider"
   | "retry_payments"
   | "retry_settlement"
   | "retry_market"
@@ -655,6 +659,75 @@ export interface OperatorControlEventRecord {
   summary?: string | null;
   result?: unknown;
   createdAt: string;
+}
+
+export type OperatorApprovalKind =
+  | "treasury_policy_change"
+  | "spend_cap_change"
+  | "signer_policy_change"
+  | "paymaster_policy_change";
+
+export type OperatorApprovalStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "expired";
+
+export interface OperatorApprovalRequestRecord {
+  requestId: string;
+  kind: OperatorApprovalKind;
+  scope: string;
+  requestedBy: string;
+  reason?: string | null;
+  payload?: unknown;
+  status: OperatorApprovalStatus;
+  expiresAt?: string | null;
+  createdAt: string;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  decisionNote?: string | null;
+}
+
+export interface OperatorAutopilotQueuePolicy {
+  enabled: boolean;
+  pendingThreshold: number;
+  limit: number;
+  cooldownSeconds: number;
+}
+
+export interface OperatorAutopilotMaintenancePolicy {
+  enabled: boolean;
+  triggerThreshold: number;
+  limit: number;
+  cooldownSeconds: number;
+}
+
+export interface OperatorAutopilotProviderPolicy {
+  enabled: boolean;
+  quarantineScoreThreshold: number;
+  quarantineMinEvents: number;
+  maxProvidersPerRun: number;
+  cooldownSeconds: number;
+}
+
+export interface OperatorAutopilotApprovalPolicy {
+  enabled: boolean;
+  defaultTtlSeconds: number;
+}
+
+export interface OperatorAutopilotConfig {
+  enabled: boolean;
+  queuePolicies: {
+    payments: OperatorAutopilotQueuePolicy;
+    settlement: OperatorAutopilotQueuePolicy;
+    market: OperatorAutopilotQueuePolicy;
+    signer: OperatorAutopilotQueuePolicy;
+    paymaster: OperatorAutopilotQueuePolicy;
+  };
+  storageMaintenance: OperatorAutopilotMaintenancePolicy;
+  artifactMaintenance: OperatorAutopilotMaintenancePolicy;
+  providerQuarantine: OperatorAutopilotProviderPolicy;
+  approvals: OperatorAutopilotApprovalPolicy;
 }
 
 export type SignerProviderTrustTier =
@@ -1413,6 +1486,52 @@ export const DEFAULT_OPERATOR_API_CONFIG: OperatorApiConfig = {
   exposeServiceStatus: true,
 };
 
+export const DEFAULT_OPERATOR_AUTOPILOT_QUEUE_POLICY: OperatorAutopilotQueuePolicy =
+  {
+    enabled: true,
+    pendingThreshold: 5,
+    limit: 25,
+    cooldownSeconds: 300,
+  };
+
+export const DEFAULT_OPERATOR_AUTOPILOT_MAINTENANCE_POLICY: OperatorAutopilotMaintenancePolicy =
+  {
+    enabled: true,
+    triggerThreshold: 1,
+    limit: 10,
+    cooldownSeconds: 1800,
+  };
+
+export const DEFAULT_OPERATOR_AUTOPILOT_PROVIDER_POLICY: OperatorAutopilotProviderPolicy =
+  {
+    enabled: true,
+    quarantineScoreThreshold: 45,
+    quarantineMinEvents: 3,
+    maxProvidersPerRun: 5,
+    cooldownSeconds: 1800,
+  };
+
+export const DEFAULT_OPERATOR_AUTOPILOT_APPROVAL_POLICY: OperatorAutopilotApprovalPolicy =
+  {
+    enabled: true,
+    defaultTtlSeconds: 86400,
+  };
+
+export const DEFAULT_OPERATOR_AUTOPILOT_CONFIG: OperatorAutopilotConfig = {
+  enabled: false,
+  queuePolicies: {
+    payments: { ...DEFAULT_OPERATOR_AUTOPILOT_QUEUE_POLICY },
+    settlement: { ...DEFAULT_OPERATOR_AUTOPILOT_QUEUE_POLICY },
+    market: { ...DEFAULT_OPERATOR_AUTOPILOT_QUEUE_POLICY },
+    signer: { ...DEFAULT_OPERATOR_AUTOPILOT_QUEUE_POLICY },
+    paymaster: { ...DEFAULT_OPERATOR_AUTOPILOT_QUEUE_POLICY },
+  },
+  storageMaintenance: { ...DEFAULT_OPERATOR_AUTOPILOT_MAINTENANCE_POLICY },
+  artifactMaintenance: { ...DEFAULT_OPERATOR_AUTOPILOT_MAINTENANCE_POLICY },
+  providerQuarantine: { ...DEFAULT_OPERATOR_AUTOPILOT_PROVIDER_POLICY },
+  approvals: { ...DEFAULT_OPERATOR_AUTOPILOT_APPROVAL_POLICY },
+};
+
 export const DEFAULT_SIGNER_PROVIDER_CONFIG: SignerProviderConfig = {
   enabled: false,
   bindHost: "127.0.0.1",
@@ -1588,6 +1707,7 @@ export const DEFAULT_CONFIG: Partial<OpenFoxConfig> = {
   bounty: DEFAULT_BOUNTY_CONFIG,
   opportunityScout: DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
   operatorApi: DEFAULT_OPERATOR_API_CONFIG,
+  operatorAutopilot: DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
   settlement: DEFAULT_SETTLEMENT_CONFIG,
   marketContracts: DEFAULT_MARKET_CONTRACT_CONFIG,
   x402Server: DEFAULT_X402_SERVER_CONFIG,
@@ -2184,6 +2304,22 @@ export interface OpenFoxDatabase {
       status?: OperatorControlEventStatus;
     },
   ): OperatorControlEventRecord[];
+  insertOperatorApprovalRequest(record: OperatorApprovalRequestRecord): void;
+  getOperatorApprovalRequest(requestId: string): OperatorApprovalRequestRecord | undefined;
+  listOperatorApprovalRequests(
+    limit: number,
+    filters?: {
+      kind?: OperatorApprovalKind;
+      status?: OperatorApprovalStatus;
+    },
+  ): OperatorApprovalRequestRecord[];
+  updateOperatorApprovalRequest(
+    requestId: string,
+    updates: Pick<
+      OperatorApprovalRequestRecord,
+      "status" | "decidedAt" | "decidedBy" | "decisionNote"
+    >,
+  ): void;
 
   // Key-value store
   getKV(key: string): string | undefined;

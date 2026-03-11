@@ -56,6 +56,9 @@ import type {
   OperatorControlAction,
   OperatorControlEventRecord,
   OperatorControlEventStatus,
+  OperatorApprovalKind,
+  OperatorApprovalRequestRecord,
+  OperatorApprovalStatus,
   StorageAnchorRecord,
   StorageAuditRecord,
   StorageAuditStatus,
@@ -107,6 +110,7 @@ import {
   MIGRATION_V26,
   MIGRATION_V27,
   MIGRATION_V28,
+  MIGRATION_V29,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -431,6 +435,85 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       )
       .all(...params, limit) as any[];
     return rows.map(deserializeOperatorControlEvent);
+  };
+
+  const insertOperatorApprovalRequest = (
+    record: OperatorApprovalRequestRecord,
+  ): void => {
+    db.prepare(
+      `INSERT OR REPLACE INTO operator_approval_requests (
+        request_id, kind, scope, requested_by, reason, payload_json, status,
+        expires_at, created_at, decided_at, decided_by, decision_note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      record.requestId,
+      record.kind,
+      record.scope,
+      record.requestedBy,
+      record.reason ?? null,
+      record.payload ? stringifyJsonSafe(record.payload) : null,
+      record.status,
+      record.expiresAt ?? null,
+      record.createdAt,
+      record.decidedAt ?? null,
+      record.decidedBy ?? null,
+      record.decisionNote ?? null,
+    );
+  };
+
+  const getOperatorApprovalRequest = (
+    requestId: string,
+  ): OperatorApprovalRequestRecord | undefined => {
+    const row = db
+      .prepare("SELECT * FROM operator_approval_requests WHERE request_id = ?")
+      .get(requestId) as any | undefined;
+    return row ? deserializeOperatorApprovalRequest(row) : undefined;
+  };
+
+  const listOperatorApprovalRequests = (
+    limit: number,
+    filters?: {
+      kind?: OperatorApprovalKind;
+      status?: OperatorApprovalStatus;
+    },
+  ): OperatorApprovalRequestRecord[] => {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (filters?.kind) {
+      clauses.push("kind = ?");
+      params.push(filters.kind);
+    }
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db
+      .prepare(
+        `SELECT * FROM operator_approval_requests ${where} ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(...params, limit) as any[];
+    return rows.map(deserializeOperatorApprovalRequest);
+  };
+
+  const updateOperatorApprovalRequest = (
+    requestId: string,
+    updates: Pick<
+      OperatorApprovalRequestRecord,
+      "status" | "decidedAt" | "decidedBy" | "decisionNote"
+    >,
+  ): void => {
+    db.prepare(
+      `UPDATE operator_approval_requests
+       SET status = ?, decided_at = ?, decided_by = ?, decision_note = ?
+       WHERE request_id = ?`,
+    ).run(
+      updates.status,
+      updates.decidedAt ?? null,
+      updates.decidedBy ?? null,
+      updates.decisionNote ?? null,
+      requestId,
+    );
   };
 
   // ─── Key-Value Store ─────────────────────────────────────────
@@ -2418,6 +2501,10 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     insertOperatorControlEvent,
     getOperatorControlEvent,
     listOperatorControlEvents,
+    insertOperatorApprovalRequest,
+    getOperatorApprovalRequest,
+    listOperatorApprovalRequests,
+    updateOperatorApprovalRequest,
     getKV,
     setKV,
     deleteKV,
@@ -2778,6 +2865,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 28,
       apply: () => db.exec(MIGRATION_V28),
+    },
+    {
+      version: 29,
+      apply: () => db.exec(MIGRATION_V29),
     },
   ];
 
@@ -3796,6 +3887,27 @@ function deserializeOperatorControlEvent(row: any): OperatorControlEventRecord {
     summary: row.summary ?? null,
     result: parseJsonSafe(row.result_json ?? "null", null, "deserializeOperatorControlEvent.result_json"),
     createdAt: row.created_at,
+  };
+}
+
+function deserializeOperatorApprovalRequest(row: any): OperatorApprovalRequestRecord {
+  return {
+    requestId: row.request_id,
+    kind: row.kind,
+    scope: row.scope,
+    requestedBy: row.requested_by,
+    reason: row.reason ?? null,
+    payload: parseJsonSafe(
+      row.payload_json ?? "null",
+      null,
+      "deserializeOperatorApprovalRequest.payload_json",
+    ),
+    status: row.status,
+    expiresAt: row.expires_at ?? null,
+    createdAt: row.created_at,
+    decidedAt: row.decided_at ?? null,
+    decidedBy: row.decided_by ?? null,
+    decisionNote: row.decision_note ?? null,
   };
 }
 

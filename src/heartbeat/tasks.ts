@@ -33,6 +33,7 @@ import {
   replicateTrackedLease,
   renewTrackedLease,
 } from "../storage/lifecycle.js";
+import { runOperatorAutopilot } from "../operator/autopilot.js";
 import { ulid } from "ulid";
 
 const logger = createLogger("heartbeat.tasks");
@@ -288,6 +289,28 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       message:
         result.failed > 0
           ? `x402 payments have ${result.failed} failed item(s).`
+          : undefined,
+    };
+  },
+
+  operator_autopilot: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    const result = await runOperatorAutopilot({
+      config: taskCtx.config,
+      db: taskCtx.db,
+      actor: "heartbeat",
+      reason: "scheduled operator autopilot",
+    });
+    taskCtx.db.setKV(
+      "last_operator_autopilot",
+      JSON.stringify(result),
+    );
+    return {
+      shouldWake: result.actions.some(
+        (action) => action.triggered && !action.changed && action.summary.includes("cooldown") === false,
+      ),
+      message:
+        result.actions.some((action) => action.changed)
+          ? `Operator autopilot applied ${result.actions.filter((action) => action.changed).length} low-risk action(s).`
           : undefined,
     };
   },

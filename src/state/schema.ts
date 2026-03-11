@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -151,7 +151,7 @@ export const CREATE_TABLES = `
   -- Operator control audit log
   CREATE TABLE IF NOT EXISTS operator_control_events (
     event_id TEXT PRIMARY KEY,
-    action TEXT NOT NULL CHECK(action IN ('pause','resume','drain','retry_payments','retry_settlement','retry_market','retry_signer','retry_paymaster')),
+    action TEXT NOT NULL CHECK(action IN ('pause','resume','drain','maintain_storage','maintain_artifacts','quarantine_provider','retry_payments','retry_settlement','retry_market','retry_signer','retry_paymaster')),
     status TEXT NOT NULL CHECK(status IN ('applied','noop','failed')),
     actor TEXT NOT NULL,
     reason TEXT,
@@ -168,6 +168,30 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_operator_control_events_status
     ON operator_control_events(status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS operator_approval_requests (
+    request_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK(kind IN ('treasury_policy_change','spend_cap_change','signer_policy_change','paymaster_policy_change')),
+    scope TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    reason TEXT,
+    payload_json TEXT,
+    status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','expired')),
+    expires_at TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT,
+    decided_by TEXT,
+    decision_note TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_created
+    ON operator_approval_requests(created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_status
+    ON operator_approval_requests(status, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_kind
+    ON operator_approval_requests(kind, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_skills_enabled ON skills(enabled);
   CREATE INDEX IF NOT EXISTS idx_children_status ON children(status);
   CREATE INDEX IF NOT EXISTS idx_reputation_to ON reputation(to_agent);
@@ -1487,6 +1511,63 @@ export const MIGRATION_V28 = `
 
   CREATE INDEX IF NOT EXISTS idx_operator_control_events_status
     ON operator_control_events(status, created_at DESC);
+`;
+
+export const MIGRATION_V29 = `
+  ALTER TABLE operator_control_events RENAME TO operator_control_events_legacy;
+
+  CREATE TABLE operator_control_events (
+    event_id TEXT PRIMARY KEY,
+    action TEXT NOT NULL CHECK(action IN ('pause','resume','drain','maintain_storage','maintain_artifacts','quarantine_provider','retry_payments','retry_settlement','retry_market','retry_signer','retry_paymaster')),
+    status TEXT NOT NULL CHECK(status IN ('applied','noop','failed')),
+    actor TEXT NOT NULL,
+    reason TEXT,
+    summary TEXT,
+    result_json TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  INSERT INTO operator_control_events (
+    event_id, action, status, actor, reason, summary, result_json, created_at
+  )
+  SELECT
+    event_id, action, status, actor, reason, summary, result_json, created_at
+  FROM operator_control_events_legacy;
+
+  DROP TABLE operator_control_events_legacy;
+
+  CREATE INDEX IF NOT EXISTS idx_operator_control_events_created
+    ON operator_control_events(created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_operator_control_events_action
+    ON operator_control_events(action, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_operator_control_events_status
+    ON operator_control_events(status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS operator_approval_requests (
+    request_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK(kind IN ('treasury_policy_change','spend_cap_change','signer_policy_change','paymaster_policy_change')),
+    scope TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    reason TEXT,
+    payload_json TEXT,
+    status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','expired')),
+    expires_at TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT,
+    decided_by TEXT,
+    decision_note TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_created
+    ON operator_approval_requests(created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_status
+    ON operator_approval_requests(status, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_operator_approval_requests_kind
+    ON operator_approval_requests(kind, created_at DESC);
 `;
 
 export const MIGRATION_V3 = `

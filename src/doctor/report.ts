@@ -24,6 +24,7 @@ import {
 } from "../state/database.js";
 import { buildProviderReputationSnapshot } from "../operator/provider-reputation.js";
 import { buildStorageLeaseHealthSnapshot } from "../operator/storage-health.js";
+import { buildOperatorAutopilotSnapshot } from "../operator/autopilot.js";
 
 export type DoctorSeverity = "ok" | "warn" | "error";
 
@@ -44,6 +45,9 @@ export interface HealthSnapshot {
   discoveryEnabled: boolean;
   operatorApiEnabled: boolean;
   operatorApiReady: boolean;
+  autopilotEnabled: boolean;
+  autopilotPendingApprovals: number;
+  autopilotQuarantinedProviders: number;
   gatewayEnabled: boolean;
   providerEnabled: boolean;
   signerProviderEnabled: boolean;
@@ -155,6 +159,9 @@ async function buildConfigSnapshot(
   discoveryEnabled: boolean;
   operatorApiEnabled: boolean;
   operatorApiReady: boolean;
+  autopilotEnabled: boolean;
+  autopilotPendingApprovals: number;
+  autopilotQuarantinedProviders: number;
   gatewayEnabled: boolean;
   providerEnabled: boolean;
   signerProviderEnabled: boolean;
@@ -242,6 +249,7 @@ async function buildConfigSnapshot(
     db,
     limit: 500,
   });
+  const autopilot = buildOperatorAutopilotSnapshot(config, db);
   const storageDueRenewals = config.storage?.enabled
     ? activeStorageLeases.filter((lease) => {
         const leadMs =
@@ -292,6 +300,9 @@ async function buildConfigSnapshot(
     operatorApiReady: Boolean(
       !config.operatorApi?.enabled || config.operatorApi.authToken,
     ),
+    autopilotEnabled: autopilot.enabled,
+    autopilotPendingApprovals: autopilot.approvals.pending,
+    autopilotQuarantinedProviders: autopilot.quarantinedProviders.length,
     gatewayEnabled:
       config.agentDiscovery?.gatewayServer?.enabled === true ||
       config.agentDiscovery?.gatewayClient?.enabled === true,
@@ -536,6 +547,30 @@ function collectFindings(
       severity: "ok",
       summary: "Operator API is enabled for remote status and audit access.",
     });
+  }
+
+  if (snapshot.autopilotEnabled) {
+    findings.push({
+      id: "autopilot-enabled",
+      severity: snapshot.autopilotPendingApprovals > 0 ? "warn" : "ok",
+      summary:
+        snapshot.autopilotPendingApprovals > 0
+          ? `Operator autopilot is enabled with ${snapshot.autopilotPendingApprovals} pending approval request(s).`
+          : "Operator autopilot is enabled for low-risk maintenance.",
+      recommendation:
+        snapshot.autopilotPendingApprovals > 0
+          ? "Run `openfox autopilot approvals --json` and explicitly approve or reject pending high-risk requests."
+          : undefined,
+    });
+    if (snapshot.autopilotQuarantinedProviders > 0) {
+      findings.push({
+        id: "autopilot-provider-quarantine",
+        severity: "warn",
+        summary: `Operator autopilot has quarantined ${snapshot.autopilotQuarantinedProviders} provider(s).`,
+        recommendation:
+          "Inspect provider reputation snapshots and operator control events before widening policy or restoring providers.",
+      });
+    }
   }
 
   if (
@@ -978,6 +1013,9 @@ export async function buildHealthSnapshot(
       discoveryEnabled: false,
       operatorApiEnabled: false,
       operatorApiReady: false,
+      autopilotEnabled: false,
+      autopilotPendingApprovals: 0,
+      autopilotQuarantinedProviders: 0,
       gatewayEnabled: false,
       providerEnabled: false,
       signerProviderEnabled: false,
@@ -1091,6 +1129,7 @@ export function buildHealthSnapshotReport(snapshot: HealthSnapshot): string {
     `RPC configured: ${yesNo(snapshot.rpcConfigured)}`,
     `Discovery enabled: ${yesNo(snapshot.discoveryEnabled)}`,
     `Operator API enabled: ${yesNo(snapshot.operatorApiEnabled)}${snapshot.operatorApiEnabled ? ` (auth=${snapshot.operatorApiReady ? "configured" : "missing"})` : ""}`,
+    `Operator autopilot: ${yesNo(snapshot.autopilotEnabled)}${snapshot.autopilotEnabled ? ` (${snapshot.autopilotPendingApprovals} pending approvals, ${snapshot.autopilotQuarantinedProviders} quarantined providers)` : ""}`,
     `Provider enabled: ${yesNo(snapshot.providerEnabled)}`,
     `Signer provider enabled: ${yesNo(snapshot.signerProviderEnabled)}${snapshot.signerProviderEnabled ? ` (${snapshot.signerRecentQuotes} quotes, ${snapshot.signerRecentExecutions} executions, ${snapshot.signerPendingExecutions} pending)` : ""}`,
     `Paymaster provider enabled: ${yesNo(snapshot.paymasterProviderEnabled)}${snapshot.paymasterProviderEnabled ? ` (${snapshot.paymasterRecentQuotes} quotes, ${snapshot.paymasterRecentAuthorizations} authorizations, ${snapshot.paymasterPendingAuthorizations} pending, sponsor funded=${snapshot.paymasterSponsorFunded === null ? "unknown" : yesNo(snapshot.paymasterSponsorFunded)}, signer parity=${snapshot.paymasterSignerParityAligned ? "aligned" : "limited"})` : ""}`,

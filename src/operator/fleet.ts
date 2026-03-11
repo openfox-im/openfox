@@ -30,6 +30,8 @@ export type FleetEndpoint =
   | "doctor"
   | "service"
   | "gateway"
+  | "control"
+  | "autopilot"
   | "wallet"
   | "finance"
   | "payments"
@@ -123,6 +125,10 @@ function getEndpointPath(endpoint: FleetEndpoint): string {
       return "service/status";
     case "gateway":
       return "gateway/status";
+    case "control":
+      return "control/status";
+    case "autopilot":
+      return "autopilot/status";
     case "wallet":
       return "wallet/status";
     case "finance":

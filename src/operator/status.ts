@@ -8,6 +8,7 @@ import { getManagedServiceStatus, type ManagedServiceStatus } from "../service/d
 import { buildProviderReputationSnapshot } from "./provider-reputation.js";
 import { buildStorageLeaseHealthSnapshot } from "./storage-health.js";
 import { buildOperatorControlSnapshot } from "./control.js";
+import { buildOperatorAutopilotSnapshot } from "./autopilot.js";
 
 export interface RuntimeStatusSnapshot {
   configured: true;
@@ -54,6 +55,13 @@ export interface RuntimeStatusSnapshot {
     latestStatus: string | null;
     summary: string;
   };
+  autopilot: {
+    enabled: boolean;
+    pendingApprovals: number;
+    quarantinedProviders: number;
+    lastRunAt: string | null;
+    summary: string;
+  };
   children: {
     alive: number;
     total: number;
@@ -76,6 +84,7 @@ export function buildRuntimeStatusSnapshot(
   const skills = db.getSkills(true);
   const children = db.getChildren();
   const control = buildOperatorControlSnapshot(config, db);
+  const autopilot = buildOperatorAutopilotSnapshot(config, db);
   const settlements = db.listSettlementReceipts(5);
   const settlementCallbacks = db.listSettlementCallbacks(5);
   const pendingSettlementCallbacks = db.listSettlementCallbacks(100, {
@@ -477,6 +486,13 @@ export function buildRuntimeStatusSnapshot(
       latestStatus: control.recentEvents[0]?.status ?? null,
       summary: control.summary,
     },
+    autopilot: {
+      enabled: autopilot.enabled,
+      pendingApprovals: autopilot.approvals.pending,
+      quarantinedProviders: autopilot.quarantinedProviders.length,
+      lastRunAt: autopilot.lastRunAt,
+      summary: autopilot.summary,
+    },
     children: {
       alive: children.filter((c) => c.status !== "dead").length,
       total: children.length,
@@ -560,6 +576,7 @@ Heartbeat paused: ${snapshot.heartbeatPaused ? "yes" : "no"}
 Operator drained: ${snapshot.operatorDrained ? "yes" : "no"}
 Pending wakes: ${snapshot.pendingWakes}
 Control:    ${snapshot.control.summary}
+Autopilot:  ${snapshot.autopilot.summary}
 Children:   ${snapshot.children.alive} alive / ${snapshot.children.total} total
 Agent ID:   ${snapshot.discovery.agentId || "not configured"}
 Model:      ${snapshot.model}

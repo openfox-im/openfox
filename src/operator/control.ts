@@ -18,6 +18,10 @@ import { createX402PaymentManager } from "../tos/x402-server.js";
 import { createSignerExecutionRetryManager } from "../signer/retry.js";
 import { createPaymasterAuthorizationRetryManager } from "../paymaster/retry.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
+import {
+  runArtifactMaintenance,
+  runStorageMaintenance,
+} from "./maintenance.js";
 
 export interface OperatorControlSnapshot {
   heartbeatPaused: boolean;
@@ -33,6 +37,45 @@ export interface OperatorControlActionResult {
   summary: string;
   result?: unknown;
   event: OperatorControlEventRecord;
+}
+
+export interface OperatorProviderQuarantineRecord {
+  providerKey: string;
+  providerKind?: string | null;
+  providerAddress?: string | null;
+  providerBaseUrl?: string | null;
+  score?: number | null;
+  grade?: string | null;
+  totalEvents?: number | null;
+  actor: string;
+  reason?: string | null;
+  createdAt: string;
+}
+
+function quarantineStorageKey(providerKey: string): string {
+  return `operator.quarantine.${Buffer.from(providerKey).toString("base64url")}`;
+}
+
+export function listQuarantinedProviders(
+  db: OpenFoxDatabase,
+  limit = 100,
+): OperatorProviderQuarantineRecord[] {
+  const rows = db.raw
+    .prepare(
+      `SELECT value
+       FROM kv
+       WHERE key LIKE 'operator.quarantine.%'
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .all(limit) as Array<{ value: string }>;
+  return rows.flatMap((row) => {
+    try {
+      return [JSON.parse(row.value) as OperatorProviderQuarantineRecord];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function recordControlEvent(params: {
@@ -95,6 +138,13 @@ export async function applyOperatorControlAction(params: {
   actor?: string;
   reason?: string;
   limit?: number;
+  providerKey?: string;
+  providerKind?: string;
+  providerAddress?: string;
+  providerBaseUrl?: string;
+  providerScore?: number;
+  providerGrade?: string;
+  providerTotalEvents?: number;
 }): Promise<OperatorControlActionResult> {
   const actor = params.actor?.trim() || "operator-api";
   const reason = params.reason?.trim();
@@ -353,6 +403,102 @@ export async function applyOperatorControlAction(params: {
         changed: result.processed > 0,
         summary: event.summary || "retried paymaster authorizations",
         result,
+        event,
+      };
+    }
+
+    if (params.action === "maintain_storage") {
+      if (!params.config.storage?.enabled) {
+        throw new Error("storage maintenance is disabled on this node");
+      }
+      const result = await runStorageMaintenance({
+        config: params.config,
+        db: params.db,
+        limit,
+      });
+      const event = recordControlEvent({
+        db: params.db,
+        action: params.action,
+        status: "applied",
+        actor,
+        reason,
+        summary: `storage maintenance: renewed=${result.renewed}, audited=${result.audited}, renewal_failures=${result.renewalFailures}, audit_failures=${result.auditFailures}`,
+        result,
+      });
+      return {
+        action: params.action,
+        status: "applied",
+        changed: result.renewed > 0 || result.audited > 0,
+        summary: event.summary || "storage maintenance completed",
+        result,
+        event,
+      };
+    }
+
+    if (params.action === "maintain_artifacts") {
+      if (!params.config.artifacts?.enabled) {
+        throw new Error("artifact maintenance is disabled on this node");
+      }
+      const result = await runArtifactMaintenance({
+        config: params.config,
+        db: params.db,
+        limit,
+      });
+      const event = recordControlEvent({
+        db: params.db,
+        action: params.action,
+        status: "applied",
+        actor,
+        reason,
+        summary: `artifact maintenance: verified=${result.verified}, anchored=${result.anchored}, verify_failures=${result.verifyFailures}, anchor_failures=${result.anchorFailures}`,
+        result,
+      });
+      return {
+        action: params.action,
+        status: "applied",
+        changed: result.verified > 0 || result.anchored > 0,
+        summary: event.summary || "artifact maintenance completed",
+        result,
+        event,
+      };
+    }
+
+    if (params.action === "quarantine_provider") {
+      const providerKey = params.providerKey?.trim();
+      if (!providerKey) {
+        throw new Error("providerKey is required for quarantine_provider");
+      }
+      const record: OperatorProviderQuarantineRecord = {
+        providerKey,
+        providerKind: params.providerKind ?? null,
+        providerAddress: params.providerAddress ?? null,
+        providerBaseUrl: params.providerBaseUrl ?? null,
+        score: params.providerScore ?? null,
+        grade: params.providerGrade ?? null,
+        totalEvents: params.providerTotalEvents ?? null,
+        actor,
+        reason: reason ?? null,
+        createdAt: new Date().toISOString(),
+      };
+      params.db.setKV(
+        quarantineStorageKey(providerKey),
+        JSON.stringify(record),
+      );
+      const event = recordControlEvent({
+        db: params.db,
+        action: params.action,
+        status: "applied",
+        actor,
+        reason,
+        summary: `provider quarantined: ${providerKey}`,
+        result: record,
+      });
+      return {
+        action: params.action,
+        status: "applied",
+        changed: true,
+        summary: event.summary || "provider quarantined",
+        result: record,
         event,
       };
     }

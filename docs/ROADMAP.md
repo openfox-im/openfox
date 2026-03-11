@@ -960,7 +960,7 @@ Delivered so far:
 
 ### Phase 17: Conservative Autopilot Policies
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -973,6 +973,23 @@ Delivered surface:
   and provider quarantine
 - approval-gated policies for treasury, spend-cap, and signer or paymaster policy changes
 - control-event reporting in dashboards and audit bundles
+- `operatorAutopilot` runtime configuration with bounded queue, maintenance,
+  and provider-quarantine thresholds
+- built-in `operator_autopilot` heartbeat task
+- `GET /operator/autopilot/status`
+- `GET /operator/autopilot/approvals`
+- `POST /operator/autopilot/run`
+- `POST /operator/autopilot/approvals/request`
+- `POST /operator/autopilot/approvals/:id/approve`
+- `POST /operator/autopilot/approvals/:id/reject`
+- `POST /operator/control/maintain/storage`
+- `POST /operator/control/maintain/artifacts`
+- `POST /operator/control/quarantine/provider`
+- `openfox autopilot status|run|approvals|request|approve|reject`
+- dashboard bundle exports for:
+  - `control-events.json`
+  - `autopilot.json`
+  - `approvals.json`
 
 Implementation tasks:
 

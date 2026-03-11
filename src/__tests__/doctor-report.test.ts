@@ -24,6 +24,9 @@ describe("doctor report formatting", () => {
       discoveryEnabled: true,
       operatorApiEnabled: true,
       operatorApiReady: true,
+      autopilotEnabled: true,
+      autopilotPendingApprovals: 1,
+      autopilotQuarantinedProviders: 2,
       gatewayEnabled: false,
       providerEnabled: false,
       signerProviderEnabled: true,
@@ -130,6 +133,7 @@ describe("doctor report formatting", () => {
 
     expect(health).toContain("=== OPENFOX HEALTH ===");
     expect(health).toContain("Operator API enabled: yes (auth=configured)");
+    expect(health).toContain("Operator autopilot: yes (1 pending approvals, 2 quarantined providers)");
     expect(health).toContain("Signer provider enabled: yes (2 quotes, 1 executions, 1 pending)");
     expect(
       health,

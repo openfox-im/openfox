@@ -167,7 +167,15 @@ It supports:
   - `POST /operator/control/retry/payments|settlement|market|signer|paymaster`
   - `openfox fleet control <pause|resume|drain>`
   - `openfox fleet retry <payments|settlement|market|signer|paymaster>`
+- bounded operator autopilot with:
+  - `openfox autopilot status|run|approvals|request|approve|reject`
+  - `GET /operator/autopilot/status`
+  - `GET /operator/autopilot/approvals`
+  - `POST /operator/autopilot/run`
+  - approval-gated changes for treasury and provider-policy expansion
+  - low-risk automated retries, maintenance, and provider quarantine
 - `openfox dashboard show|export` for reusable JSON and HTML fleet dashboards with role margin, capability, counterparty, and delayed-queue finance sections
+  plus bundle-ready `control-events.json`, `autopilot.json`, and `approvals.json` audit exports
 - `openfox wallet report` and `openfox finance report` for single-node operator snapshots
 - a paid signer-provider surface for bounded delegated execution with:
   - `openfox signer discover`
@@ -255,6 +263,7 @@ pnpm openfox templates list
 pnpm openfox payments list
 pnpm openfox settlement list
 pnpm openfox market list
+pnpm openfox autopilot status
 pnpm openfox fleet payments --manifest ./fleet.yml
 pnpm openfox fleet settlement --manifest ./fleet.yml
 pnpm openfox fleet market --manifest ./fleet.yml

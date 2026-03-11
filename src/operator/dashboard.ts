@@ -13,6 +13,8 @@ export const DEFAULT_DASHBOARD_ENDPOINTS: FleetEndpoint[] = [
   "health",
   "service",
   "gateway",
+  "control",
+  "autopilot",
   "wallet",
   "finance",
   "payments",
@@ -106,7 +108,28 @@ export interface FleetDashboardBundleResult {
   lintPath: string;
   jsonPath: string;
   htmlPath: string;
+  controlEventsPath: string;
+  autopilotPath: string;
+  approvalsPath: string;
   snapshot: FleetDashboardSnapshot;
+}
+
+interface FleetAuditBundleSnapshot {
+  generatedAt: string;
+  manifestPath: string;
+  path: string;
+  total: number;
+  ok: number;
+  failed: number;
+  nodes: Array<{
+    name: string;
+    role: string | null;
+    baseUrl: string;
+    ok: boolean;
+    statusCode?: number;
+    payload?: unknown;
+    error?: string;
+  }>;
 }
 
 function summarizeRoles(manifestPath: string): {
@@ -147,6 +170,82 @@ function payloadSummary(payload: unknown): string {
     return (payload as { summary: string }).summary;
   }
   return JSON.stringify(payload);
+}
+
+async function fetchAuditNode(
+  params: {
+    name: string;
+    role?: string;
+    baseUrl: string;
+    authToken?: string;
+  },
+  requestPath: string,
+): Promise<FleetAuditBundleSnapshot["nodes"][number]> {
+  const url = `${params.baseUrl.replace(/\/+$/, "")}/${requestPath.replace(/^\/+/, "")}`;
+  try {
+    const response = await fetch(url, {
+      headers: params.authToken
+        ? {
+            Authorization: `Bearer ${params.authToken}`,
+          }
+        : undefined,
+    });
+    const text = await response.text();
+    let payload: unknown = text;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      // keep raw text payload
+    }
+    return {
+      name: params.name,
+      role: params.role || null,
+      baseUrl: params.baseUrl,
+      ok: response.ok,
+      statusCode: response.status,
+      payload,
+      error: response.ok ? undefined : `HTTP ${response.status}`,
+    };
+  } catch (error) {
+    return {
+      name: params.name,
+      role: params.role || null,
+      baseUrl: params.baseUrl,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function buildFleetAuditBundleSnapshot(params: {
+  manifestPath: string;
+  requestPath: string;
+}): Promise<FleetAuditBundleSnapshot> {
+  const manifestPath = path.resolve(params.manifestPath);
+  const manifest = loadFleetManifest(manifestPath);
+  const nodes = await Promise.all(
+    manifest.nodes.map((node) =>
+      fetchAuditNode(
+        {
+          name: node.name,
+          role: node.role,
+          baseUrl: node.baseUrl,
+          authToken: node.authToken,
+        },
+        params.requestPath,
+      ),
+    ),
+  );
+  const ok = nodes.filter((node) => node.ok).length;
+  return {
+    generatedAt: new Date().toISOString(),
+    manifestPath,
+    path: params.requestPath,
+    total: nodes.length,
+    ok,
+    failed: nodes.length - ok,
+    nodes,
+  };
 }
 
 function toBigInt(value: string | bigint | null | undefined): bigint {
@@ -624,13 +723,35 @@ export async function exportFleetDashboardBundle(params: {
 
   const snapshot = await buildFleetDashboardSnapshot({ manifestPath });
   const lint = buildFleetLintSnapshot({ manifestPath });
+  const controlEvents = await buildFleetAuditBundleSnapshot({
+    manifestPath,
+    requestPath: "control/events?limit=100",
+  });
+  const autopilot = await buildFleetAuditBundleSnapshot({
+    manifestPath,
+    requestPath: "autopilot/status",
+  });
+  const approvals = await buildFleetAuditBundleSnapshot({
+    manifestPath,
+    requestPath: "autopilot/approvals?limit=100",
+  });
   const jsonPath = path.join(outputPath, "dashboard.json");
   const htmlPath = path.join(outputPath, "dashboard.html");
   const lintPath = path.join(outputPath, "fleet-lint.json");
+  const controlEventsPath = path.join(outputPath, "control-events.json");
+  const autopilotPath = path.join(outputPath, "autopilot.json");
+  const approvalsPath = path.join(outputPath, "approvals.json");
 
   fs.writeFileSync(jsonPath, JSON.stringify(snapshot, null, 2), "utf8");
   fs.writeFileSync(htmlPath, buildFleetDashboardHtml(snapshot), "utf8");
   fs.writeFileSync(lintPath, JSON.stringify(lint, null, 2), "utf8");
+  fs.writeFileSync(
+    controlEventsPath,
+    JSON.stringify(controlEvents, null, 2),
+    "utf8",
+  );
+  fs.writeFileSync(autopilotPath, JSON.stringify(autopilot, null, 2), "utf8");
+  fs.writeFileSync(approvalsPath, JSON.stringify(approvals, null, 2), "utf8");
 
   return {
     outputPath,
@@ -638,6 +759,9 @@ export async function exportFleetDashboardBundle(params: {
     lintPath,
     jsonPath,
     htmlPath,
+    controlEventsPath,
+    autopilotPath,
+    approvalsPath,
     snapshot,
   };
 }

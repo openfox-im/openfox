@@ -78,6 +78,12 @@ const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
       enabled: true,
     },
     {
+      name: "operator_autopilot",
+      schedule: "*/10 * * * *",
+      task: "operator_autopilot",
+      enabled: true,
+    },
+    {
       name: "audit_storage_leases",
       schedule: "0 */6 * * *",
       task: "audit_storage_leases",

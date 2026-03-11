@@ -20,6 +20,7 @@ import type {
   MarketContractConfig,
   OpportunityScoutConfig,
   OperatorApiConfig,
+  OperatorAutopilotConfig,
   SignerProviderConfig,
   SettlementConfig,
   StorageMarketConfig,
@@ -47,6 +48,7 @@ import {
   DEFAULT_MARKET_CONTRACT_CONFIG,
   DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
   DEFAULT_OPERATOR_API_CONFIG,
+  DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
   DEFAULT_SIGNER_PROVIDER_CONFIG,
   DEFAULT_SETTLEMENT_CONFIG,
   DEFAULT_STORAGE_MARKET_CONFIG,
@@ -536,6 +538,81 @@ export function loadConfig(): OpenFoxConfig | null {
     ...((raw?.operatorApi as JsonRecord | undefined) ?? {}),
   };
 
+  const operatorAutopilot: OperatorAutopilotConfig = {
+    ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
+    ...((raw?.operatorAutopilot as JsonRecord | undefined) ?? {}),
+    queuePolicies: {
+      ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies,
+      ...((((raw?.operatorAutopilot as JsonRecord | undefined)?.queuePolicies as
+        | JsonRecord
+        | undefined) ?? {}) as Partial<OperatorAutopilotConfig["queuePolicies"]>),
+      payments: {
+        ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.payments,
+        ...(((((raw?.operatorAutopilot as JsonRecord | undefined)?.queuePolicies as
+          | JsonRecord
+          | undefined)?.payments as JsonRecord | undefined) ?? {}) as Partial<
+          OperatorAutopilotConfig["queuePolicies"]["payments"]
+        >),
+      },
+      settlement: {
+        ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.settlement,
+        ...(((((raw?.operatorAutopilot as JsonRecord | undefined)?.queuePolicies as
+          | JsonRecord
+          | undefined)?.settlement as JsonRecord | undefined) ?? {}) as Partial<
+          OperatorAutopilotConfig["queuePolicies"]["settlement"]
+        >),
+      },
+      market: {
+        ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.market,
+        ...(((((raw?.operatorAutopilot as JsonRecord | undefined)?.queuePolicies as
+          | JsonRecord
+          | undefined)?.market as JsonRecord | undefined) ?? {}) as Partial<
+          OperatorAutopilotConfig["queuePolicies"]["market"]
+        >),
+      },
+      signer: {
+        ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.signer,
+        ...(((((raw?.operatorAutopilot as JsonRecord | undefined)?.queuePolicies as
+          | JsonRecord
+          | undefined)?.signer as JsonRecord | undefined) ?? {}) as Partial<
+          OperatorAutopilotConfig["queuePolicies"]["signer"]
+        >),
+      },
+      paymaster: {
+        ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.paymaster,
+        ...(((((raw?.operatorAutopilot as JsonRecord | undefined)?.queuePolicies as
+          | JsonRecord
+          | undefined)?.paymaster as JsonRecord | undefined) ?? {}) as Partial<
+          OperatorAutopilotConfig["queuePolicies"]["paymaster"]
+        >),
+      },
+    },
+    storageMaintenance: {
+      ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.storageMaintenance,
+      ...((((raw?.operatorAutopilot as JsonRecord | undefined)?.storageMaintenance as
+        | JsonRecord
+        | undefined) ?? {}) as Partial<OperatorAutopilotConfig["storageMaintenance"]>),
+    },
+    artifactMaintenance: {
+      ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.artifactMaintenance,
+      ...((((raw?.operatorAutopilot as JsonRecord | undefined)?.artifactMaintenance as
+        | JsonRecord
+        | undefined) ?? {}) as Partial<OperatorAutopilotConfig["artifactMaintenance"]>),
+    },
+    providerQuarantine: {
+      ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.providerQuarantine,
+      ...((((raw?.operatorAutopilot as JsonRecord | undefined)?.providerQuarantine as
+        | JsonRecord
+        | undefined) ?? {}) as Partial<OperatorAutopilotConfig["providerQuarantine"]>),
+    },
+    approvals: {
+      ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.approvals,
+      ...((((raw?.operatorAutopilot as JsonRecord | undefined)?.approvals as
+        | JsonRecord
+        | undefined) ?? {}) as Partial<OperatorAutopilotConfig["approvals"]>),
+    },
+  };
+
   const settlement: SettlementConfig = {
     ...DEFAULT_SETTLEMENT_CONFIG,
     ...((raw?.settlement as JsonRecord | undefined) ?? {}),
@@ -791,6 +868,7 @@ export function loadConfig(): OpenFoxConfig | null {
     bounty,
     opportunityScout,
     operatorApi,
+    operatorAutopilot,
     settlement,
     marketContracts,
     x402Server,
@@ -820,6 +898,8 @@ export function saveConfig(config: OpenFoxConfig): void {
     bounty: config.bounty ?? DEFAULT_BOUNTY_CONFIG,
     opportunityScout: config.opportunityScout ?? DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
     operatorApi: config.operatorApi ?? DEFAULT_OPERATOR_API_CONFIG,
+    operatorAutopilot:
+      config.operatorAutopilot ?? DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
     settlement: config.settlement ?? DEFAULT_SETTLEMENT_CONFIG,
     marketContracts: config.marketContracts ?? DEFAULT_MARKET_CONTRACT_CONFIG,
     x402Server: config.x402Server ?? DEFAULT_X402_SERVER_CONFIG,
@@ -909,6 +989,7 @@ export function createConfig(params: {
     bounty: DEFAULT_BOUNTY_CONFIG,
     opportunityScout: DEFAULT_OPPORTUNITY_SCOUT_CONFIG,
     operatorApi: DEFAULT_OPERATOR_API_CONFIG,
+    operatorAutopilot: DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
     settlement: DEFAULT_SETTLEMENT_CONFIG,
     marketContracts: DEFAULT_MARKET_CONTRACT_CONFIG,
     x402Server: DEFAULT_X402_SERVER_CONFIG,

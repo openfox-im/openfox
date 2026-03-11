@@ -73,6 +73,7 @@ const TASK_DESCRIPTIONS: Record<string, string> = {
   retry_settlement_callbacks: "Retry or confirm pending settlement callback transactions for contract-bound results.",
   retry_market_contract_callbacks: "Retry or confirm pending contract-native market binding callbacks for task and query creation events.",
   retry_x402_payments: "Retry or confirm pending server-side x402 payments for paid provider requests.",
+  operator_autopilot: "Apply bounded low-risk operator automation for retries, maintenance, and provider quarantine.",
   audit_storage_leases: "Audit tracked storage leases and record local health results for stored bundles.",
   renew_storage_leases: "Renew tracked storage leases before expiry for requester-owned bundles.",
   replicate_storage_leases: "Replicate tracked storage bundles to additional providers when policy requires more copies.",

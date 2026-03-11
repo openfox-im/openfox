@@ -35,6 +35,12 @@ import {
   applyOperatorControlAction,
   buildOperatorControlSnapshot,
 } from "./control.js";
+import {
+  buildOperatorAutopilotSnapshot,
+  createOperatorApprovalRequest,
+  decideOperatorApprovalRequest,
+  runOperatorAutopilot,
+} from "./autopilot.js";
 
 const logger = createLogger("operator.api");
 
@@ -137,6 +143,12 @@ export async function startOperatorApiServer(
   const controlRetryMarketPath = `${pathPrefix}/control/retry/market`;
   const controlRetrySignerPath = `${pathPrefix}/control/retry/signer`;
   const controlRetryPaymasterPath = `${pathPrefix}/control/retry/paymaster`;
+  const controlMaintainStoragePath = `${pathPrefix}/control/maintain/storage`;
+  const controlMaintainArtifactsPath = `${pathPrefix}/control/maintain/artifacts`;
+  const controlQuarantineProviderPath = `${pathPrefix}/control/quarantine/provider`;
+  const autopilotStatusPath = `${pathPrefix}/autopilot/status`;
+  const autopilotRunPath = `${pathPrefix}/autopilot/run`;
+  const autopilotApprovalsPath = `${pathPrefix}/autopilot/approvals`;
   const healthzPath = `${pathPrefix}/healthz`;
 
   const server = http.createServer(async (req, res) => {
@@ -356,11 +368,48 @@ export async function startOperatorApiServer(
         return;
       }
 
+      if (req.method === "GET" && url.pathname === autopilotStatusPath) {
+        json(res, 200, buildOperatorAutopilotSnapshot(params.config, params.db));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === autopilotApprovalsPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 50;
+        const statusParam = url.searchParams.get("status");
+        const kindParam = url.searchParams.get("kind");
+        json(res, 200, {
+          items: params.db.listOperatorApprovalRequests(limit, {
+            status:
+              statusParam === "pending" ||
+              statusParam === "approved" ||
+              statusParam === "rejected" ||
+              statusParam === "expired"
+                ? statusParam
+                : undefined,
+            kind:
+              kindParam === "treasury_policy_change" ||
+              kindParam === "spend_cap_change" ||
+              kindParam === "signer_policy_change" ||
+              kindParam === "paymaster_policy_change"
+                ? kindParam
+                : undefined,
+          }),
+        });
+        return;
+      }
+
       if (
         req.method === "POST" &&
         (url.pathname === controlPausePath ||
           url.pathname === controlResumePath ||
           url.pathname === controlDrainPath ||
+          url.pathname === controlMaintainStoragePath ||
+          url.pathname === controlMaintainArtifactsPath ||
+          url.pathname === controlQuarantineProviderPath ||
           url.pathname === controlRetryPaymentsPath ||
           url.pathname === controlRetrySettlementPath ||
           url.pathname === controlRetryMarketPath ||
@@ -375,6 +424,12 @@ export async function startOperatorApiServer(
               ? "resume"
               : url.pathname === controlDrainPath
                 ? "drain"
+                : url.pathname === controlMaintainStoragePath
+                  ? "maintain_storage"
+                  : url.pathname === controlMaintainArtifactsPath
+                    ? "maintain_artifacts"
+                    : url.pathname === controlQuarantineProviderPath
+                      ? "quarantine_provider"
                 : url.pathname === controlRetryPaymentsPath
                   ? "retry_payments"
                   : url.pathname === controlRetrySettlementPath
@@ -396,12 +451,132 @@ export async function startOperatorApiServer(
             typeof body.reason === "string" && body.reason.trim()
               ? body.reason.trim()
               : undefined,
+          providerKey:
+            typeof body.providerKey === "string" && body.providerKey.trim()
+              ? body.providerKey.trim()
+              : undefined,
+          providerKind:
+            typeof body.providerKind === "string" && body.providerKind.trim()
+              ? body.providerKind.trim()
+              : undefined,
+          providerAddress:
+            typeof body.providerAddress === "string" && body.providerAddress.trim()
+              ? body.providerAddress.trim()
+              : undefined,
+          providerBaseUrl:
+            typeof body.providerBaseUrl === "string" && body.providerBaseUrl.trim()
+              ? body.providerBaseUrl.trim()
+              : undefined,
+          providerScore:
+            typeof body.providerScore === "number" && Number.isFinite(body.providerScore)
+              ? body.providerScore
+              : undefined,
+          providerGrade:
+            typeof body.providerGrade === "string" && body.providerGrade.trim()
+              ? body.providerGrade.trim()
+              : undefined,
+          providerTotalEvents:
+            typeof body.providerTotalEvents === "number" &&
+            Number.isFinite(body.providerTotalEvents)
+              ? body.providerTotalEvents
+              : undefined,
           limit:
             typeof body.limit === "number" && Number.isFinite(body.limit)
               ? body.limit
               : undefined,
         });
         json(res, result.status === "failed" ? 409 : 200, result);
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === autopilotRunPath) {
+        const body = await readJsonBody(req);
+        json(
+          res,
+          200,
+          await runOperatorAutopilot({
+            config: params.config,
+            db: params.db,
+            actor:
+              typeof body.actor === "string" && body.actor.trim()
+                ? body.actor.trim()
+                : "operator-api",
+            reason:
+              typeof body.reason === "string" && body.reason.trim()
+                ? body.reason.trim()
+                : undefined,
+          }),
+        );
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === `${autopilotApprovalsPath}/request`) {
+        const body = await readJsonBody(req);
+        const kind =
+          body.kind === "treasury_policy_change" ||
+          body.kind === "spend_cap_change" ||
+          body.kind === "signer_policy_change" ||
+          body.kind === "paymaster_policy_change"
+            ? body.kind
+            : null;
+        if (!kind || typeof body.scope !== "string" || !body.scope.trim()) {
+          json(res, 400, { error: "kind and scope are required" });
+          return;
+        }
+        json(
+          res,
+          200,
+          createOperatorApprovalRequest({
+            db: params.db,
+            config: params.config,
+            kind,
+            scope: body.scope.trim(),
+            requestedBy:
+              typeof body.requestedBy === "string" && body.requestedBy.trim()
+                ? body.requestedBy.trim()
+                : "operator-api",
+            reason:
+              typeof body.reason === "string" && body.reason.trim()
+                ? body.reason.trim()
+                : undefined,
+            payload: body.payload,
+            ttlSeconds:
+              typeof body.ttlSeconds === "number" && Number.isFinite(body.ttlSeconds)
+                ? body.ttlSeconds
+                : undefined,
+          }),
+        );
+        return;
+      }
+
+      if (
+        req.method === "POST" &&
+        /^\/?.*\/autopilot\/approvals\/[^/]+\/(approve|reject)$/.test(url.pathname)
+      ) {
+        const match = url.pathname.match(/\/autopilot\/approvals\/([^/]+)\/(approve|reject)$/);
+        if (!match) {
+          json(res, 404, { error: "not found" });
+          return;
+        }
+        const [, requestId, decision] = match;
+        const body = await readJsonBody(req);
+        json(
+          res,
+          200,
+          decideOperatorApprovalRequest({
+            db: params.db,
+            requestId,
+            status: decision === "approve" ? "approved" : "rejected",
+            decidedBy:
+              typeof body.decidedBy === "string" && body.decidedBy.trim()
+                ? body.decidedBy.trim()
+                : "operator-api",
+            decisionNote:
+              typeof body.decisionNote === "string" && body.decisionNote.trim()
+                ? body.decisionNote.trim()
+                : undefined,
+          }),
+        );
         return;
       }
 

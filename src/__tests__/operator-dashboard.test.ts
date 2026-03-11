@@ -60,6 +60,8 @@ describe("operator dashboard", () => {
       "/operator/health": { ok: true, summary: "health ok" },
       "/operator/service/status": { summary: "service ready" },
       "/operator/gateway/status": { summary: "gateway ready" },
+      "/operator/control/status": { summary: "control ready" },
+      "/operator/autopilot/status": { summary: "autopilot ready" },
       "/operator/wallet/status": {
         summary: "balance=5.000000 TOS reserved=1.000000 TOS",
         pendingReceivablesWei: "1000000000000000000",
@@ -128,7 +130,7 @@ describe("operator dashboard", () => {
     const snapshot = await buildFleetDashboardSnapshot({ manifestPath });
     expect(snapshot.nodeCount).toBe(1);
     expect(snapshot.roles.storage).toBe(1);
-    expect(snapshot.endpointSummaries).toHaveLength(15);
+    expect(snapshot.endpointSummaries).toHaveLength(17);
     expect(snapshot.failingEndpoints).toHaveLength(0);
     expect(snapshot.financeSummary.roles[0]?.role).toBe("storage");
     expect(snapshot.financeSummary.capabilities[0]?.capability).toBe("oracle");
@@ -139,6 +141,7 @@ describe("operator dashboard", () => {
     const report = buildFleetDashboardReport(snapshot);
     expect(report).toContain("=== OPENFOX DASHBOARD ===");
     expect(report).toContain("status: 1/1 healthy");
+    expect(report).toContain("autopilot: 1/1 healthy");
     expect(report).toContain("Fleet finance: 30d revenue=8 TOS, cost=3 TOS, net=5 TOS");
 
     const html = buildFleetDashboardHtml(snapshot);
@@ -158,6 +161,8 @@ describe("operator dashboard", () => {
       "/operator/health": { summary: "health ok" },
       "/operator/service/status": { summary: "service ready" },
       "/operator/gateway/status": { summary: "gateway ready" },
+      "/operator/control/status": { summary: "control ready" },
+      "/operator/autopilot/status": { summary: "autopilot ready" },
       "/operator/wallet/status": { summary: "wallet ready" },
       "/operator/finance/status": {
         summary: "finance ready",
@@ -209,6 +214,10 @@ describe("operator dashboard", () => {
       "/operator/health": { summary: "health ok" },
       "/operator/service/status": { summary: "service ready" },
       "/operator/gateway/status": { summary: "gateway ready" },
+      "/operator/control/status": { summary: "control ready" },
+      "/operator/autopilot/status": { summary: "autopilot ready" },
+      "/operator/control/events?limit=100": { items: [{ action: "pause", status: "applied" }] },
+      "/operator/autopilot/approvals?limit=100": { items: [{ requestId: "req-1", status: "pending" }] },
       "/operator/wallet/status": { summary: "wallet ready" },
       "/operator/finance/status": {
         summary: "finance ready",
@@ -246,6 +255,18 @@ describe("operator dashboard", () => {
     expect(fs.existsSync(result.jsonPath)).toBe(true);
     expect(fs.existsSync(result.htmlPath)).toBe(true);
     expect(fs.existsSync(result.lintPath)).toBe(true);
+    expect(fs.existsSync(result.controlEventsPath)).toBe(true);
+    expect(fs.existsSync(result.autopilotPath)).toBe(true);
+    expect(fs.existsSync(result.approvalsPath)).toBe(true);
     expect(JSON.parse(fs.readFileSync(result.lintPath, "utf8")).errors).toBe(0);
+    expect(
+      JSON.parse(fs.readFileSync(result.controlEventsPath, "utf8")).nodes[0]?.payload?.items?.[0]?.action,
+    ).toBe("pause");
+    expect(
+      JSON.parse(fs.readFileSync(result.autopilotPath, "utf8")).nodes[0]?.payload?.summary,
+    ).toBe("autopilot ready");
+    expect(
+      JSON.parse(fs.readFileSync(result.approvalsPath, "utf8")).nodes[0]?.payload?.items?.[0]?.requestId,
+    ).toBe("req-1");
   });
 });

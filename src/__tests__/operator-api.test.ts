@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestConfig, createTestDb } from "./mocks.js";
 import { startOperatorApiServer } from "../operator/api.js";
 import { isHeartbeatPaused, isOperatorDrained } from "../state/database.js";
+import {
+  DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
+  type PaymasterAuthorizationRecord,
+} from "../types.js";
 
 const servers: Array<{ close(): Promise<void> }> = [];
 
@@ -14,6 +18,109 @@ afterEach(async () => {
 });
 
 describe("operator api", () => {
+  function toHexId(value: string): `0x${string}` {
+    return `0x${Buffer.from(value, "utf8")
+      .toString("hex")
+      .slice(0, 64)
+      .padEnd(64, "a")}` as `0x${string}`;
+  }
+
+  function createAutopilotConfig() {
+    return createTestConfig({
+      operatorApi: {
+        enabled: true,
+        bindHost: "127.0.0.1",
+        port: 0,
+        pathPrefix: "/operator",
+        authToken: "secret-token",
+        exposeDoctor: true,
+        exposeServiceStatus: true,
+      },
+      operatorAutopilot: {
+        ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG,
+        enabled: true,
+        queuePolicies: {
+          payments: {
+            ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.payments,
+            enabled: false,
+          },
+          settlement: {
+            ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.settlement,
+            enabled: false,
+          },
+          market: {
+            ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.market,
+            enabled: false,
+          },
+          signer: {
+            ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.signer,
+            enabled: false,
+          },
+          paymaster: {
+            ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.queuePolicies.paymaster,
+            enabled: false,
+          },
+        },
+        storageMaintenance: {
+          ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.storageMaintenance,
+          enabled: false,
+        },
+        artifactMaintenance: {
+          ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.artifactMaintenance,
+          enabled: false,
+        },
+        providerQuarantine: {
+          ...DEFAULT_OPERATOR_AUTOPILOT_CONFIG.providerQuarantine,
+          enabled: true,
+          quarantineMinEvents: 3,
+          maxProvidersPerRun: 1,
+        },
+      },
+    });
+  }
+
+  function createFailedPaymasterAuthorization(
+    authorizationId: string,
+    providerAddress: `0x${string}`,
+  ): PaymasterAuthorizationRecord {
+    const now = new Date().toISOString();
+    return {
+      authorizationId,
+      quoteId: `quote-${authorizationId}`,
+      chainId: "1666",
+      requestKey: `paymaster:${authorizationId}`,
+      requestHash: toHexId(authorizationId),
+      providerAddress,
+      sponsorAddress:
+        "0xabababababababababababababababababababababababababababababababab",
+      sponsorSignerType: "secp256k1",
+      walletAddress:
+        "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      requesterAddress:
+        "0xefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      requesterSignerType: "secp256k1",
+      targetAddress:
+        "0x9898989898989898989898989898989898989898989898989898989898989898",
+      valueWei: "0",
+      dataHex: "0x",
+      gas: "21000",
+      policyId: "policy-2",
+      policyHash:
+        "0x8888888888888888888888888888888888888888888888888888888888888888",
+      scopeHash:
+        "0x9999999999999999999999999999999999999999999999999999999999999999",
+      trustTier: "self_hosted",
+      requestNonce: "1",
+      requestExpiresAt: Date.now() + 60_000,
+      executionNonce: "1",
+      sponsorNonce: "1",
+      sponsorExpiry: Date.now() + 60_000,
+      status: "failed",
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   it("serves healthz without auth and protects operator endpoints", async () => {
     const db = createTestDb();
     const server = await startOperatorApiServer({
@@ -521,6 +628,99 @@ describe("operator api", () => {
     expect(eventsJson.items.length).toBeGreaterThanOrEqual(4);
     expect(eventsJson.items.some((item) => item.action === "retry_payments" && item.status === "failed")).toBe(true);
     expect(eventsJson.items.some((item) => item.action === "drain" && item.actor === "test-suite")).toBe(true);
+
+    db.close();
+  });
+
+  it("serves autopilot status, approvals, and run surfaces", async () => {
+    const db = createTestDb();
+    const config = createAutopilotConfig();
+    const providerAddress =
+      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
+    db.upsertPaymasterAuthorization(
+      createFailedPaymasterAuthorization("auto-1", providerAddress),
+    );
+    db.upsertPaymasterAuthorization(
+      createFailedPaymasterAuthorization("auto-2", providerAddress),
+    );
+    db.upsertPaymasterAuthorization(
+      createFailedPaymasterAuthorization("auto-3", providerAddress),
+    );
+    const server = await startOperatorApiServer({ config, db });
+    expect(server).not.toBeNull();
+    if (!server) {
+      db.close();
+      return;
+    }
+    servers.push(server);
+
+    const headers = {
+      Authorization: "Bearer secret-token",
+      "Content-Type": "application/json",
+    };
+
+    const status = await fetch(`${server.url}/autopilot/status`, {
+      headers: { Authorization: "Bearer secret-token" },
+    });
+    expect(status.status).toBe(200);
+    const statusJson = (await status.json()) as {
+      enabled: boolean;
+      approvals: { pending: number };
+    };
+    expect(statusJson.enabled).toBe(true);
+    expect(statusJson.approvals.pending).toBe(0);
+
+    const request = await fetch(`${server.url}/autopilot/approvals/request`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        kind: "treasury_policy_change",
+        scope: "treasury.max_daily_transfer",
+        reason: "raise ceiling",
+      }),
+    });
+    expect(request.status).toBe(200);
+    const requestJson = (await request.json()) as { requestId: string; status: string };
+    expect(requestJson.status).toBe("pending");
+
+    const approvals = await fetch(
+      `${server.url}/autopilot/approvals?status=pending&limit=10`,
+      {
+        headers: { Authorization: "Bearer secret-token" },
+      },
+    );
+    expect(approvals.status).toBe(200);
+    const approvalsJson = (await approvals.json()) as {
+      items: Array<{ requestId: string; status: string }>;
+    };
+    expect(approvalsJson.items[0]?.requestId).toBe(requestJson.requestId);
+
+    const approve = await fetch(
+      `${server.url}/autopilot/approvals/${requestJson.requestId}/approve`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ decisionNote: "approved by test" }),
+      },
+    );
+    expect(approve.status).toBe(200);
+    const approveJson = (await approve.json()) as { status: string };
+    expect(approveJson.status).toBe("approved");
+
+    const run = await fetch(`${server.url}/autopilot/run`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ actor: "test-suite" }),
+    });
+    expect(run.status).toBe(200);
+    const runJson = (await run.json()) as {
+      enabled: boolean;
+      actions: Array<{ action: string; changed: boolean }>;
+    };
+    expect(runJson.enabled).toBe(true);
+    expect(
+      runJson.actions.find((item) => item.action === "quarantine_provider")?.changed,
+    ).toBe(true);
 
     db.close();
   });
