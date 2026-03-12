@@ -1,5 +1,7 @@
 import type { OpenFoxDatabase } from "../types.js";
 import type { EvidenceWorkflowRunRecord } from "./coordinator.js";
+import { createCommitteeManager } from "../committee/manager.js";
+import { buildProofVerificationSummary, buildZkTlsBundleSummary } from "../proof-market/records.js";
 
 function listEvidenceWorkflowRuns(
   db: OpenFoxDatabase,
@@ -29,6 +31,11 @@ export interface EvidenceWorkflowSummarySnapshot {
   attemptedSources: number;
   aggregatePublished: number;
   estimatedCostWei: string;
+  zktlsBundles: number;
+  proofVerifications: number;
+  cryptographicVerifications: number;
+  committeeRuns: number;
+  committeeQuorumMet: number;
   latestRunId: string | null;
   latestUpdatedAt: string | null;
   runs: EvidenceWorkflowRunRecord[];
@@ -47,6 +54,12 @@ export function buildEvidenceWorkflowSummary(params: {
   const aggregatePublished = runs.filter(
     (run) => Boolean(run.aggregateObjectId || run.aggregateResultUrl),
   ).length;
+  const zktls = buildZkTlsBundleSummary(params.db, params.limit ?? 20);
+  const proofs = buildProofVerificationSummary(params.db, params.limit ?? 20);
+  const committees = createCommitteeManager(params.db).buildSummary(
+    params.limit ?? 20,
+    "evidence",
+  );
   const estimatedCostWei = runs
     .reduce((acc, run) => {
       const sourceCost = run.sourceRecords.reduce((inner, source) => {
@@ -67,13 +80,18 @@ export function buildEvidenceWorkflowSummary(params: {
     attemptedSources,
     aggregatePublished,
     estimatedCostWei,
+    zktlsBundles: zktls.totalBundles,
+    proofVerifications: proofs.totalResults,
+    cryptographicVerifications: proofs.realProofVerifications,
+    committeeRuns: committees.totalRuns,
+    committeeQuorumMet: committees.quorumMet,
     latestRunId: latest?.runId ?? null,
     latestUpdatedAt: latest?.updatedAt ?? null,
     runs,
     summary:
       runs.length === 0
         ? "No evidence workflow runs recorded."
-        : `${runs.length} workflow run(s), completed=${completedRuns}, failed=${failedRuns}, valid_sources=${validSources}/${attemptedSources}, aggregate_published=${aggregatePublished}.`,
+        : `${runs.length} workflow run(s), completed=${completedRuns}, failed=${failedRuns}, valid_sources=${validSources}/${attemptedSources}, aggregate_published=${aggregatePublished}, zktls=${zktls.totalBundles}, proofs=${proofs.totalResults}, committee_runs=${committees.totalRuns}.`,
   };
 }
 
@@ -88,6 +106,9 @@ export function buildEvidenceWorkflowSummaryReport(
     `Valid sources:   ${snapshot.validSources}/${snapshot.attemptedSources}`,
     `Aggregates:      ${snapshot.aggregatePublished}`,
     `Estimated cost:  ${snapshot.estimatedCostWei} wei`,
+    `zkTLS bundles:   ${snapshot.zktlsBundles}`,
+    `Proof results:   ${snapshot.proofVerifications} (${snapshot.cryptographicVerifications} cryptographic)`,
+    `Committees:      ${snapshot.committeeRuns} (${snapshot.committeeQuorumMet} quorum met)`,
     `Latest run:      ${snapshot.latestRunId || "(none)"}`,
     `Latest updated:  ${snapshot.latestUpdatedAt || "(none)"}`,
     "",
@@ -95,4 +116,3 @@ export function buildEvidenceWorkflowSummaryReport(
   ];
   return lines.join("\n");
 }
-

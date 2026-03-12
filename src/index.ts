@@ -182,6 +182,20 @@ import {
   buildEvidenceWorkflowSummary,
   buildEvidenceWorkflowSummaryReport,
 } from "./evidence-workflow/summary.js";
+import {
+  buildZkTlsBundleSummary,
+  buildZkTlsBundleSummaryReport,
+  buildProofVerificationSummary,
+  buildProofVerificationSummaryReport,
+  getZkTlsBundleRecord,
+  getProofVerificationRecord,
+  listZkTlsBundleRecords,
+  listProofVerificationRecords,
+} from "./proof-market/records.js";
+import {
+  buildCommitteeSummaryReport,
+  createCommitteeManager,
+} from "./committee/manager.js";
 import { startSignerProviderServer } from "./signer/http.js";
 import {
   fetchSignerExecutionReceipt,
@@ -538,6 +552,21 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (args[0] === "news") {
+    await handleNewsCommand(args.slice(1));
+    process.exit(0);
+  }
+
+  if (args[0] === "proof") {
+    await handleProofCommand(args.slice(1));
+    process.exit(0);
+  }
+
+  if (args[0] === "committee") {
+    await handleCommitteeCommand(args.slice(1));
+    process.exit(0);
+  }
+
   if (args[0] === "trails") {
     await handleTrailsCommand(args.slice(1));
     process.exit(0);
@@ -612,6 +641,9 @@ Usage:
   openfox artifacts ...  Build and verify public news and oracle bundles
   openfox evidence ...   Run coordinator-side M-of-N evidence workflows
   openfox oracle ...     Inspect paid oracle results and summaries
+  openfox news ...       Inspect zkTLS-backed news capture bundle records
+  openfox proof ...      Inspect proof verification records and summaries
+  openfox committee ...  Inspect and manage M-of-N committee workflows
   openfox signer ...     Use delegated signer-provider execution
   openfox paymaster ...  Use native sponsored execution through a paymaster-provider
   openfox fleet ...      Inspect multiple OpenFox nodes through operator APIs
@@ -4532,6 +4564,306 @@ Usage:
     }
 
     throw new Error(`Unknown oracle command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleNewsCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox news
+
+Usage:
+  openfox news list [--limit N] [--json]
+  openfox news get --record-id <id> [--json]
+  openfox news summary [--limit N] [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    if (command === "list") {
+      const items = listZkTlsBundleRecords(db, readNumberOption(args, "--limit", 20));
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No zkTLS bundle records found.");
+        return;
+      }
+      logger.info("=== OPENFOX NEWS CAPTURE BUNDLES ===");
+      for (const item of items) {
+        logger.info(
+          `${item.recordId}  policy=${item.originClaims.sourcePolicyId || "(unspecified)"}  host=${item.originClaims.sourcePolicyHost || new URL(item.originClaims.canonicalUrl).hostname}  bundle=${item.bundleFormat}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "get") {
+      const recordId = readOption(args, "--record-id");
+      if (!recordId) throw new Error("Usage: openfox news get --record-id <id> [--json]");
+      const item = getZkTlsBundleRecord(db, recordId);
+      if (!item) throw new Error(`zkTLS bundle record not found: ${recordId}`);
+      logger.info(JSON.stringify(item, null, 2));
+      return;
+    }
+
+    if (command === "summary") {
+      const snapshot = buildZkTlsBundleSummary(db, readNumberOption(args, "--limit", 20));
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info(buildZkTlsBundleSummaryReport(snapshot));
+      return;
+    }
+
+    throw new Error(`Unknown news command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleProofCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox proof
+
+Usage:
+  openfox proof list [--limit N] [--json]
+  openfox proof get --record-id <id> [--json]
+  openfox proof summary [--limit N] [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  try {
+    if (command === "list") {
+      const items = listProofVerificationRecords(db, readNumberOption(args, "--limit", 20));
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No proof verification records found.");
+        return;
+      }
+      logger.info("=== OPENFOX PROOF VERIFICATIONS ===");
+      for (const item of items) {
+        logger.info(
+          `${item.recordId}  class=${item.verifierClass}  mode=${item.verificationMode}  verdict=${item.verdict}  reason=${item.verdictReason}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "get") {
+      const recordId = readOption(args, "--record-id");
+      if (!recordId) throw new Error("Usage: openfox proof get --record-id <id> [--json]");
+      const item = getProofVerificationRecord(db, recordId);
+      if (!item) throw new Error(`Proof verification record not found: ${recordId}`);
+      logger.info(JSON.stringify(item, null, 2));
+      return;
+    }
+
+    if (command === "summary") {
+      const snapshot = buildProofVerificationSummary(db, readNumberOption(args, "--limit", 20));
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info(buildProofVerificationSummaryReport(snapshot));
+      return;
+    }
+
+    throw new Error(`Unknown proof command: ${command}`);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleCommitteeCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox committee
+
+Usage:
+  openfox committee list [--kind <evidence|oracle>] [--limit N] [--json]
+  openfox committee get --run-id <id> [--json]
+  openfox committee summary [--kind <evidence|oracle>] [--limit N] [--json]
+  openfox committee create --kind <evidence|oracle> --title <text> --question <text> --committee-size N --threshold-m N --member <id>... [--payout-total-wei <wei>] [--max-reruns N] [--subject-ref <ref>] [--artifact-id <id>]... [--json]
+  openfox committee vote --run-id <id> --member-id <id> --decision <accept|reject|inconclusive> [--result-hash <0x...>] [--reason-code <code>] [--signature <0x...>] [--payout-address <0x...>] [--metadata-file <path>] [--json]
+  openfox committee mark-failed --run-id <id> --member-id <id> --reason <text> [--json]
+  openfox committee rerun --run-id <id> [--json]
+  openfox committee tally --run-id <id> [--json]
+  openfox committee payout --run-id <id> [--json]
+`);
+    return;
+  }
+
+  const config = loadConfig();
+  if (!config) {
+    throw new Error("OpenFox is not configured. Run openfox --setup first.");
+  }
+
+  const db = createDatabase(resolvePath(config.dbPath));
+  const manager = createCommitteeManager(db);
+  try {
+    const kind = readOption(args, "--kind") as "evidence" | "oracle" | undefined;
+
+    if (command === "list") {
+      const items = manager
+        .list(readNumberOption(args, "--limit", 20))
+        .filter((item) => !kind || item.kind === kind);
+      if (asJson) {
+        logger.info(JSON.stringify({ items }, null, 2));
+        return;
+      }
+      if (!items.length) {
+        logger.info("No committee runs found.");
+        return;
+      }
+      logger.info("=== OPENFOX COMMITTEE RUNS ===");
+      for (const item of items) {
+        logger.info(
+          `${item.runId}  kind=${item.kind}  status=${item.status}  quorum=${item.thresholdM}/${item.committeeSize}  reruns=${item.rerunCount}/${item.maxReruns}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "get") {
+      const runId = readOption(args, "--run-id");
+      if (!runId) throw new Error("Usage: openfox committee get --run-id <id> [--json]");
+      const item = manager.get(runId);
+      if (!item) throw new Error(`Committee run not found: ${runId}`);
+      logger.info(JSON.stringify(item, null, 2));
+      return;
+    }
+
+    if (command === "summary") {
+      const snapshot = manager.buildSummary(readNumberOption(args, "--limit", 20), kind);
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info(buildCommitteeSummaryReport(snapshot));
+      return;
+    }
+
+    if (command === "create") {
+      const createKind = kind;
+      const title = readOption(args, "--title");
+      const question = readOption(args, "--question");
+      const committeeSize = readNumberOption(args, "--committee-size", 0);
+      const thresholdM = readNumberOption(args, "--threshold-m", 0);
+      const memberIds = collectRepeatedOption(args, "--member");
+      if (!createKind || !title || !question || committeeSize <= 0 || thresholdM <= 0 || memberIds.length === 0) {
+        throw new Error(
+          "Usage: openfox committee create --kind <evidence|oracle> --title <text> --question <text> --committee-size N --threshold-m N --member <id>... [--payout-total-wei <wei>] [--max-reruns N] [--subject-ref <ref>] [--artifact-id <id>]... [--json]",
+        );
+      }
+      const item = manager.createRun({
+        kind: createKind,
+        title,
+        question,
+        subjectRef: readOption(args, "--subject-ref") || null,
+        artifactIds: collectRepeatedOption(args, "--artifact-id"),
+        committeeSize,
+        thresholdM,
+        payoutTotalWei: readOption(args, "--payout-total-wei") || "0",
+        maxReruns: readNumberOption(args, "--max-reruns", 1),
+        members: memberIds.map((memberId) => ({ memberId })),
+      });
+      logger.info(JSON.stringify(item, null, 2));
+      return;
+    }
+
+    if (command === "vote") {
+      const runId = readOption(args, "--run-id");
+      const memberId = readOption(args, "--member-id");
+      const decision = readOption(args, "--decision") as
+        | "accept"
+        | "reject"
+        | "inconclusive"
+        | undefined;
+      if (!runId || !memberId || !decision) {
+        throw new Error(
+          "Usage: openfox committee vote --run-id <id> --member-id <id> --decision <accept|reject|inconclusive> [--result-hash <0x...>] [--reason-code <code>] [--signature <0x...>] [--payout-address <0x...>] [--metadata-file <path>] [--json]",
+        );
+      }
+      const metadataFile = readOption(args, "--metadata-file");
+      const metadata = metadataFile
+        ? (JSON.parse(await fs.readFile(resolvePath(metadataFile), "utf8")) as Record<string, unknown>)
+        : undefined;
+      const item = manager.recordVote({
+        runId,
+        memberId,
+        decision,
+        resultHash: (readOption(args, "--result-hash") || null) as `0x${string}` | null,
+        reasonCode: readOption(args, "--reason-code") || null,
+        signature: (readOption(args, "--signature") || null) as `0x${string}` | null,
+        payoutAddress: readOption(args, "--payout-address") || null,
+        metadata,
+      });
+      logger.info(JSON.stringify(item, null, 2));
+      return;
+    }
+
+    if (command === "mark-failed") {
+      const runId = readOption(args, "--run-id");
+      const memberId = readOption(args, "--member-id");
+      const reason = readOption(args, "--reason");
+      if (!runId || !memberId || !reason) {
+        throw new Error("Usage: openfox committee mark-failed --run-id <id> --member-id <id> --reason <text> [--json]");
+      }
+      logger.info(JSON.stringify(manager.markMemberFailed({ runId, memberId, reason }), null, 2));
+      return;
+    }
+
+    if (command === "rerun") {
+      const runId = readOption(args, "--run-id");
+      if (!runId) throw new Error("Usage: openfox committee rerun --run-id <id> [--json]");
+      logger.info(JSON.stringify(manager.rerun(runId), null, 2));
+      return;
+    }
+
+    if (command === "tally") {
+      const runId = readOption(args, "--run-id");
+      if (!runId) throw new Error("Usage: openfox committee tally --run-id <id> [--json]");
+      logger.info(JSON.stringify(manager.tally(runId), null, 2));
+      return;
+    }
+
+    if (command === "payout") {
+      const runId = readOption(args, "--run-id");
+      if (!runId) throw new Error("Usage: openfox committee payout --run-id <id> [--json]");
+      logger.info(JSON.stringify(manager.markPaid(runId), null, 2));
+      return;
+    }
+
+    throw new Error(`Unknown committee command: ${command}`);
   } finally {
     db.close();
   }

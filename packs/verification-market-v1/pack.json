@@ -1,0 +1,17 @@
+{
+  "name": "verification-market-v1",
+  "version": "1.0.0",
+  "description": "Versioned control-plane pack for public verifier committees and proof-backed result publication.",
+  "policies": [
+    "policies/committee.json",
+    "policies/storage.json",
+    "policies/artifacts.json"
+  ],
+  "manifests": [
+    "manifests/verification-market.public.json"
+  ],
+  "contracts": [
+    "contracts/committee-tally-callback.json",
+    "contracts/committee-payout-callback.json"
+  ]
+}

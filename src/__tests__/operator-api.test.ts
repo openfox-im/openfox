@@ -18,6 +18,11 @@ import {
   type PaymasterAuthorizationRecord,
 } from "../types.js";
 import { MockInferenceClient, createTestIdentity, noToolResponse } from "./mocks.js";
+import {
+  storeProofVerificationRecord,
+  storeZkTlsBundleRecord,
+} from "../proof-market/records.js";
+import { createCommitteeManager } from "../committee/manager.js";
 
 const servers: Array<{ close(): Promise<void> }> = [];
 
@@ -593,6 +598,348 @@ describe("operator api", () => {
     db.close();
   });
 
+  it("serves zkTLS, proof, committee, evidence, and oracle summary endpoints", async () => {
+    const db = createTestDb();
+    const config = createTestConfig({
+      operatorApi: {
+        enabled: true,
+        bindHost: "127.0.0.1",
+        port: 0,
+        pathPrefix: "/operator",
+        authToken: "secret-token",
+        exposeDoctor: true,
+        exposeServiceStatus: true,
+      },
+    });
+
+    storeZkTlsBundleRecord(db, {
+      recordId: "zktls:1",
+      jobId: "job-1",
+      requestKey: "request-1",
+      capability: "news.fetch",
+      requesterIdentity: "tos:requester",
+      providerBackend: {
+        kind: "skills",
+        stages: ["newsfetch.capture", "zktls.bundle"],
+      },
+      sourceUrl: "https://example.com/article",
+      resultUrl: "/news/fetch/result/job-1",
+      bundleUrl: "/news/fetch/bundle/job-1",
+      bundleFormat: "zktls_bundle_v1",
+      originClaims: {
+        sourceUrl: "https://example.com/article",
+        canonicalUrl: "https://example.com/article",
+        sourcePolicyId: "example-policy-v1",
+        sourcePolicyHost: "example.com",
+        fetchedAt: 1773273600,
+        httpStatus: 200,
+        contentType: "text/html",
+      },
+      verifierMaterialReferences: [
+        {
+          kind: "tlsn.attestation",
+          ref: "artifact://bundle/1",
+          hash: `0x${"a".repeat(64)}`,
+        },
+      ],
+      integrity: {
+        bundleSha256: `0x${"b".repeat(64)}`,
+        articleSha256: `0x${"c".repeat(64)}`,
+        sourceResponseSha256: `0x${"d".repeat(64)}`,
+      },
+      bundle: { headline: "Example headline" },
+      metadata: { provider_backend: "skills_first" },
+      createdAt: "2026-03-12T00:00:00.000Z",
+      updatedAt: "2026-03-12T00:00:00.000Z",
+    });
+
+    storeProofVerificationRecord(db, {
+      recordId: "proof:1",
+      resultId: "result-1",
+      requestKey: "request-1",
+      capability: "proof.verify",
+      requesterIdentity: "tos:requester",
+      providerBackend: { kind: "builtin", stages: ["proofverify.verify"] },
+      verifierClass: "bundle_integrity_verification",
+      verificationMode: "fallback",
+      verdict: "valid",
+      verdictReason: "all_checks_passed",
+      summary: "fallback verification succeeded",
+      verifierReceiptSha256: `0x${"e".repeat(64)}`,
+      verifierMaterialReference: {
+        kind: "proof_bundle",
+        ref: "https://example.com/bundle.json",
+        hash: `0x${"f".repeat(64)}`,
+      },
+      boundSubjectHashes: {
+        subjectSha256: `0x${"1".repeat(64)}`,
+        bundleSha256: `0x${"2".repeat(64)}`,
+        responseHash: `0x${"3".repeat(64)}`,
+      },
+      request: {
+        subjectUrl: "https://example.com/article",
+        proofBundleUrl: "https://example.com/bundle.json",
+      },
+      metadata: null,
+      createdAt: "2026-03-12T00:00:00.000Z",
+      updatedAt: "2026-03-12T00:00:00.000Z",
+    });
+    storeProofVerificationRecord(db, {
+      recordId: "proof:2",
+      resultId: "result-2",
+      requestKey: "request-2",
+      capability: "proof.verify",
+      requesterIdentity: "tos:requester",
+      providerBackend: { kind: "skills", stages: ["proofverify.verify"] },
+      verifierClass: "cryptographic_proof_verification",
+      verificationMode: "cryptographic",
+      verdict: "valid",
+      verdictReason: "proof_verified",
+      summary: "cryptographic verification succeeded",
+      verifierProfile: "tlsn.rust",
+      verifierReceiptSha256: `0x${"4".repeat(64)}`,
+      verifierMaterialReference: {
+        kind: "tlsn.attestation",
+        ref: "artifact://proof/1",
+      },
+      boundSubjectHashes: {
+        subjectSha256: `0x${"5".repeat(64)}`,
+        bundleSha256: `0x${"6".repeat(64)}`,
+        responseHash: `0x${"7".repeat(64)}`,
+      },
+      request: {
+        subjectUrl: "https://example.com/article",
+        proofBundleUrl: "artifact://proof/1",
+      },
+      metadata: null,
+      createdAt: "2026-03-12T00:01:00.000Z",
+      updatedAt: "2026-03-12T00:01:00.000Z",
+    });
+
+    const committee = createCommitteeManager(db);
+    const evidenceRun = committee.createRun({
+      kind: "evidence",
+      title: "Verify Times headline",
+      question: "Is the captured headline valid?",
+      subjectRef: "artifact://capture/1",
+      artifactIds: ["artifact://capture/1"],
+      committeeSize: 3,
+      thresholdM: 2,
+      payoutTotalWei: "9",
+      members: [
+        {
+          memberId: "agent-a",
+          payoutAddress:
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        {
+          memberId: "agent-b",
+          payoutAddress:
+            "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        },
+        {
+          memberId: "agent-c",
+          payoutAddress:
+            "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        },
+      ],
+    });
+    committee.recordVote({
+      runId: evidenceRun.runId,
+      memberId: "agent-a",
+      decision: "accept",
+      resultHash: `0x${"1".repeat(64)}`,
+      payoutAddress:
+        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    committee.recordVote({
+      runId: evidenceRun.runId,
+      memberId: "agent-b",
+      decision: "accept",
+      resultHash: `0x${"1".repeat(64)}`,
+      payoutAddress:
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    });
+    committee.markMemberFailed({
+      runId: evidenceRun.runId,
+      memberId: "agent-c",
+      reason: "timeout",
+    });
+    committee.markPaid(committee.tally(evidenceRun.runId).runId);
+
+    const oracleRun = committee.createRun({
+      kind: "oracle",
+      title: "Oracle committee",
+      question: "Resolve query",
+      committeeSize: 3,
+      thresholdM: 2,
+      members: [{ memberId: "a" }, { memberId: "b" }, { memberId: "c" }],
+    });
+    committee.recordVote({
+      runId: oracleRun.runId,
+      memberId: "a",
+      decision: "accept",
+      resultHash: `0x${"2".repeat(64)}`,
+    });
+    committee.recordVote({
+      runId: oracleRun.runId,
+      memberId: "b",
+      decision: "reject",
+    });
+    committee.markMemberFailed({
+      runId: oracleRun.runId,
+      memberId: "c",
+      reason: "unreachable",
+    });
+    committee.tally(oracleRun.runId);
+
+    const evidenceNow = "2026-03-12T00:02:00.000Z";
+    db.setKV(
+      "evidence_workflow:run:evidence-run-1",
+      JSON.stringify({
+        runId: "evidence-run-1",
+        title: "Evidence workflow",
+        question: "Verify Times",
+        quorumM: 2,
+        quorumN: 3,
+        status: "completed",
+        attemptedCount: 3,
+        validCount: 2,
+        aggregateObjectId: "artifact://aggregate/1",
+        aggregateResultUrl: "https://artifacts.example.com/evidence/1",
+        sourceRecords: [],
+        payments: [],
+        createdAt: evidenceNow,
+        updatedAt: evidenceNow,
+      }),
+    );
+    db.setKV(
+      `evidence_workflow:index:${evidenceNow}:evidence-run-1`,
+      "evidence-run-1",
+    );
+
+    db.setKV(
+      "agent_discovery:oracle:job:oracle-result-1",
+      JSON.stringify({
+        resultId: "oracle-result-1",
+        request: {
+          query: "Who won?",
+          query_kind: "enum",
+        },
+        response: {
+          status: "ok",
+          result_id: "oracle-result-1",
+          query_kind: "enum",
+          confidence: 0.91,
+          price_wei: "500",
+          settlement_tx_hash: `0x${"9".repeat(64)}`,
+          market_callback_tx_hash: `0x${"8".repeat(64)}`,
+          binding_hash: `0x${"7".repeat(64)}`,
+          resolved_at: 1773273720,
+        },
+        createdAt: "2026-03-12T00:03:00.000Z",
+      }),
+    );
+
+    const server = await startOperatorApiServer({
+      config,
+      db,
+    });
+    expect(server).not.toBeNull();
+    if (!server) {
+      db.close();
+      return;
+    }
+    servers.push(server);
+
+    const headers = {
+      Authorization: "Bearer secret-token",
+    };
+
+    const news = await fetch(`${server.url}/news/zktls?limit=10`, { headers });
+    expect(news.status).toBe(200);
+    const newsJson = (await news.json()) as {
+      totalBundles: number;
+      sourcePolicies: Record<string, number>;
+    };
+    expect(newsJson.totalBundles).toBe(1);
+    expect(newsJson.sourcePolicies["example-policy-v1"]).toBe(1);
+
+    const newsRecord = await fetch(
+      `${server.url}/news/zktls?recordId=${encodeURIComponent("zktls:1")}`,
+      { headers },
+    );
+    expect(newsRecord.status).toBe(200);
+    expect((await newsRecord.json()) as { recordId: string }).toMatchObject({
+      recordId: "zktls:1",
+    });
+
+    const proof = await fetch(`${server.url}/proof/summary?limit=10`, { headers });
+    expect(proof.status).toBe(200);
+    const proofJson = (await proof.json()) as {
+      totalResults: number;
+      fallbackVerifications: number;
+      realProofVerifications: number;
+    };
+    expect(proofJson.totalResults).toBe(2);
+    expect(proofJson.fallbackVerifications).toBe(1);
+    expect(proofJson.realProofVerifications).toBe(1);
+
+    const proofRecord = await fetch(
+      `${server.url}/proof/summary?recordId=${encodeURIComponent("proof:2")}`,
+      { headers },
+    );
+    expect(proofRecord.status).toBe(200);
+    expect((await proofRecord.json()) as { recordId: string }).toMatchObject({
+      recordId: "proof:2",
+    });
+
+    const evidenceCommittee = await fetch(
+      `${server.url}/committee/summary?kind=evidence&limit=10`,
+      { headers },
+    );
+    expect(evidenceCommittee.status).toBe(200);
+    expect((await evidenceCommittee.json()) as { totalRuns: number; quorumMet: number }).toMatchObject({
+      totalRuns: 1,
+      quorumMet: 1,
+    });
+
+    const oracleCommittee = await fetch(
+      `${server.url}/committee/summary?kind=oracle&limit=10`,
+      { headers },
+    );
+    expect(oracleCommittee.status).toBe(200);
+    expect((await oracleCommittee.json()) as { totalRuns: number; quorumFailed: number }).toMatchObject({
+      totalRuns: 1,
+      quorumFailed: 1,
+    });
+
+    const evidenceSummary = await fetch(`${server.url}/evidence/summary?limit=10`, {
+      headers,
+    });
+    expect(evidenceSummary.status).toBe(200);
+    expect((await evidenceSummary.json()) as { totalRuns: number; aggregatePublished: number }).toMatchObject({
+      totalRuns: 1,
+      aggregatePublished: 1,
+    });
+
+    const oracleSummary = await fetch(`${server.url}/oracle/summary?limit=10`, {
+      headers,
+    });
+    expect(oracleSummary.status).toBe(200);
+    expect((await oracleSummary.json()) as {
+      totalResults: number;
+      marketBoundResults: number;
+      settledResults: number;
+    }).toMatchObject({
+      totalResults: 1,
+      marketBoundResults: 1,
+      settledResults: 1,
+    });
+
+    db.close();
+  });
+
   it("accepts authenticated storage and artifact maintenance requests", async () => {
     const db = createTestDb();
     const server = await startOperatorApiServer({
@@ -950,6 +1297,16 @@ describe("operator api", () => {
     let bountyServer: Awaited<ReturnType<typeof startBountyHttpServer>> | null = null;
     let inferenceServer: Awaited<ReturnType<typeof startMockInferenceServer>> | null = null;
     try {
+      await fs.mkdir(path.join(rootDir, ".openfox"), { recursive: true });
+      await fs.writeFile(
+        path.join(rootDir, ".openfox", "wallet.json"),
+        JSON.stringify({
+          privateKey:
+            "0x59c6995e998f97a5a0044966f094538e4a2e0d7a5b5d5b4b8b1c1d1e1f1a1b1c",
+          createdAt: new Date().toISOString(),
+        }),
+        "utf8",
+      );
       const hostIdentity = createTestIdentity();
       const hostEngine = createBountyEngine({
         identity: hostIdentity,
@@ -969,7 +1326,7 @@ describe("operator api", () => {
         question: "Capital of Germany?",
         referenceAnswer: "Berlin",
         rewardWei: "1000",
-        submissionDeadline: "2026-03-12T00:00:00.000Z",
+        submissionDeadline: "2027-03-12T00:00:00.000Z",
       });
       bountyServer = await startBountyHttpServer({
         bountyConfig: {
@@ -987,6 +1344,17 @@ describe("operator api", () => {
       const config = createAutopilotConfig();
       config.inferenceModel = "ollama/test";
       config.ollamaBaseUrl = inferenceServer.url;
+      db.upsertSkill({
+        name: "question-bounty-solver",
+        description: "Solve bounded question bounties.",
+        autoActivate: false,
+        requires: [],
+        instructions: "Answer with the bounded reference answer only.",
+        source: "bundled",
+        path: "skills/question-bounty-solver/SKILL.md",
+        enabled: true,
+        installedAt: "2026-03-11T18:00:00.000Z",
+      });
       const providerAddress =
         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
       db.upsertPaymasterAuthorization(

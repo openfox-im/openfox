@@ -23,6 +23,8 @@ describe("control-plane packs", () => {
     const items = listBundledPacks();
     expect(items.some((item) => item.name === "fleet-automation-v1")).toBe(true);
     expect(items.some((item) => item.name === "market-operations-v1")).toBe(true);
+    expect(items.some((item) => item.name === "proof-market-v1")).toBe(true);
+    expect(items.some((item) => item.name === "verification-market-v1")).toBe(true);
   });
 
   it("reads bundled pack readmes", () => {
@@ -49,6 +51,46 @@ describe("control-plane packs", () => {
     const lint = lintBundledPack(outputPath);
     expect(lint.errors).toEqual([]);
     expect(lint.warnings).toEqual([]);
+  });
+
+  it("exports and lints proof and verification market packs", () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-pack-"));
+
+    const proofOutput = path.join(tempDir, "proof-market-v1");
+    exportBundledPack({
+      name: "proof-market-v1",
+      outputPath: proofOutput,
+    });
+    expect(fs.existsSync(path.join(proofOutput, "pack.json"))).toBe(true);
+    expect(fs.existsSync(path.join(proofOutput, "policies", "proof-verifier.json"))).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(proofOutput, "manifests", "proof-market.public.json"))).toBe(
+      true,
+    );
+    expect(
+      fs.existsSync(path.join(proofOutput, "contracts", "proof-verification-callback.json")),
+    ).toBe(true);
+    expect(lintBundledPack(proofOutput).errors).toEqual([]);
+
+    const verificationOutput = path.join(tempDir, "verification-market-v1");
+    exportBundledPack({
+      name: "verification-market-v1",
+      outputPath: verificationOutput,
+    });
+    expect(fs.existsSync(path.join(verificationOutput, "pack.json"))).toBe(true);
+    expect(
+      fs.existsSync(path.join(verificationOutput, "policies", "committee.json")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(verificationOutput, "manifests", "verification-market.public.json"),
+      ),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(verificationOutput, "contracts", "committee-tally-callback.json")),
+    ).toBe(true);
+    expect(lintBundledPack(verificationOutput).errors).toEqual([]);
   });
 
   it("reports missing required exports when a pack is incomplete", () => {

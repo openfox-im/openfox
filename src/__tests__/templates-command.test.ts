@@ -25,6 +25,8 @@ describe("bundled templates", () => {
     expect(items.some((item) => item.name === "public-fleet-operator")).toBe(true);
     expect(items.some((item) => item.name === "evidence-market-flow")).toBe(true);
     expect(items.some((item) => item.name === "oracle-market-flow")).toBe(true);
+    expect(items.some((item) => item.name === "proof-market-flow")).toBe(true);
+    expect(items.some((item) => item.name === "verification-market-flow")).toBe(true);
   });
 
   it("reads bundled template readmes", () => {
@@ -76,5 +78,21 @@ describe("bundled templates", () => {
       outputPath: oracleOutput,
     });
     expect(fs.existsSync(path.join(oracleOutput, "operator.openfox.json"))).toBe(true);
+
+    const proofOutput = path.join(tempDir, "proof-market-flow");
+    exportBundledTemplate({
+      name: "proof-market-flow",
+      outputPath: proofOutput,
+    });
+    expect(fs.existsSync(path.join(proofOutput, "operator.openfox.json"))).toBe(true);
+
+    const verificationOutput = path.join(tempDir, "verification-market-flow");
+    exportBundledTemplate({
+      name: "verification-market-flow",
+      outputPath: verificationOutput,
+    });
+    expect(
+      fs.existsSync(path.join(verificationOutput, "operator.openfox.json")),
+    ).toBe(true);
   });
 });

@@ -1,0 +1,8 @@
+{
+  "role": "storage",
+  "default_ttl_seconds": 604800,
+  "max_ttl_seconds": 7776000,
+  "target_copies": 3,
+  "proof_retention_class": "long_lived",
+  "audit_interval_seconds": 1800
+}

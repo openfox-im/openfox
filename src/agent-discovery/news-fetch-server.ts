@@ -41,6 +41,12 @@ import {
   parseNewsFetchCaptureSkillResult,
   parseZkTlsBundleSkillResult,
 } from "./skill-backend-contracts.js";
+import {
+  storeZkTlsBundleRecord,
+  type ProofMaterialReference,
+  type ZkTlsBundleIntegrityRecord,
+  type ZkTlsBundleOriginClaims,
+} from "../proof-market/records.js";
 
 const logger = createLogger("agent-discovery.news-fetch");
 
@@ -84,6 +90,9 @@ interface NewsFetchBackendResult {
   };
   sourcePolicyId?: string;
   sourcePolicyHost?: string;
+  originClaims: ZkTlsBundleOriginClaims;
+  verifierMaterialReferences: ProofMaterialReference[];
+  integrity: ZkTlsBundleIntegrityRecord;
 }
 
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -390,6 +399,25 @@ async function runBuiltinNewsFetchBackend(params: {
     },
     sourcePolicyId: params.sourcePolicyId,
     sourcePolicyHost: params.sourcePolicyHost,
+    originClaims: {
+      sourceUrl: params.request.source_url,
+      canonicalUrl: fetched.canonicalUrl,
+      sourcePolicyId: params.sourcePolicyId ?? null,
+      sourcePolicyHost: params.sourcePolicyHost ?? null,
+      publisherHint: params.request.publisher_hint ?? null,
+      headlineHint: params.request.headline_hint ?? null,
+      publisher: publisher ?? null,
+      headline: headline ?? null,
+      fetchedAt: params.fetchedAt,
+      httpStatus: fetched.status,
+      contentType: fetched.contentType,
+    },
+    verifierMaterialReferences: [],
+    integrity: {
+      bundleSha256,
+      articleSha256: fetched.bodySha256,
+      sourceResponseSha256: fetched.bodySha256,
+    },
   };
 }
 
@@ -459,6 +487,54 @@ async function runSkillNewsFetchBackend(params: {
     },
     sourcePolicyId: params.sourcePolicyId,
     sourcePolicyHost: params.sourcePolicyHost,
+    originClaims: {
+      sourceUrl: params.request.source_url,
+      canonicalUrl: capture.canonicalUrl,
+      sourcePolicyId: params.sourcePolicyId ?? null,
+      sourcePolicyHost: params.sourcePolicyHost ?? null,
+      publisherHint: params.request.publisher_hint ?? null,
+      headlineHint: params.request.headline_hint ?? null,
+      publisher: capture.publisher ?? null,
+      headline: capture.headline ?? null,
+      fetchedAt: params.fetchedAt,
+      httpStatus: capture.httpStatus,
+      contentType: capture.contentType,
+      ...(bundled.originClaims &&
+      typeof bundled.originClaims === "object" &&
+      !Array.isArray(bundled.originClaims)
+        ? (bundled.originClaims as Partial<ZkTlsBundleOriginClaims>)
+        : {}),
+    },
+    verifierMaterialReferences: (bundled.verifierMaterialReferences ?? [])
+      .map((entry) => ({
+        kind:
+          typeof entry.kind === "string" && entry.kind.trim()
+            ? entry.kind.trim()
+            : "worker_material",
+        ref:
+          typeof entry.ref === "string" && entry.ref.trim()
+            ? entry.ref.trim()
+            : "inline://unknown",
+        hash:
+          typeof entry.hash === "string" && /^0x[0-9a-f]{64}$/i.test(entry.hash)
+            ? (entry.hash as `0x${string}`)
+            : null,
+        metadata:
+          entry.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
+            ? (entry.metadata as Record<string, unknown>)
+            : null,
+      }))
+      .filter((entry) => entry.ref !== "inline://unknown"),
+    integrity: {
+      bundleSha256: bundled.bundleSha256,
+      articleSha256: capture.articleSha256,
+      sourceResponseSha256:
+        bundled.integrity &&
+        typeof bundled.integrity.sourceResponseSha256 === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(bundled.integrity.sourceResponseSha256)
+          ? (bundled.integrity.sourceResponseSha256 as `0x${string}`)
+          : capture.articleSha256,
+    },
   };
 }
 
@@ -691,6 +767,44 @@ export async function startAgentDiscoveryNewsFetchServer(
         requesterIdentity,
         capability: body.capability,
         createdAt: new Date().toISOString(),
+      });
+      const verifierMaterialReferences = [
+        {
+          kind: "news.fetch.result",
+          ref: buildNewsFetchResultPath(jobId),
+          hash: null,
+          metadata: {
+            capability: body.capability,
+          },
+        },
+        {
+          kind: result.bundleFormat,
+          ref: buildNewsFetchBundlePath(jobId),
+          hash: result.bundleSha256,
+          metadata: {
+            sourcePolicyId: result.sourcePolicyId ?? null,
+          },
+        },
+        ...result.verifierMaterialReferences,
+      ];
+      storeZkTlsBundleRecord(db, {
+        recordId: `zktls:${jobId}`,
+        jobId,
+        requestKey,
+        capability: body.capability,
+        requesterIdentity,
+        providerBackend: result.backendSummary,
+        sourceUrl: sourceUrl.toString(),
+        resultUrl: buildNewsFetchResultPath(jobId),
+        bundleUrl: buildNewsFetchBundlePath(jobId),
+        bundleFormat: result.bundleFormat,
+        originClaims: result.originClaims,
+        verifierMaterialReferences,
+        integrity: result.integrity,
+        bundle: result.bundle,
+        metadata: response.metadata ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
       json(res, 200, response);
     } catch (error) {

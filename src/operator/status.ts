@@ -13,6 +13,10 @@ import {
   isFollowUpAction,
   isFollowUpExecution,
 } from "../reports/opportunity-execution.js";
+import { buildZkTlsBundleSummary, buildProofVerificationSummary } from "../proof-market/records.js";
+import { createCommitteeManager } from "../committee/manager.js";
+import { buildEvidenceWorkflowSummary } from "../evidence-workflow/summary.js";
+import { buildOracleSummary } from "../agent-discovery/oracle-summary.js";
 
 export interface RuntimeStatusSnapshot {
   configured: true;
@@ -45,6 +49,21 @@ export interface RuntimeStatusSnapshot {
   settlement: Record<string, unknown> | null;
   marketContracts: Record<string, unknown> | null;
   opportunityScout: Record<string, unknown> | null;
+  proofMarket:
+    | {
+        zktlsBundles: number;
+        proofVerifications: number;
+        cryptographicProofVerifications: number;
+        fallbackVerifications: number;
+        evidenceCommitteeRuns: number;
+        evidenceCommitteeQuorumMet: number;
+        oracleCommitteeRuns: number;
+        oracleCommitteeQuorumMet: number;
+        oracleCommitteeDisagreements: number;
+        evidenceWorkflowRuns: number;
+        oracleResults: number;
+      }
+    | null;
   state: string;
   turns: number;
   toolsInstalled: number;
@@ -155,6 +174,18 @@ export function buildRuntimeStatusSnapshot(
     db,
     limit: 50,
   });
+  const zktlsSummary = buildZkTlsBundleSummary(db, 20);
+  const proofSummary = buildProofVerificationSummary(db, 20);
+  const evidenceCommitteeSummary = createCommitteeManager(db).buildSummary(
+    20,
+    "evidence",
+  );
+  const oracleCommitteeSummary = createCommitteeManager(db).buildSummary(
+    20,
+    "oracle",
+  );
+  const evidenceWorkflowSummary = buildEvidenceWorkflowSummary({ db, limit: 20 });
+  const oracleSummary = buildOracleSummary({ db, limit: 20 });
   const discovery = config.agentDiscovery;
   const gatewaySummary = discovery?.gatewayClient?.enabled
     ? discovery.gatewayClient.gatewayUrl || "discovery/bootnodes"
@@ -575,6 +606,29 @@ export function buildRuntimeStatusSnapshot(
           remoteBaseUrls: config.opportunityScout.remoteBaseUrls,
         }
       : null,
+    proofMarket:
+      config.agentDiscovery?.newsFetchServer?.enabled ||
+      config.agentDiscovery?.proofVerifyServer?.enabled ||
+      zktlsSummary.totalBundles > 0 ||
+      proofSummary.totalResults > 0 ||
+      evidenceCommitteeSummary.totalRuns > 0 ||
+      oracleCommitteeSummary.totalRuns > 0
+        ? {
+            zktlsBundles: zktlsSummary.totalBundles,
+            proofVerifications: proofSummary.totalResults,
+            cryptographicProofVerifications:
+              proofSummary.realProofVerifications,
+            fallbackVerifications: proofSummary.fallbackVerifications,
+            evidenceCommitteeRuns: evidenceCommitteeSummary.totalRuns,
+            evidenceCommitteeQuorumMet: evidenceCommitteeSummary.quorumMet,
+            oracleCommitteeRuns: oracleCommitteeSummary.totalRuns,
+            oracleCommitteeQuorumMet: oracleCommitteeSummary.quorumMet,
+            oracleCommitteeDisagreements:
+              oracleCommitteeSummary.disagreements,
+            evidenceWorkflowRuns: evidenceWorkflowSummary.totalRuns,
+            oracleResults: oracleSummary.totalResults,
+          }
+        : null,
     state,
     turns: turnCount,
     toolsInstalled: tools.length,
@@ -667,6 +721,21 @@ export function buildRuntimeStatusReport(snapshot: RuntimeStatusSnapshot): strin
   const market = snapshot.marketContracts as
     | { enabled: boolean; recentBindings: unknown[]; pendingCount: number }
     | null;
+  const proofMarket = snapshot.proofMarket as
+    | {
+        zktlsBundles: number;
+        proofVerifications: number;
+        cryptographicProofVerifications: number;
+        fallbackVerifications: number;
+        evidenceCommitteeRuns: number;
+        evidenceCommitteeQuorumMet: number;
+        oracleCommitteeRuns: number;
+        oracleCommitteeQuorumMet: number;
+        oracleCommitteeDisagreements: number;
+        evidenceWorkflowRuns: number;
+        oracleResults: number;
+      }
+    | null;
 
   return `
 === OPENFOX STATUS ===
@@ -688,6 +757,7 @@ Providers:  ${providerReputation ? `${providerReputation.totalProviders} tracked
 Settlement: ${settlement?.enabled ? `enabled (${settlement.receiptCount} recent receipt${settlement.receiptCount === 1 ? "" : "s"}, ${settlement.callbacks.pendingCount} pending callback${settlement.callbacks.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Market:     ${market?.enabled ? `enabled (${market.recentBindings.length} recent binding${market.recentBindings.length === 1 ? "" : "s"}, ${market.pendingCount} pending callback${market.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Scout:      ${(snapshot.opportunityScout as { enabled?: boolean } | null)?.enabled ? "enabled" : "disabled"}
+Proofs:     ${proofMarket ? `${proofMarket.zktlsBundles} zkTLS bundle${proofMarket.zktlsBundles === 1 ? "" : "s"}, ${proofMarket.proofVerifications} verification${proofMarket.proofVerifications === 1 ? "" : "s"} (${proofMarket.cryptographicProofVerifications} cryptographic / ${proofMarket.fallbackVerifications} fallback), committees=${proofMarket.evidenceCommitteeRuns + proofMarket.oracleCommitteeRuns}` : "disabled"}
 Creator:    ${snapshot.creator}
 Sandbox:    ${snapshot.sandboxId}
 State:      ${snapshot.state}

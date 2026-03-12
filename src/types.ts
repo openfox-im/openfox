@@ -953,6 +953,11 @@ export interface OwnerReportInput {
           attemptedSources: number;
           aggregatePublished: number;
           estimatedCostWei: string;
+          zktlsBundles?: number;
+          proofVerifications?: number;
+          cryptographicVerifications?: number;
+          committeeRuns?: number;
+          committeeQuorumMet?: number;
           summary: string;
         };
         oracle: {
@@ -962,6 +967,10 @@ export interface OwnerReportInput {
           marketBoundResults: number;
           averageConfidence: number;
           estimatedCostWei: string;
+          committeeRuns?: number;
+          committeeQuorumMet?: number;
+          committeeDisagreements?: number;
+          committeePayoutWei?: string;
           summary: string;
         };
         summary: string;

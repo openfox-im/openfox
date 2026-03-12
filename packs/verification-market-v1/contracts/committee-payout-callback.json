@@ -1,0 +1,10 @@
+{
+  "name": "committee-payout-callback",
+  "path": "/contracts/committee/payout/callback",
+  "method": "POST",
+  "body": {
+    "run_id": "committee-run-1",
+    "status": "paid",
+    "total_payout_wei": "900000000000000000"
+  }
+}

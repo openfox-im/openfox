@@ -1,0 +1,17 @@
+{
+  "agentDiscovery": {
+    "enabled": true,
+    "publishCard": true,
+    "proofVerifyServer": {
+      "enabled": true,
+      "capability": "proof.verify"
+    }
+  },
+  "bounty": {
+    "enabled": true,
+    "role": "host"
+  },
+  "ownerReports": {
+    "enabled": true
+  }
+}

@@ -46,6 +46,15 @@ import { executeOwnerOpportunityAction } from "../reports/action-execution.js";
 import { getWallet } from "../identity/wallet.js";
 import { createInferenceClient } from "../runtime/inference.js";
 import { ModelRegistry } from "../inference/registry.js";
+import {
+  buildZkTlsBundleSummary,
+  getZkTlsBundleRecord,
+  buildProofVerificationSummary,
+  getProofVerificationRecord,
+} from "../proof-market/records.js";
+import { createCommitteeManager } from "../committee/manager.js";
+import { buildEvidenceWorkflowSummary } from "../evidence-workflow/summary.js";
+import { buildOracleSummary } from "../agent-discovery/oracle-summary.js";
 
 const logger = createLogger("operator.api");
 
@@ -141,6 +150,11 @@ export async function startOperatorApiServer(
   const ownerAlertsPath = `${pathPrefix}/owner/alerts`;
   const ownerActionsPath = `${pathPrefix}/owner/actions`;
   const ownerActionExecutionsPath = `${pathPrefix}/owner/action-executions`;
+  const newsZkTlsPath = `${pathPrefix}/news/zktls`;
+  const proofSummaryPath = `${pathPrefix}/proof/summary`;
+  const committeeSummaryPath = `${pathPrefix}/committee/summary`;
+  const evidenceSummaryPath = `${pathPrefix}/evidence/summary`;
+  const oracleSummaryPath = `${pathPrefix}/oracle/summary`;
   const paymentsPath = `${pathPrefix}/payments/status`;
   const settlementPath = `${pathPrefix}/settlement/status`;
   const marketPath = `${pathPrefix}/market/status`;
@@ -498,6 +512,81 @@ export async function startOperatorApiServer(
                 : undefined,
           }),
         });
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === newsZkTlsPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        const recordId = url.searchParams.get("recordId");
+        if (recordId) {
+          const record = getZkTlsBundleRecord(params.db, recordId);
+          if (!record) {
+            json(res, 404, { error: "zkTLS bundle record not found" });
+            return;
+          }
+          json(res, 200, record);
+          return;
+        }
+        json(res, 200, buildZkTlsBundleSummary(params.db, limit));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === proofSummaryPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        const recordId = url.searchParams.get("recordId");
+        if (recordId) {
+          const record = getProofVerificationRecord(params.db, recordId);
+          if (!record) {
+            json(res, 404, { error: "proof verification record not found" });
+            return;
+          }
+          json(res, 200, record);
+          return;
+        }
+        json(res, 200, buildProofVerificationSummary(params.db, limit));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === committeeSummaryPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        const kindParam = url.searchParams.get("kind");
+        const kind =
+          kindParam === "evidence" || kindParam === "oracle"
+            ? kindParam
+            : undefined;
+        json(res, 200, createCommitteeManager(params.db).buildSummary(limit, kind));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === evidenceSummaryPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        json(res, 200, buildEvidenceWorkflowSummary({ db: params.db, limit }));
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === oracleSummaryPath) {
+        const limitParam = url.searchParams.get("limit");
+        const limit =
+          limitParam && Number.isFinite(Number(limitParam))
+            ? Number(limitParam)
+            : 20;
+        json(res, 200, buildOracleSummary({ db: params.db, limit }));
         return;
       }
 

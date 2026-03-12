@@ -13,6 +13,7 @@ import {
   DEFAULT_NEWS_FETCH_SKILL_STAGES,
   DEFAULT_PROVIDER_BACKEND_MODE,
 } from "../agent-discovery/provider-skill-spec.js";
+import { buildZkTlsBundleSummary, listZkTlsBundleRecords } from "../proof-market/records.js";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 import { createDatabase } from "../state/database.js";
 
@@ -251,6 +252,13 @@ describe.sequential("agent discovery news.fetch server", () => {
       const secondBody = second.response as Record<string, unknown>;
       expect(secondBody.idempotent).toBe(true);
       expect(submittedPayments).toBe(1);
+      const records = listZkTlsBundleRecords(db, 10);
+      expect(records).toHaveLength(1);
+      expect(records[0]?.originClaims.sourcePolicyId ?? null).toBeNull();
+      expect(records[0]?.integrity.bundleSha256).toMatch(/^0x[0-9a-f]{64}$/);
+      const summary = buildZkTlsBundleSummary(db, 10);
+      expect(summary.totalBundles).toBe(1);
+      expect(summary.sourcePolicies["(unspecified)"]).toBe(1);
     } finally {
       await server.close();
       db.close();
@@ -332,6 +340,10 @@ describe.sequential("agent discovery news.fetch server", () => {
         backend: "rust_fixture_zktls_v0",
         source_policy_id: "news.fetch",
       });
+      const records = listZkTlsBundleRecords(db, 10);
+      expect(records).toHaveLength(1);
+      expect(records[0]?.verifierMaterialReferences[0]?.kind).toBeTruthy();
+      expect(records[0]?.integrity.bundleSha256).toMatch(/^0x[0-9a-f]{64}$/);
     } finally {
       await server.close();
       db.close();

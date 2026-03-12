@@ -1947,7 +1947,7 @@ Delivered so far:
 
 ### Phase 42: Stronger zkTLS Backend Integration
 
-Status: in progress
+Status: completed
 
 Goal:
 
@@ -2003,7 +2003,7 @@ Acceptance criteria:
 
 ### Phase 43: Stronger Proof Verifier Backend Integration
 
-Status: in progress
+Status: completed
 
 Goal:
 
@@ -2059,7 +2059,7 @@ Acceptance criteria:
 
 ### Phase 44: Coordinator-Side M-of-N Evidence and Oracle Committees
 
-Status: planned
+Status: completed
 
 Goal:
 
@@ -2110,7 +2110,7 @@ Acceptance criteria:
 
 ### Phase 45: Public Proof and Verification Infrastructure
 
-Status: planned
+Status: completed
 
 Goal:
 

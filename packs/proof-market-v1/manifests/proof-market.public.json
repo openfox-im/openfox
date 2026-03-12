@@ -1,0 +1,13 @@
+{
+  "market_id": "public-proof-market-1",
+  "proof_capture_base_url": "https://capture.example.com",
+  "proof_verify_base_url": "https://verify.example.com",
+  "artifacts_base_url": "https://artifacts.example.com",
+  "storage_provider": "https://storage.example.com",
+  "required_capabilities": [
+    "news.fetch",
+    "proof.verify",
+    "storage.put",
+    "storage.get"
+  ]
+}

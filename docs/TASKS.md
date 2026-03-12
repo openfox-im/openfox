@@ -1172,7 +1172,7 @@ building OpenFox into a TOS-native agent platform.
 - [x] Define a versioned `zktls.bundle` backend contract with canonical input/output schemas.
 - [x] Add a Rust-first CLI worker adapter behind the existing `news.fetch` provider shell.
 - [x] Add bounded source-policy configuration for allowlisted major news and public-information sites.
-- [ ] Persist zkTLS bundle metadata, origin claims, verifier-material references, and integrity hashes in durable local state.
+- [x] Persist zkTLS bundle metadata, origin claims, verifier-material references, and integrity hashes in durable local state.
 - [x] Surface zkTLS backend readiness, source-policy coverage, and bundle health through service status, `doctor`, and operator APIs.
 - [x] Add end-to-end tests for paid `news.fetch -> zktls.bundle` runs with deterministic fixtures and replay/idempotency coverage.
 - Progress already landed:
@@ -1201,7 +1201,7 @@ building OpenFox into a TOS-native agent platform.
     than introducing a second public protocol.
 - [x] Define canonical verifier backend classes for structural verification, bundle integrity verification, and cryptographic proof verification.
 - [x] Add a Rust-first CLI worker adapter behind the existing `proof.verify` provider shell.
-- [ ] Persist verifier class, verifier-material reference, verdict reason, and bound subject hashes in durable verification records.
+- [x] Persist verifier class, verifier-material reference, verdict reason, and bound subject hashes in durable verification records.
 - [x] Surface verifier readiness, unsupported proof classes, and degraded verifier state through service status, `doctor`, and operator APIs.
 - Progress already landed:
   - The `proofverify.verify` CLI worker contract is defined in `OpenFox-CLI-Worker-Contracts-v0.md`.
@@ -1210,29 +1210,29 @@ building OpenFox into a TOS-native agent platform.
   - Deterministic fixture tests now cover worker-backed `proof.verify` routing over paid provider invocation.
   - A Rust workspace now exists under `workers/` with a deterministic `openfox-proof-verifier` CLI worker implementation.
   - End-to-end paid `proof.verify` tests now exercise the real Rust worker binary rather than an inline JavaScript stub.
-- [ ] Add requester-side summaries that distinguish fallback verification from real proof verification.
-- [ ] Add end-to-end tests for invalid, inconclusive, and valid proof bundle paths.
+- [x] Add requester-side summaries that distinguish fallback verification from real proof verification.
+- [x] Add end-to-end tests for invalid, inconclusive, and valid proof bundle paths.
 
 ## Task 88 Breakdown
 
 - Product mapping:
   - This task supports threshold-backed verified-news, evidence markets, and bounded oracle products.
   - It provides the reusable coordinator-side committee layer that third-party products can compose.
-- [ ] Define canonical committee assignment, vote, tally, and aggregate schemas for evidence and oracle committee workflows.
-- [ ] Add deterministic coordinator-side `M-of-N` tallying with bounded member assignment, quorum, and payout rules.
-- [ ] Persist committee runs, member votes, quorum state, and payout allocations in durable local state.
-- [ ] Add coordinator CLI surfaces for committee list/get/tally/payout inspection.
-- [ ] Connect committee outcomes into owner reports, operator summaries, and market result surfaces.
-- [ ] Add end-to-end tests for partial quorum, disagreement, failed members, and bounded re-run behavior.
+- [x] Define canonical committee assignment, vote, tally, and aggregate schemas for evidence and oracle committee workflows.
+- [x] Add deterministic coordinator-side `M-of-N` tallying with bounded member assignment, quorum, and payout rules.
+- [x] Persist committee runs, member votes, quorum state, and payout allocations in durable local state.
+- [x] Add coordinator CLI surfaces for committee list/get/tally/payout inspection.
+- [x] Connect committee outcomes into owner reports, operator summaries, and market result surfaces.
+- [x] Add end-to-end tests for partial quorum, disagreement, failed members, and bounded re-run behavior.
 
 ## Task 89 Breakdown
 
 - Product mapping:
   - This task supports public proof-backed feeds such as `news.get`, evidence retrieval products, and reusable verification lanes for external builders.
   - It completes the public proof and verification substrate rather than a single product.
-- [ ] Define canonical public proof bundle classes for zkTLS bundles, committee votes, aggregates, verifier receipts, and proof material references.
-- [ ] Extend storage and artifact policy packs for proof-oriented replication, durability, and retention rules.
-- [ ] Add public search and index surfaces for proof and verification artifacts.
-- [ ] Add reusable `tosdk` helpers and example packs for proof retrieval and verification consumption.
-- [ ] Add operator packs for proof-market and verification-market public deployments.
-- [ ] Add end-to-end packaged deployment validation for proof capture, verification, storage, and retrieval on a public multi-node topology.
+- [x] Define canonical public proof bundle classes for zkTLS bundles, committee votes, aggregates, verifier receipts, and proof material references.
+- [x] Extend storage and artifact policy packs for proof-oriented replication, durability, and retention rules.
+- [x] Add public search and index surfaces for proof and verification artifacts.
+- [x] Add reusable `tosdk` helpers and example packs for proof retrieval and verification consumption.
+- [x] Add operator packs for proof-market and verification-market public deployments.
+- [x] Add end-to-end packaged deployment validation for proof capture, verification, storage, and retrieval on a public multi-node topology.

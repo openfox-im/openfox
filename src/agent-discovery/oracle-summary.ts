@@ -1,5 +1,6 @@
 import type { OpenFoxDatabase } from "../types.js";
 import type { OracleResolutionResponse } from "./types.js";
+import { createCommitteeManager } from "../committee/manager.js";
 
 export interface StoredOracleJobSummary {
   resultId: string;
@@ -39,6 +40,10 @@ export interface OracleSummarySnapshot {
   marketBoundResults: number;
   averageConfidence: number;
   estimatedCostWei: string;
+  committeeRuns: number;
+  committeeQuorumMet: number;
+  committeeDisagreements: number;
+  committeePayoutWei: string;
   latestResultId: string | null;
   latestResolvedAt: number | null;
   items: StoredOracleJobSummary[];
@@ -56,6 +61,10 @@ export function buildOracleSummary(params: {
   let confidenceTotal = 0;
   let confidenceCount = 0;
   let estimatedCostWei = 0n;
+  const committees = createCommitteeManager(params.db).buildSummary(
+    params.limit ?? 20,
+    "oracle",
+  );
 
   for (const item of items) {
     queryKinds[item.response.query_kind] = (queryKinds[item.response.query_kind] || 0) + 1;
@@ -81,13 +90,17 @@ export function buildOracleSummary(params: {
     averageConfidence:
       confidenceCount === 0 ? 0 : Number((confidenceTotal / confidenceCount).toFixed(4)),
     estimatedCostWei: estimatedCostWei.toString(),
+    committeeRuns: committees.totalRuns,
+    committeeQuorumMet: committees.quorumMet,
+    committeeDisagreements: committees.disagreements,
+    committeePayoutWei: committees.totalPayoutWei,
     latestResultId: latest?.resultId ?? null,
     latestResolvedAt: latest?.response.resolved_at ?? null,
     items,
     summary:
       items.length === 0
         ? "No oracle results recorded."
-        : `${items.length} oracle result(s), settled=${settledResults}, market_bound=${marketBoundResults}, avg_confidence=${confidenceCount === 0 ? "0.0000" : (confidenceTotal / confidenceCount).toFixed(4)}.`,
+        : `${items.length} oracle result(s), settled=${settledResults}, market_bound=${marketBoundResults}, avg_confidence=${confidenceCount === 0 ? "0.0000" : (confidenceTotal / confidenceCount).toFixed(4)}, committee_runs=${committees.totalRuns}, committee_quorum_met=${committees.quorumMet}.`,
   };
 }
 
@@ -99,6 +112,8 @@ export function buildOracleSummaryReport(snapshot: OracleSummarySnapshot): strin
     `Market bound:    ${snapshot.marketBoundResults}`,
     `Avg confidence:  ${snapshot.averageConfidence.toFixed(4)}`,
     `Estimated cost:  ${snapshot.estimatedCostWei} wei`,
+    `Committees:      ${snapshot.committeeRuns} (${snapshot.committeeQuorumMet} quorum met, ${snapshot.committeeDisagreements} disagreements)`,
+    `Committee pay:   ${snapshot.committeePayoutWei} wei`,
     `Latest result:   ${snapshot.latestResultId || "(none)"}`,
     `Latest resolved: ${snapshot.latestResolvedAt ?? "(none)"}`,
     `Kinds:           ${

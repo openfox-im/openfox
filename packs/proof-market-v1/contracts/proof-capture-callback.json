@@ -1,0 +1,11 @@
+{
+  "name": "proof-capture-callback",
+  "path": "/contracts/proof/capture/callback",
+  "method": "POST",
+  "body": {
+    "record_id": "zktls:1",
+    "bundle_sha256": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_ref": "artifact://proof-bundles/1",
+    "status": "captured"
+  }
+}

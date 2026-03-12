@@ -1,0 +1,11 @@
+{
+  "role": "artifacts",
+  "allowed_kinds": [
+    "committee.vote",
+    "committee.aggregate",
+    "proof.verifier_receipt",
+    "oracle.aggregate"
+  ],
+  "auto_anchor": true,
+  "retention_class": "committee-results"
+}

@@ -14,6 +14,10 @@ import {
   DEFAULT_PROOF_VERIFY_SKILL_STAGES,
   DEFAULT_PROVIDER_BACKEND_MODE,
 } from "../agent-discovery/provider-skill-spec.js";
+import {
+  buildProofVerificationSummary,
+  listProofVerificationRecords,
+} from "../proof-market/records.js";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 import { createDatabase } from "../state/database.js";
 
@@ -258,6 +262,14 @@ describe.sequential("agent discovery proof.verify server", () => {
         stages: ["proofverify.verify"],
       });
       expect(submittedPayments).toBe(1);
+      const records = listProofVerificationRecords(db, 10);
+      expect(records).toHaveLength(1);
+      expect(records[0]?.verificationMode).toBe("fallback");
+      expect(records[0]?.verdictReason).toBe("all_checks_passed");
+      expect(records[0]?.boundSubjectHashes.subjectSha256).toBe(SUBJECT_SHA);
+      const summary = buildProofVerificationSummary(db, 10);
+      expect(summary.totalResults).toBe(1);
+      expect(summary.fallbackVerifications).toBe(1);
     } finally {
       await server.close();
       db.close();
@@ -362,9 +374,141 @@ describe.sequential("agent discovery proof.verify server", () => {
       expect((response.metadata as Record<string, unknown>).verifier_class).toBe(
         "bundle_integrity_verification",
       );
+      const records = listProofVerificationRecords(db, 10);
+      expect(records).toHaveLength(1);
+      expect(records[0]?.verificationMode).toBe("worker_backed");
+      expect(records[0]?.verifierClass).toBe("bundle_integrity_verification");
+      expect(records[0]?.verifierMaterialReference?.kind).toBe("proof_bundle");
+      expect(records[0]?.boundSubjectHashes.subjectSha256).toBe(SUBJECT_SHA);
     } finally {
       await new Promise<void>((resolve, reject) =>
         fixtureServer.close((error) => (error ? reject(error) : resolve())),
+      );
+      await server.close();
+      db.close();
+    }
+  });
+
+  it("records invalid and inconclusive proof verification paths", async () => {
+    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-proof-verify-paths-"));
+    process.env.HOME = tempHome;
+    process.env.TOS_RPC_URL = "http://127.0.0.1:8545";
+    fs.mkdirSync(path.join(tempHome, ".openfox"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tempHome, ".openfox", "wallet.json"),
+      JSON.stringify({ privateKey: TEST_PRIVATE_KEY, createdAt: new Date().toISOString() }),
+    );
+
+    const config = makeConfig();
+    config.agentDiscovery!.proofVerifyServer!.verifierWorker = makeRustWorkerConfig(
+      "openfox-proof-verifier",
+    );
+    const { startAgentDiscoveryProofVerifyServer } = await import("../agent-discovery/proof-verify-server.js");
+    const db = makeDb(tempHome);
+    const server = await startAgentDiscoveryProofVerifyServer({
+      identity: makeIdentity(),
+      config,
+      address: config.walletAddress!,
+      db,
+      proofVerifyConfig: config.agentDiscovery!.proofVerifyServer!,
+    });
+
+    const requester = makeIdentity();
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url === config.rpcUrl) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { id: number; method: string };
+        switch (body.method) {
+          case "tos_chainId":
+            return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x682" }), { status: 200 });
+          case "tos_getTransactionReceipt":
+          case "tos_getTransactionByHash":
+            return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: null }), { status: 200 });
+          case "tos_getTransactionCount":
+            return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0x1" }), { status: 200 });
+          case "tos_sendRawTransaction":
+            return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: "0xpay1" }), { status: 200 });
+          default:
+            throw new Error(`unexpected RPC method ${body.method}`);
+        }
+      }
+      return originalFetch(input as RequestInfo | URL, init);
+    }) as typeof fetch;
+
+    const invalidFixture = http.createServer((req, res) => {
+      if (req.url === "/subject.txt") {
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("proof verify subject payload");
+        return;
+      }
+      if (req.url === "/bundle.json") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ article_sha256: `0x${"f".repeat(64)}` }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => invalidFixture.listen(0, "127.0.0.1", resolve));
+    const invalidAddress = invalidFixture.address();
+    const invalidPort =
+      invalidAddress && typeof invalidAddress === "object" && "port" in invalidAddress
+        ? invalidAddress.port
+        : 0;
+
+    try {
+      const invalid = await postPaid(
+        server.url,
+        {
+          capability: "proof.verify",
+          requester: {
+            agent_id: requester.address.toLowerCase(),
+            identity: { kind: "tos", value: requester.address.toLowerCase() },
+          },
+          request_nonce: "proofverifyinvalid1",
+          request_expires_at: Math.floor(Date.now() / 1000) + 300,
+          subject_url: `http://127.0.0.1:${invalidPort}/subject.txt`,
+          subject_sha256: SUBJECT_SHA,
+          proof_bundle_url: `http://127.0.0.1:${invalidPort}/bundle.json`,
+          reason: "invalid proof path",
+        },
+        config.rpcUrl!,
+      );
+      expect(invalid.success).toBe(true);
+      expect((invalid.response as Record<string, unknown>).verdict).toBe("invalid");
+
+      const inconclusive = await postPaid(
+        server.url,
+        {
+          capability: "proof.verify",
+          requester: {
+            agent_id: requester.address.toLowerCase(),
+            identity: { kind: "tos", value: requester.address.toLowerCase() },
+          },
+          request_nonce: "proofverifyinconclusive1",
+          request_expires_at: Math.floor(Date.now() / 1000) + 300,
+          subject_sha256: SUBJECT_SHA,
+          reason: "inconclusive proof path",
+        },
+        config.rpcUrl!,
+      );
+      expect(inconclusive.success).toBe(true);
+      expect((inconclusive.response as Record<string, unknown>).verdict).toBe(
+        "inconclusive",
+      );
+
+      const records = listProofVerificationRecords(db, 10);
+      expect(records.map((item) => item.verdict)).toEqual([
+        "inconclusive",
+        "invalid",
+      ]);
+      expect(records[0]?.verdictReason).toBeTruthy();
+      const summary = buildProofVerificationSummary(db, 10);
+      expect(summary.verdicts.invalid).toBe(1);
+      expect(summary.verdicts.inconclusive).toBe(1);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        invalidFixture.close((error) => (error ? reject(error) : resolve())),
       );
       await server.close();
       db.close();

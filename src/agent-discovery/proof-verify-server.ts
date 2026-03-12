@@ -37,6 +37,10 @@ import { executeProviderBackend } from "./provider-backends.js";
 import { formatSkillBackendStage } from "./provider-skill-spec.js";
 import { runSkillBackend } from "../skills/backend-runner.js";
 import { parseProofVerifySkillResult } from "./skill-backend-contracts.js";
+import {
+  storeProofVerificationRecord,
+  type ProofMaterialReference,
+} from "../proof-market/records.js";
 
 const logger = createLogger("agent-discovery.proof-verify");
 
@@ -71,6 +75,13 @@ interface ProofVerifyBackendResult {
   backendSummary: {
     kind: "skills" | "builtin";
     stages: string[];
+  };
+  verdictReason: string;
+  verifierMaterialReference?: ProofMaterialReference | null;
+  boundSubjectHashes: {
+    subjectSha256?: `0x${string}` | null;
+    bundleSha256?: `0x${string}` | null;
+    responseHash?: `0x${string}` | null;
   };
 }
 
@@ -297,6 +308,11 @@ async function verifyRequestBackend(
   if (checks.length > 0) {
     verdict = checks.every((entry) => entry.ok) ? "valid" : "invalid";
   }
+  const verifierClass: string =
+    request.proof_bundle_url || request.proof_bundle_sha256
+      ? "bundle_integrity_verification"
+      : "structural_verification";
+  metadata.verifier_class = verifierClass;
   const summary =
     verdict === "valid"
       ? `Verified ${checks.length} proof check${checks.length === 1 ? "" : "s"} successfully.`
@@ -318,6 +334,36 @@ async function verifyRequestBackend(
     backendSummary: {
       kind: "builtin",
       stages: ["builtin:proof.verify"],
+    },
+    verdictReason:
+      verdict === "valid"
+        ? "all_checks_passed"
+        : verdict === "invalid"
+          ? "checks_failed"
+          : "insufficient_comparable_hashes",
+    verifierMaterialReference: request.proof_bundle_url
+      ? {
+            kind: verifierClass,
+            ref: request.proof_bundle_url,
+            hash:
+              request.proof_bundle_sha256 && /^0x[0-9a-f]{64}$/i.test(request.proof_bundle_sha256)
+              ? (request.proof_bundle_sha256 as `0x${string}`)
+              : null,
+          metadata: {
+            verifier_backend: "bounded_receipt_verifier_v0",
+          },
+        }
+      : null,
+    boundSubjectHashes: {
+      subjectSha256:
+        request.subject_sha256 && /^0x[0-9a-f]{64}$/i.test(request.subject_sha256)
+          ? (request.subject_sha256 as `0x${string}`)
+          : null,
+      bundleSha256:
+        request.proof_bundle_sha256 && /^0x[0-9a-f]{64}$/i.test(request.proof_bundle_sha256)
+          ? (request.proof_bundle_sha256 as `0x${string}`)
+          : null,
+      responseHash: verifierReceiptSha256,
     },
   };
 }
@@ -360,6 +406,60 @@ async function runSkillProofVerifyBackend(params: {
     backendSummary: {
       kind: "skills",
       stages: params.proofVerifyConfig.skillStages.map(formatSkillBackendStage),
+    },
+    verdictReason: result.verdictReason || "worker_verdict",
+    verifierMaterialReference:
+      result.verifierMaterialReference &&
+      typeof result.verifierMaterialReference === "object"
+        ? {
+            kind:
+              typeof result.verifierMaterialReference.kind === "string" &&
+              result.verifierMaterialReference.kind.trim()
+                ? result.verifierMaterialReference.kind.trim()
+                : "worker_material",
+            ref:
+              typeof result.verifierMaterialReference.ref === "string" &&
+              result.verifierMaterialReference.ref.trim()
+                ? result.verifierMaterialReference.ref.trim()
+                : "inline://unknown",
+            hash:
+              typeof result.verifierMaterialReference.hash === "string" &&
+              /^0x[0-9a-f]{64}$/i.test(result.verifierMaterialReference.hash)
+                ? (result.verifierMaterialReference.hash as `0x${string}`)
+                : null,
+            metadata:
+              result.verifierMaterialReference.metadata &&
+              typeof result.verifierMaterialReference.metadata === "object" &&
+              !Array.isArray(result.verifierMaterialReference.metadata)
+                ? (result.verifierMaterialReference.metadata as Record<string, unknown>)
+                : null,
+          }
+        : null,
+    boundSubjectHashes: {
+      subjectSha256:
+        result.boundSubjectHashes &&
+        typeof result.boundSubjectHashes.subjectSha256 === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(result.boundSubjectHashes.subjectSha256)
+          ? (result.boundSubjectHashes.subjectSha256 as `0x${string}`)
+          : params.request.subject_sha256 &&
+              /^0x[0-9a-f]{64}$/i.test(params.request.subject_sha256)
+            ? (params.request.subject_sha256 as `0x${string}`)
+            : null,
+      bundleSha256:
+        result.boundSubjectHashes &&
+        typeof result.boundSubjectHashes.bundleSha256 === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(result.boundSubjectHashes.bundleSha256)
+          ? (result.boundSubjectHashes.bundleSha256 as `0x${string}`)
+          : params.request.proof_bundle_sha256 &&
+              /^0x[0-9a-f]{64}$/i.test(params.request.proof_bundle_sha256)
+            ? (params.request.proof_bundle_sha256 as `0x${string}`)
+            : null,
+      responseHash:
+        result.boundSubjectHashes &&
+        typeof result.boundSubjectHashes.responseHash === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(result.boundSubjectHashes.responseHash)
+          ? (result.boundSubjectHashes.responseHash as `0x${string}`)
+          : result.verifierReceiptSha256,
     },
   };
 }
@@ -547,6 +647,57 @@ export async function startAgentDiscoveryProofVerifyServer(
         requesterIdentity,
         capability: body.capability,
         createdAt: new Date().toISOString(),
+      });
+      const verifierClass =
+        typeof verification.metadata.verifier_class === "string" &&
+        verification.metadata.verifier_class.length > 0
+          ? verification.metadata.verifier_class
+          : proofVerifyConfig.supportedVerifierClasses?.includes("cryptographic_proof_verification")
+            ? "cryptographic_proof_verification"
+            : "structural_verification";
+      const verificationMode =
+        typeof verification.metadata.verification_mode === "string" &&
+        (verification.metadata.verification_mode === "fallback" ||
+          verification.metadata.verification_mode === "worker_backed" ||
+          verification.metadata.verification_mode === "cryptographic")
+          ? verification.metadata.verification_mode
+          : "fallback";
+      storeProofVerificationRecord(db, {
+        recordId: `proof:${resultId}`,
+        resultId,
+        requestKey,
+        capability: body.capability,
+        requesterIdentity,
+        providerBackend: verification.backendSummary,
+        verifierClass,
+        verificationMode,
+        verdict: verification.verdict,
+        verdictReason: verification.verdictReason,
+        summary: verification.summary,
+        verifierProfile: body.verifier_profile ?? null,
+        verifierReceiptSha256: verification.verifierReceiptSha256,
+        verifierMaterialReference:
+          verification.verifierMaterialReference ??
+          (body.proof_bundle_url
+            ? {
+                kind: verifierClass,
+                ref: body.proof_bundle_url,
+                hash:
+                  body.proof_bundle_sha256 &&
+                  /^0x[0-9a-f]{64}$/i.test(body.proof_bundle_sha256)
+                    ? (body.proof_bundle_sha256 as `0x${string}`)
+                    : null,
+                metadata: null,
+              }
+            : null),
+        boundSubjectHashes: verification.boundSubjectHashes,
+        request: {
+          subjectUrl: body.subject_url ?? null,
+          proofBundleUrl: body.proof_bundle_url ?? null,
+        },
+        metadata: response.metadata ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
       json(res, 200, response);
     } catch (error) {

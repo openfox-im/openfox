@@ -1,0 +1,11 @@
+{
+  "name": "proof-verification-callback",
+  "path": "/contracts/proof/verification/callback",
+  "method": "POST",
+  "body": {
+    "record_id": "proof:1",
+    "verifier_class": "cryptographic_proof_verification",
+    "verdict": "valid",
+    "receipt_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

@@ -17,6 +17,9 @@ export interface ZkTlsBundleSkillResult {
   format: string;
   bundleSha256: `0x${string}`;
   bundle: Record<string, unknown>;
+  originClaims?: Record<string, unknown>;
+  verifierMaterialReferences?: Array<Record<string, unknown>>;
+  integrity?: Record<string, unknown>;
 }
 
 export interface ProofVerifySkillResult {
@@ -24,6 +27,9 @@ export interface ProofVerifySkillResult {
   summary: string;
   metadata: Record<string, unknown>;
   verifierReceiptSha256: `0x${string}`;
+  verdictReason?: string;
+  verifierMaterialReference?: Record<string, unknown>;
+  boundSubjectHashes?: Record<string, unknown>;
 }
 
 export interface StoragePutSkillResult {
@@ -72,6 +78,19 @@ export function parseZkTlsBundleSkillResult(
     format: requireString(record.format, "format"),
     bundleSha256: requireHex64(record.bundleSha256, "bundleSha256"),
     bundle: asRecord(record.bundle, "bundle"),
+    originClaims:
+      record.originClaims && typeof record.originClaims === "object" && !Array.isArray(record.originClaims)
+        ? (record.originClaims as Record<string, unknown>)
+        : undefined,
+    verifierMaterialReferences: Array.isArray(record.verifierMaterialReferences)
+      ? record.verifierMaterialReferences.map((entry, index) =>
+          asRecord(entry, `verifierMaterialReferences[${index}]`),
+        )
+      : undefined,
+    integrity:
+      record.integrity && typeof record.integrity === "object" && !Array.isArray(record.integrity)
+        ? (record.integrity as Record<string, unknown>)
+        : undefined,
   };
 }
 
@@ -91,6 +110,19 @@ export function parseProofVerifySkillResult(
       record.verifierReceiptSha256,
       "verifierReceiptSha256",
     ),
+    verdictReason: optionalString(record.verdictReason, "verdictReason"),
+    verifierMaterialReference:
+      record.verifierMaterialReference &&
+      typeof record.verifierMaterialReference === "object" &&
+      !Array.isArray(record.verifierMaterialReference)
+        ? (record.verifierMaterialReference as Record<string, unknown>)
+        : undefined,
+    boundSubjectHashes:
+      record.boundSubjectHashes &&
+      typeof record.boundSubjectHashes === "object" &&
+      !Array.isArray(record.boundSubjectHashes)
+        ? (record.boundSubjectHashes as Record<string, unknown>)
+        : undefined,
   };
 }
 
