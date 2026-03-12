@@ -22,13 +22,13 @@
       "types": "./dist/state/database.d.ts",
       "default": "./dist/state/database.js"
     },
-    "./tos/address.js": {
-      "types": "./dist/tos/address.d.ts",
-      "default": "./dist/tos/address.js"
+    "./chain/address.js": {
+      "types": "./dist/chain/address.d.ts",
+      "default": "./dist/chain/address.js"
     },
-    "./tos/client.js": {
-      "types": "./dist/tos/client.d.ts",
-      "default": "./dist/tos/client.js"
+    "./chain/client.js": {
+      "types": "./dist/chain/client.d.ts",
+      "default": "./dist/chain/client.js"
     },
     "./agent-discovery/card.js": {
       "types": "./dist/agent-discovery/card.d.ts",
@@ -42,6 +42,15 @@
   "bin": {
     "openfox": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "skills",
+    "packs",
+    "templates",
+    "constitution.md",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/openfox-im/openfox.git"
@@ -67,12 +76,11 @@
     "test:security": "vitest run --grep 'security|injection|policy'",
     "test:financial": "vitest run --grep 'financial|spend|treasury'",
     "test:ci": "vitest run --reporter=verbose",
-    "clean": "rm -rf dist && pnpm -r clean"
+    "clean": "rm -rf dist && pnpm -r clean",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@noble/secp256k1": "^2.3.0",
-    "@types/better-sqlite3": "^7.6.0",
-    "@types/ws": "^8.18.1",
     "better-sqlite3": "^11.0.0",
     "chalk": "^5.3.0",
     "cron-parser": "^4.9.0",
@@ -83,13 +91,15 @@
     "ora": "^8.0.0",
     "simple-git": "^3.24.0",
     "siwe": "^2.3.0",
-    "tosdk": "link:../tosdk",
+    "tosdk": "github:tos-network/tosdk",
     "ulid": "^2.3.0",
     "ws": "^8.19.0",
     "yaml": "^2.4.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^20.10.0",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",
     "vitest": "^2.0.0"
@@ -100,7 +110,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3",
-      "esbuild"
+      "esbuild",
+      "tosdk"
     ]
   }
 }

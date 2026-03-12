@@ -62,13 +62,13 @@ import {
   buildPublishedAgentDiscoveryConfig,
 } from "./agent-gateway/publish.js";
 import {
-  deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey,
-  normalizeTOSAddress,
-} from "./tos/address.js";
+  deriveAddressFromPrivateKey,
+  normalizeAddress,
+} from "./chain/address.js";
 import {
-  grantTOSCapability as grantCapability,
-  registerTOSCapabilityName as registerCapabilityName,
-} from "./tos/client.js";
+  grantCapability,
+  registerCapabilityName,
+} from "./chain/client.js";
 import {
   installSkillFromGit,
   installSkillFromUrl,
@@ -159,7 +159,7 @@ import { createNativeSettlementPublisher } from "./settlement/publisher.js";
 import { createNativeSettlementCallbackDispatcher } from "./settlement/callbacks.js";
 import { createMarketBindingPublisher } from "./market/publisher.js";
 import { createMarketContractDispatcher } from "./market/contracts.js";
-import { createX402PaymentManager } from "./tos/x402-server.js";
+import { createX402PaymentManager } from "./chain/x402-server.js";
 import { startStorageProviderServer } from "./storage/http.js";
 import {
   auditStoredBundle,
@@ -1001,13 +1001,13 @@ function toPaymasterQuoteRecord(body: Record<string, unknown>): PaymasterQuoteRe
   return {
     quoteId: String(body.quote_id),
     chainId: String(body.chain_id ?? "0"),
-    providerAddress: normalizeTOSAddress(String(body.provider_address)),
-    sponsorAddress: normalizeTOSAddress(String(body.sponsor_address)),
+    providerAddress: normalizeAddress(String(body.provider_address)),
+    sponsorAddress: normalizeAddress(String(body.sponsor_address)),
     sponsorSignerType: String(body.sponsor_signer_type ?? "secp256k1"),
-    walletAddress: normalizeTOSAddress(String(body.wallet_address)),
-    requesterAddress: normalizeTOSAddress(String(body.requester_address)),
+    walletAddress: normalizeAddress(String(body.wallet_address)),
+    requesterAddress: normalizeAddress(String(body.requester_address)),
     requesterSignerType: String(body.requester_signer_type ?? "secp256k1"),
-    targetAddress: normalizeTOSAddress(String(body.target_address)),
+    targetAddress: normalizeAddress(String(body.target_address)),
     valueWei: String(body.value_wei ?? "0"),
     dataHex: String(body.data_hex ?? "0x") as `0x${string}`,
     gas: String(body.gas ?? "0"),
@@ -1038,19 +1038,19 @@ function toPaymasterAuthorizationRecord(
     chainId: String(body.chain_id ?? quote.chainId),
     requestKey: String(body.request_key ?? ""),
     requestHash: String(body.request_hash ?? "0x") as `0x${string}`,
-    providerAddress: normalizeTOSAddress(String(body.provider_address ?? quote.providerAddress)),
-    sponsorAddress: normalizeTOSAddress(String(body.sponsor_address ?? quote.sponsorAddress)),
+    providerAddress: normalizeAddress(String(body.provider_address ?? quote.providerAddress)),
+    sponsorAddress: normalizeAddress(String(body.sponsor_address ?? quote.sponsorAddress)),
     sponsorSignerType: String(
       body.sponsor_signer_type ?? quote.sponsorSignerType ?? "secp256k1",
     ),
-    walletAddress: normalizeTOSAddress(String(body.wallet_address ?? quote.walletAddress)),
-    requesterAddress: normalizeTOSAddress(
+    walletAddress: normalizeAddress(String(body.wallet_address ?? quote.walletAddress)),
+    requesterAddress: normalizeAddress(
       String(body.requester_address ?? quote.requesterAddress),
     ),
     requesterSignerType: String(
       body.requester_signer_type ?? quote.requesterSignerType ?? "secp256k1",
     ),
-    targetAddress: normalizeTOSAddress(String(body.target_address ?? quote.targetAddress)),
+    targetAddress: normalizeAddress(String(body.target_address ?? quote.targetAddress)),
     valueWei: String(body.value_wei ?? quote.valueWei),
     dataHex: String(body.data_hex ?? quote.dataHex) as `0x${string}`,
     gas: String(body.gas ?? quote.gas),

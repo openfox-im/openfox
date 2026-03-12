@@ -7,9 +7,9 @@ import { fileURLToPath } from "url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { privateKeyToAccount } from "tosdk/accounts";
 import {
-  buildTOSX402Payment,
-  encodeTOSX402PaymentHeader,
-} from "../tos/client.js";
+  buildX402Payment,
+  encodeX402PaymentHeader,
+} from "../chain/client.js";
 import {
   DEFAULT_PROOF_VERIFY_SKILL_STAGES,
   DEFAULT_PROVIDER_BACKEND_MODE,
@@ -138,12 +138,12 @@ async function postPaid(
       response: paymentRequired,
     };
   }
-  const payment = await buildTOSX402Payment({
+  const payment = await buildX402Payment({
     privateKey: TEST_PRIVATE_KEY,
     requirement,
     rpcUrl,
   });
-  const paymentHeader = encodeTOSX402PaymentHeader(payment);
+  const paymentHeader = encodeX402PaymentHeader(payment);
   const paid = await fetch(url, {
     method: "POST",
     headers: {

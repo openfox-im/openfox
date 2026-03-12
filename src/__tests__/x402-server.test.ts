@@ -3,13 +3,13 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDatabase } from "../state/database.js";
-import { buildTOSX402Payment } from "../tos/client.js";
-import { deriveTOSAddressFromPrivateKey } from "../tos/address.js";
+import { buildX402Payment } from "../chain/client.js";
+import { deriveAddressFromPrivateKey } from "../chain/address.js";
 import {
   createX402PaymentManager,
   hashX402RequestPayload,
   X402ServerPaymentRejectedError,
-} from "../tos/x402-server.js";
+} from "../chain/x402-server.js";
 import type { OpenFoxDatabase, X402ServerConfig } from "../types.js";
 
 const TEST_PRIVATE_KEY =
@@ -60,24 +60,13 @@ describe("x402 server payment manager", () => {
     const rpcUrl = "http://127.0.0.1:8545";
     const providerAddress =
       "0x0000000000000000000000000000000000000000000000000000000000000042";
-    const payerAddress = deriveTOSAddressFromPrivateKey(TEST_PRIVATE_KEY);
+    const payerAddress = deriveAddressFromPrivateKey(TEST_PRIVATE_KEY);
     const requestKey = "observation:req:1";
     const requestHash = hashX402RequestPayload({
       capability: "observation.once",
       requester_identity: payerAddress,
       target_url: "https://target.example/data",
       reason: "test",
-    });
-
-    const envelope = await buildTOSX402Payment({
-      privateKey: TEST_PRIVATE_KEY,
-      rpcUrl,
-      requirement: {
-        scheme: "exact",
-        network: "tos:1666",
-        maxAmountRequired: "1000000000000000",
-        payToAddress: providerAddress,
-      },
     });
 
     let sendAttempts = 0;
@@ -122,6 +111,17 @@ describe("x402 server payment manager", () => {
           throw new Error(`unexpected RPC method ${body.method}`);
       }
     }) as typeof fetch;
+
+    const envelope = await buildX402Payment({
+      privateKey: TEST_PRIVATE_KEY,
+      rpcUrl,
+      requirement: {
+        scheme: "exact",
+        network: "tos:1666",
+        maxAmountRequired: "1000000000000000",
+        payToAddress: providerAddress,
+      },
+    });
 
     const paymentManager = createX402PaymentManager({
       db: makeDb(),
@@ -173,17 +173,7 @@ describe("x402 server payment manager", () => {
     const rpcUrl = "http://127.0.0.1:8545";
     const providerAddress =
       "0x0000000000000000000000000000000000000000000000000000000000000042";
-    const payerAddress = deriveTOSAddressFromPrivateKey(TEST_PRIVATE_KEY);
-    const envelope = await buildTOSX402Payment({
-      privateKey: TEST_PRIVATE_KEY,
-      rpcUrl,
-      requirement: {
-        scheme: "exact",
-        network: "tos:1666",
-        maxAmountRequired: "2000000000000000",
-        payToAddress: providerAddress,
-      },
-    });
+    const payerAddress = deriveAddressFromPrivateKey(TEST_PRIVATE_KEY);
 
     global.fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? "{}")) as { id: number; method: string };
@@ -215,6 +205,17 @@ describe("x402 server payment manager", () => {
           throw new Error(`unexpected RPC method ${body.method}`);
       }
     }) as typeof fetch;
+
+    const envelope = await buildX402Payment({
+      privateKey: TEST_PRIVATE_KEY,
+      rpcUrl,
+      requirement: {
+        scheme: "exact",
+        network: "tos:1666",
+        maxAmountRequired: "2000000000000000",
+        payToAddress: providerAddress,
+      },
+    });
 
     const paymentManager = createX402PaymentManager({
       db: makeDb(),

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../tos/client.js", () => ({
-  TOSRpcClient: class {
+vi.mock("../chain/client.js", () => ({
+  ChainRpcClient: class {
     async getTransactionReceipt() {
       return { status: "0x1" };
     }
   },
-  sendTOSNativeTransfer: vi.fn(async () => ({
+  sendNativeTransfer: vi.fn(async () => ({
     txHash:
       "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     receipt: { status: "0x1" },
@@ -16,7 +16,7 @@ vi.mock("../tos/client.js", () => ({
 import { createMarketContractDispatcher } from "../market/contracts.js";
 import { buildMarketBindingRecord } from "../market/publisher.js";
 import { createTestDb, createTestIdentity } from "./mocks.js";
-import { sendTOSNativeTransfer } from "../tos/client.js";
+import { sendNativeTransfer } from "../chain/client.js";
 import { DEFAULT_MARKET_CONTRACT_CONFIG } from "../types.js";
 
 describe("market contract callbacks", () => {
@@ -62,7 +62,7 @@ describe("market contract callbacks", () => {
 
     expect(result.action).toBe("confirmed");
     expect(result.callback?.status).toBe("confirmed");
-    expect(sendTOSNativeTransfer).toHaveBeenCalledTimes(1);
+    expect(sendNativeTransfer).toHaveBeenCalledTimes(1);
     expect(
       db.getMarketContractCallbackByBindingId(binding.bindingId)?.status,
     ).toBe("confirmed");

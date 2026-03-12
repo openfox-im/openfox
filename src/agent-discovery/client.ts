@@ -2,9 +2,9 @@ import { randomBytes } from "crypto";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { checkX402, x402Fetch } from "../runtime/x402.js";
 import {
-  recordTOSReputationScore as recordReputationScore,
-  TOSRpcClient as RpcClient,
-} from "../tos/client.js";
+  recordReputationScore as recordReputationScore,
+  ChainRpcClient as RpcClient,
+} from "../chain/client.js";
 import {
   AGENT_GATEWAY_E2E_HEADER,
   AGENT_GATEWAY_E2E_SCHEME,

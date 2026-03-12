@@ -1,7 +1,7 @@
 import { getPublicKey } from "@noble/secp256k1";
 import { keccak256, toHex } from "tosdk";
 
-export type TOSAddress = `0x${string}`;
+export type ChainAddress = `0x${string}`;
 export type HexString = `0x${string}`;
 
 function strip0x(value: string): string {
@@ -24,33 +24,33 @@ export function hexToBytes(value: HexString): Uint8Array {
   return out;
 }
 
-export function normalizeTOSAddress(value: string): TOSAddress {
+export function normalizeAddress(value: string): ChainAddress {
   const normalized = strip0x(value).toLowerCase();
   if (!/^[0-9a-f]*$/.test(normalized)) {
     throw new Error(`Invalid TOS address: ${value}`);
   }
   if (normalized.length > 64) {
-    return `0x${normalized.slice(-64)}` as TOSAddress;
+    return `0x${normalized.slice(-64)}` as ChainAddress;
   }
-  return `0x${normalized.padStart(64, "0")}` as TOSAddress;
+  return `0x${normalized.padStart(64, "0")}` as ChainAddress;
 }
 
-export function deriveTOSAddressFromPrivateKey(privateKey: HexString): TOSAddress {
+export function deriveAddressFromPrivateKey(privateKey: HexString): ChainAddress {
   const pubkey = getPublicKey(strip0x(privateKey), false);
-  return deriveTOSAddressFromPublicKey(pubkey);
+  return deriveAddressFromPublicKey(pubkey);
 }
 
-export function deriveTOSAddressFromPublicKey(publicKey: Uint8Array): TOSAddress {
+export function deriveAddressFromPublicKey(publicKey: Uint8Array): ChainAddress {
   const uncompressed =
     publicKey.length === 65 && publicKey[0] === 0x04 ? publicKey.slice(1) : publicKey;
   const digest = keccak256(bytesToHex(uncompressed));
-  return normalizeTOSAddress(digest);
+  return normalizeAddress(digest);
 }
 
-export function isTOSAddress(value: string): value is TOSAddress {
+export function isChainAddress(value: string): value is ChainAddress {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
 }
 
-export function tosAddressBytes(address: TOSAddress): Uint8Array {
+export function addressBytes(address: ChainAddress): Uint8Array {
   return hexToBytes(address);
 }

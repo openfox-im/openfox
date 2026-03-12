@@ -16,9 +16,9 @@ import {
   type X402ServerPaymentResult,
   writeX402RequirementResponse,
   X402ServerPaymentRejectedError,
-} from "../tos/x402-server.js";
-import { normalizeTOSAddress as normalizeAddress, type TOSAddress } from "../tos/address.js";
-import { sendTOSNativeTransfer, type TOSSignedTransaction } from "../tos/client.js";
+} from "../chain/x402-server.js";
+import { normalizeAddress, type ChainAddress } from "../chain/address.js";
+import { sendNativeTransfer, type SignedTransaction } from "../chain/client.js";
 import {
   ensureRequestNotReplayed,
   normalizeNonce,
@@ -35,10 +35,10 @@ export interface SignerQuoteRequest {
   requester: {
     identity: {
       kind: "tos";
-      value: TOSAddress;
+      value: ChainAddress;
     };
   };
-  target: TOSAddress;
+  target: ChainAddress;
   value_wei?: string;
   data?: Hex;
   gas?: string;
@@ -50,12 +50,12 @@ export interface SignerExecutionSubmitRequest {
   requester: {
     identity: {
       kind: "tos";
-      value: TOSAddress;
+      value: ChainAddress;
     };
   };
   request_nonce: string;
   request_expires_at: number;
-  target: TOSAddress;
+  target: ChainAddress;
   value_wei?: string;
   data?: Hex;
   gas?: string;
@@ -71,7 +71,7 @@ export interface StartSignerProviderServerParams {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
   db: OpenFoxDatabase;
-  address: TOSAddress;
+  address: ChainAddress;
   privateKey: Hex;
   signerConfig: SignerProviderConfig;
   paymentManager?: {
@@ -94,7 +94,7 @@ export interface StartSignerProviderServerParams {
   sendTransaction?: (params: {
     rpcUrl: string;
     privateKey: Hex;
-    to: TOSAddress;
+    to: ChainAddress;
     amountWei: bigint;
     gas?: bigint;
     data?: Hex;
@@ -102,7 +102,7 @@ export interface StartSignerProviderServerParams {
     receiptTimeoutMs?: number;
     pollIntervalMs?: number;
   }) => Promise<{
-    signed: TOSSignedTransaction;
+    signed: SignedTransaction;
     txHash: Hex;
     receipt?: Record<string, unknown> | null;
   }>;
@@ -136,10 +136,10 @@ function normalizePathPrefix(pathPrefix: string): string {
 }
 
 function buildQuoteId(params: {
-  requesterAddress: TOSAddress;
-  providerAddress: TOSAddress;
-  walletAddress: TOSAddress;
-  targetAddress: TOSAddress;
+  requesterAddress: ChainAddress;
+  providerAddress: ChainAddress;
+  walletAddress: ChainAddress;
+  targetAddress: ChainAddress;
   valueWei: string;
   dataHex: Hex;
   gas: string;
@@ -162,7 +162,7 @@ function buildQuoteId(params: {
 }
 
 function buildSignerRequestKey(params: {
-  requesterAddress: TOSAddress;
+  requesterAddress: ChainAddress;
   capability: string;
   quoteId: string;
   nonce: string;
@@ -219,7 +219,7 @@ function buildExecutionResponse(params: {
 }
 
 function validateQuoteRequest(body: SignerQuoteRequest): {
-  requesterAddress: TOSAddress;
+  requesterAddress: ChainAddress;
 } {
   const requesterAddress = normalizeAddress(body.requester?.identity?.value);
   return { requesterAddress };
@@ -252,7 +252,7 @@ export async function startSignerProviderServer(
             config: config.x402Server,
           })
         : null;
-  const sendTransaction = params.sendTransaction ?? sendTOSNativeTransfer;
+  const sendTransaction = params.sendTransaction ?? sendNativeTransfer;
 
   const server = http.createServer(async (req, res) => {
     try {

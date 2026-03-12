@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getTransactionReceiptMock = vi.fn();
-const sendTOSNativeTransferMock = vi.fn();
+const sendNativeTransferMock = vi.fn();
 
-vi.mock("../tos/client.js", () => ({
-  TOSRpcClient: class {
+vi.mock("../chain/client.js", () => ({
+  ChainRpcClient: class {
     async getTransactionReceipt(txHash: string) {
       return getTransactionReceiptMock(txHash);
     }
   },
-  sendTOSNativeTransfer: (...args: unknown[]) => sendTOSNativeTransferMock(...args),
+  sendNativeTransfer: (...args: unknown[]) => sendNativeTransferMock(...args),
 }));
 
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
@@ -35,7 +35,7 @@ describe("settlement callbacks", () => {
     });
     db.upsertSettlementReceipt(settlement);
 
-    sendTOSNativeTransferMock.mockResolvedValue({
+    sendNativeTransferMock.mockResolvedValue({
       txHash:
         "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       receipt: { status: "0x1" },
@@ -66,7 +66,7 @@ describe("settlement callbacks", () => {
     expect(result.callback?.callbackTxHash).toBe(
       "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     );
-    expect(sendTOSNativeTransferMock).toHaveBeenCalledTimes(1);
+    expect(sendNativeTransferMock).toHaveBeenCalledTimes(1);
     expect(
       db.getSettlementCallbackByReceiptId(settlement.receiptId)?.status,
     ).toBe("confirmed");
@@ -132,7 +132,7 @@ describe("settlement callbacks", () => {
 
     expect(retried.processed).toBe(1);
     expect(retried.confirmed).toBe(1);
-    expect(sendTOSNativeTransferMock).not.toHaveBeenCalled();
+    expect(sendNativeTransferMock).not.toHaveBeenCalled();
     expect(
       db.getSettlementCallbackByReceiptId(settlement.receiptId)?.status,
     ).toBe("confirmed");

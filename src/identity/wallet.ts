@@ -11,7 +11,7 @@ import { generatePrivateKey, privateKeyToAccount } from "tosdk/accounts";
 import fs from "fs";
 import path from "path";
 import type { WalletData } from "../types.js";
-import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "../tos/address.js";
+import { deriveAddressFromPrivateKey } from "../chain/address.js";
 
 const OPENFOX_DIR = path.join(
   process.env.HOME || "/root",

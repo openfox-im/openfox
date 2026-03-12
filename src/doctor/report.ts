@@ -5,7 +5,7 @@ import { buildSkillStatusReport } from "../skills/loader.js";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 import { getWalletPath, walletExists } from "../identity/wallet.js";
 import { buildWalletStatusSnapshot } from "../wallet/operator.js";
-import { TOSRpcClient } from "../tos/client.js";
+import { ChainRpcClient } from "../chain/client.js";
 import {
   buildGatewayStatusReport,
   buildServiceStatusReport,
@@ -373,7 +373,7 @@ async function buildConfigSnapshot(
   let paymasterSponsorFunded: boolean | null = null;
   if (config.paymasterProvider?.enabled && config.rpcUrl && sponsorAddress) {
     try {
-      const rpc = new TOSRpcClient({ rpcUrl: config.rpcUrl });
+      const rpc = new ChainRpcClient({ rpcUrl: config.rpcUrl });
       const sponsorBalance = await rpc.getBalance(sponsorAddress as `0x${string}`);
       paymasterSponsorFunded = sponsorBalance > 0n;
     } catch {

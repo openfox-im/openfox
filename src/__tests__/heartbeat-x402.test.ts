@@ -6,8 +6,8 @@ const getTransactionReceiptMock = vi.fn();
 const getTransactionByHashMock = vi.fn();
 const sendRawTransactionMock = vi.fn();
 
-vi.mock("../tos/client.js", () => ({
-  TOSRpcClient: class {
+vi.mock("../chain/client.js", () => ({
+  ChainRpcClient: class {
     async getTransactionReceipt(txHash: string) {
       return getTransactionReceiptMock(txHash);
     }

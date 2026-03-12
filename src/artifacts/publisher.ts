@@ -10,7 +10,7 @@ import {
   bindExecutionTrailsByTransaction,
   propagateExecutionTrailsForSubject,
 } from "../audit/execution-trails.js";
-import { sendTOSNativeTransfer } from "../tos/client.js";
+import { sendNativeTransfer } from "../chain/client.js";
 import type {
   ArtifactAnchorConfig,
   ArtifactAnchorRecord,
@@ -90,7 +90,7 @@ export function createNativeArtifactAnchorPublisher(params: {
       if (existing && existing.summaryHash === nextRecord.summaryHash && existing.anchorTxHash) {
         return existing;
       }
-      const transfer = await sendTOSNativeTransfer({
+      const transfer = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: params.config.sinkAddress || params.publisherAddress,

@@ -1,12 +1,12 @@
 import { keccak256, toHex, type Hex } from "tosdk";
-import { normalizeTOSAddress, type TOSAddress } from "../tos/address.js";
+import { normalizeAddress, type ChainAddress } from "../chain/address.js";
 import type {
   PaymasterProviderConfig,
   PaymasterProviderPolicyConfig,
   PaymasterProviderTrustTier,
 } from "../types.js";
 
-const SYSTEM_ACTION_ADDRESS = normalizeTOSAddress("0x1");
+const SYSTEM_ACTION_ADDRESS = normalizeAddress("0x1");
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") {
@@ -41,14 +41,14 @@ function selectorFromData(dataHex: Hex): Hex | null {
 }
 
 export function getPolicySponsorAddress(
-  providerAddress: TOSAddress,
+  providerAddress: ChainAddress,
   policy: PaymasterProviderPolicyConfig,
-): TOSAddress {
-  return normalizeTOSAddress(policy.sponsorAddress || providerAddress);
+): ChainAddress {
+  return normalizeAddress(policy.sponsorAddress || providerAddress);
 }
 
 export function hashPaymasterPolicy(params: {
-  providerAddress: TOSAddress;
+  providerAddress: ChainAddress;
   policy: PaymasterProviderPolicyConfig;
 }): Hex {
   const sponsorAddress = getPolicySponsorAddress(params.providerAddress, params.policy);
@@ -58,10 +58,10 @@ export function hashPaymasterPolicy(params: {
     delegate_identity: params.policy.delegateIdentity || null,
     trust_tier: params.policy.trustTier,
     allowed_wallets: params.policy.allowedWallets.map((entry) =>
-      normalizeTOSAddress(entry),
+      normalizeAddress(entry),
     ),
     allowed_targets: params.policy.allowedTargets.map((entry) =>
-      normalizeTOSAddress(entry),
+      normalizeAddress(entry),
     ),
     allowed_function_selectors: params.policy.allowedFunctionSelectors.map((entry) =>
       normalizeSelector(entry),
@@ -74,18 +74,18 @@ export function hashPaymasterPolicy(params: {
 }
 
 export function buildPaymasterScopeHash(params: {
-  walletAddress: TOSAddress;
-  sponsorAddress: TOSAddress;
-  targetAddress: TOSAddress;
+  walletAddress: ChainAddress;
+  sponsorAddress: ChainAddress;
+  targetAddress: ChainAddress;
   valueWei: string;
   dataHex: Hex;
   gas: string;
   trustTier: PaymasterProviderTrustTier;
 }): Hex {
   const normalized = {
-    wallet_address: normalizeTOSAddress(params.walletAddress),
-    sponsor_address: normalizeTOSAddress(params.sponsorAddress),
-    target_address: normalizeTOSAddress(params.targetAddress),
+    wallet_address: normalizeAddress(params.walletAddress),
+    sponsor_address: normalizeAddress(params.sponsorAddress),
+    target_address: normalizeAddress(params.targetAddress),
     value_wei: params.valueWei,
     data_hex: params.dataHex.toLowerCase(),
     gas: params.gas,
@@ -95,7 +95,7 @@ export function buildPaymasterScopeHash(params: {
 }
 
 export function validatePaymasterPolicyRequest(params: {
-  providerAddress: TOSAddress;
+  providerAddress: ChainAddress;
   config: PaymasterProviderConfig;
   walletAddress: string;
   targetAddress: string;
@@ -103,9 +103,9 @@ export function validatePaymasterPolicyRequest(params: {
   dataHex?: string;
   gas?: string;
 }): {
-  sponsorAddress: TOSAddress;
-  walletAddress: TOSAddress;
-  targetAddress: TOSAddress;
+  sponsorAddress: ChainAddress;
+  walletAddress: ChainAddress;
+  targetAddress: ChainAddress;
   valueWei: string;
   dataHex: Hex;
   gas: string;
@@ -114,8 +114,8 @@ export function validatePaymasterPolicyRequest(params: {
 } {
   const policy = params.config.policy;
   const sponsorAddress = getPolicySponsorAddress(params.providerAddress, policy);
-  const walletAddress = normalizeTOSAddress(params.walletAddress);
-  const targetAddress = normalizeTOSAddress(params.targetAddress);
+  const walletAddress = normalizeAddress(params.walletAddress);
+  const targetAddress = normalizeAddress(params.targetAddress);
   const value = BigInt(params.valueWei || "0");
   if (value < 0n) {
     throw new Error("value_wei must be non-negative");
@@ -141,7 +141,7 @@ export function validatePaymasterPolicyRequest(params: {
   }
   if (
     !policy.allowedTargets
-      .map((entry) => normalizeTOSAddress(entry))
+      .map((entry) => normalizeAddress(entry))
       .includes(targetAddress)
   ) {
     throw new Error("target is not allowed by paymaster policy");
@@ -149,7 +149,7 @@ export function validatePaymasterPolicyRequest(params: {
   if (
     policy.allowedWallets.length > 0 &&
     !policy.allowedWallets
-      .map((entry) => normalizeTOSAddress(entry))
+      .map((entry) => normalizeAddress(entry))
       .includes(walletAddress)
   ) {
     throw new Error("wallet is not allowed by paymaster policy");

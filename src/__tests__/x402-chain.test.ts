@@ -29,7 +29,7 @@ function jsonResponse(
   });
 }
 
-describe("x402 TOS payments", () => {
+describe("x402 chain payments", () => {
   let tempHome: string;
 
   beforeEach(() => {
@@ -66,7 +66,7 @@ describe("x402 TOS payments", () => {
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
 
-  it("accepts TOS exact payment requirements", async () => {
+  it("accepts chain exact payment requirements", async () => {
     const account = privateKeyToAccount(TEST_PRIVATE_KEY);
     let paidRequestHeaders: Headers | null = null;
 

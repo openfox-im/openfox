@@ -1,14 +1,14 @@
-export class TOSRpcError extends Error {
+export class ChainRpcError extends Error {
   readonly code?: number;
 
   constructor(message: string, code?: number) {
     super(message);
-    this.name = "TOSRpcError";
+    this.name = "ChainRpcError";
     this.code = code;
   }
 }
 
-export type TOSRpcErrorKind =
+export type ChainRpcErrorKind =
   | "rpc_unreachable"
   | "insufficient_balance"
   | "nonce_conflict"
@@ -18,13 +18,13 @@ export type TOSRpcErrorKind =
   | "rpc_error"
   | "unknown";
 
-export interface TOSRpcErrorExplanation {
-  kind: TOSRpcErrorKind;
+export interface ChainRpcErrorExplanation {
+  kind: ChainRpcErrorKind;
   summary: string;
   recommendation: string;
 }
 
-export function explainTOSRpcError(error: unknown): TOSRpcErrorExplanation {
+export function explainChainRpcError(error: unknown): ChainRpcErrorExplanation {
   const message =
     error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
   const lower = message.toLowerCase();
@@ -77,7 +77,7 @@ export function explainTOSRpcError(error: unknown): TOSRpcErrorExplanation {
     };
   }
 
-  if (error instanceof TOSRpcError) {
+  if (error instanceof ChainRpcError) {
     return {
       kind: "rpc_error",
       summary: message,

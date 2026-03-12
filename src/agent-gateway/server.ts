@@ -5,17 +5,17 @@ import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.j
 import { createLogger } from "../observability/logger.js";
 import type { AgentGatewayServerConfig } from "../types.js";
 import {
-  submitTOSPayment,
-  verifyTOSPayment,
-  writeTOSPaymentRequired,
-  readTOSPaymentEnvelope,
-  type TOSPaymentEnvelope,
-} from "../tos/x402.js";
+  submitPayment,
+  verifyPayment,
+  writePaymentRequired,
+  readPaymentEnvelope,
+  type PaymentEnvelope,
+} from "../chain/x402.js";
 import {
-  formatTOSNetwork as formatNetwork,
-  TOSRpcClient as RpcClient,
-} from "../tos/client.js";
-import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
+  formatNetwork as formatNetwork,
+  ChainRpcClient as RpcClient,
+} from "../chain/client.js";
+import { normalizeAddress } from "../chain/address.js";
 import { verifyGatewaySessionAuth } from "./auth.js";
 import {
   buildGatewayPublicUrl,
@@ -316,13 +316,13 @@ async function enforceRelayPayment(params: {
       params.gatewayConfig.relayPaymentDescription ||
       "OpenFox gateway relay payment",
   };
-  const envelope = readTOSPaymentEnvelope(params.req);
+  const envelope = readPaymentEnvelope(params.req);
   if (!envelope) {
-    writeTOSPaymentRequired(params.res, requirement);
+    writePaymentRequired(params.res, requirement);
     return false;
   }
-  const verified = verifyTOSPayment(requirement, envelope);
-  await submitTOSPayment(rpcUrl, verified);
+  const verified = verifyPayment(requirement, envelope);
+  await submitPayment(rpcUrl, verified);
   return true;
 }
 
@@ -330,7 +330,7 @@ async function enforceSessionPayment(params: {
   config?: OpenFoxConfig;
   gatewayAddress: string;
   gatewayConfig: AgentGatewayServerConfig;
-  payment?: TOSPaymentEnvelope;
+  payment?: PaymentEnvelope;
 }): Promise<void> {
   const sessionFeeWei = sessionPaymentAmount(params.gatewayConfig);
   if (sessionFeeWei === 0n) {
@@ -357,8 +357,8 @@ async function enforceSessionPayment(params: {
       params.gatewayConfig.relayPaymentRequiredDeadlineSeconds ?? 300,
     description: "OpenFox gateway session payment",
   };
-  const verified = verifyTOSPayment(requirement, params.payment);
-  await submitTOSPayment(rpcUrl, verified);
+  const verified = verifyPayment(requirement, params.payment);
+  await submitPayment(rpcUrl, verified);
 }
 
 function allocateEndpoints(params: {

@@ -8,13 +8,13 @@ import type {
   X402PaymentStatus,
   X402ServerConfig,
 } from "../types.js";
-import { normalizeTOSAddress, type TOSAddress } from "./address.js";
-import { TOSRpcClient } from "./client.js";
+import { normalizeAddress, type ChainAddress } from "./address.js";
+import { ChainRpcClient } from "./client.js";
 import {
-  readTOSPaymentEnvelope,
-  verifyTOSPayment,
-  writeTOSPaymentRequired,
-  type TOSPaymentRequirement,
+  readPaymentEnvelope,
+  verifyPayment,
+  writePaymentRequired,
+  type PaymentRequirement,
 } from "./x402.js";
 
 export interface X402ServerRequirementInput {
@@ -57,7 +57,7 @@ export interface X402PaymentRetryResult {
 export type X402ServerPaymentResult =
   | {
       state: "required";
-      requirement: TOSPaymentRequirement;
+      requirement: PaymentRequirement;
     }
   | {
       state: "pending";
@@ -120,8 +120,8 @@ function isPaymentReady(
 
 export async function buildX402ServerRequirement(
   params: X402ServerRequirementInput,
-): Promise<TOSPaymentRequirement> {
-  const client = new TOSRpcClient({ rpcUrl: params.rpcUrl });
+): Promise<PaymentRequirement> {
+  const client = new ChainRpcClient({ rpcUrl: params.rpcUrl });
   const chainId =
     params.chainId !== undefined
       ? typeof params.chainId === "number"
@@ -132,7 +132,7 @@ export async function buildX402ServerRequirement(
     scheme: "exact",
     network: `tos:${chainId.toString()}`,
     maxAmountRequired: params.amountWei,
-    payToAddress: normalizeTOSAddress(params.providerAddress),
+    payToAddress: normalizeAddress(params.providerAddress),
     asset: "native",
     requiredDeadlineSeconds: params.requiredDeadlineSeconds ?? 300,
     description: params.description,
@@ -140,7 +140,7 @@ export async function buildX402ServerRequirement(
 }
 
 async function waitForReceipt(params: {
-  client: TOSRpcClient;
+  client: ChainRpcClient;
   txHash: Hex;
   timeoutMs: number;
   pollIntervalMs: number;
@@ -160,10 +160,10 @@ function createPaymentRecord(params: {
   serviceKind: X402PaymentServiceKind;
   requestKey: string;
   requestHash: Hex;
-  providerAddress: TOSAddress;
+  providerAddress: ChainAddress;
   amountWei: string;
   config: X402ServerConfig;
-  verified: ReturnType<typeof verifyTOSPayment>;
+  verified: ReturnType<typeof verifyPayment>;
   nowIso: string;
 }): X402PaymentRecord {
   return {
@@ -202,7 +202,7 @@ function updatePaymentRecord(
 }
 
 async function recoverKnownPayment(params: {
-  client: TOSRpcClient;
+  client: ChainRpcClient;
   db: OpenFoxDatabase;
   payment: X402PaymentRecord;
   config: X402ServerConfig;
@@ -244,7 +244,7 @@ async function drivePaymentRecord(params: {
   payment: X402PaymentRecord;
   config: X402ServerConfig;
 }): Promise<X402PaymentRecord> {
-  const client = new TOSRpcClient({ rpcUrl: params.rpcUrl });
+  const client = new ChainRpcClient({ rpcUrl: params.rpcUrl });
   const current = params.payment;
   const nowIso = new Date().toISOString();
 
@@ -356,10 +356,10 @@ export function hashX402RequestPayload(payload: unknown): Hex {
 }
 
 export function writeX402RequirementResponse(params: {
-  requirement: TOSPaymentRequirement;
+  requirement: PaymentRequirement;
   res: import("http").ServerResponse;
 }): void {
-  writeTOSPaymentRequired(params.res, params.requirement);
+  writePaymentRequired(params.res, params.requirement);
 }
 
 export function bindX402Payment(params: {
@@ -400,7 +400,7 @@ export function bindX402Payment(params: {
 export async function requireX402ServerPayment(
   params: X402ServerPaymentContext,
 ): Promise<X402ServerPaymentResult> {
-  const providerAddress = normalizeTOSAddress(params.providerAddress);
+  const providerAddress = normalizeAddress(params.providerAddress);
   const requirement = await buildX402ServerRequirement({
     rpcUrl: params.rpcUrl,
     providerAddress,
@@ -409,7 +409,7 @@ export async function requireX402ServerPayment(
     requiredDeadlineSeconds: params.requiredDeadlineSeconds,
   });
 
-  const envelope = readTOSPaymentEnvelope(params.req);
+  const envelope = readPaymentEnvelope(params.req);
   const existingForRequest = params.db.getLatestX402PaymentByRequestKey(
     params.serviceKind,
     params.requestKey,
@@ -446,7 +446,7 @@ export async function requireX402ServerPayment(
     return { state: "required", requirement };
   }
 
-  const verified = verifyTOSPayment(requirement, envelope);
+  const verified = verifyPayment(requirement, envelope);
   const txHash = verified.txHash as Hex;
   const existingByPayment = params.db.getX402Payment(txHash);
   if (existingByPayment) {

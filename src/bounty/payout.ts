@@ -1,5 +1,5 @@
 import type { Address } from "tosdk";
-import { sendTOSNativeTransfer } from "../tos/client.js";
+import { sendNativeTransfer } from "../chain/client.js";
 
 export interface BountyPayoutSender {
   send(params: {
@@ -14,7 +14,7 @@ export function createNativeBountyPayoutSender(params: {
 }): BountyPayoutSender {
   return {
     async send({ to, amountWei }) {
-      const transfer = await sendTOSNativeTransfer({
+      const transfer = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to,

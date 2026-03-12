@@ -8,7 +8,7 @@ import {
   fundWalletFromLocalDevnet,
   fundWalletFromTestnet,
 } from "../wallet/operator.js";
-import { parseTOSAmount } from "../tos/client.js";
+import { parseAmount as parseChainAmount } from "../chain/client.js";
 import {
   buildOperatorWalletReport,
   buildOperatorWalletSnapshot,
@@ -27,7 +27,7 @@ function parseAmount(args: string[], defaultWei?: string): bigint | undefined {
   const amountWei = readFlag(args, "--amount-wei");
   if (amountWei) return BigInt(amountWei);
   const amount = readFlag(args, "--amount");
-  if (amount) return parseTOSAmount(amount);
+  if (amount) return parseChainAmount(amount);
   return defaultWei ? BigInt(defaultWei) : undefined;
 }
 

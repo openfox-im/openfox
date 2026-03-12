@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../tos/client.js", () => ({
-  sendTOSNativeTransfer: vi.fn(async () => ({
+vi.mock("../chain/client.js", () => ({
+  sendNativeTransfer: vi.fn(async () => ({
     txHash: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     receipt: { status: "0x1" },
   })),
@@ -10,7 +10,7 @@ vi.mock("../tos/client.js", () => ({
 import { createNativeSettlementPublisher } from "../settlement/publisher.js";
 import { createTestDb, createTestIdentity } from "./mocks.js";
 import { DEFAULT_SETTLEMENT_CONFIG } from "../types.js";
-import { sendTOSNativeTransfer } from "../tos/client.js";
+import { sendNativeTransfer } from "../chain/client.js";
 
 describe("settlement publisher", () => {
   beforeEach(() => {
@@ -63,7 +63,7 @@ describe("settlement publisher", () => {
     );
     expect(second.receiptHash).toBe(first.receiptHash);
     expect(second.settlementTxHash).toBe(first.settlementTxHash);
-    expect(sendTOSNativeTransfer).toHaveBeenCalledTimes(1);
+    expect(sendNativeTransfer).toHaveBeenCalledTimes(1);
 
     const stored = db.getSettlementReceipt("bounty", "bounty-1");
     expect(stored?.receiptId).toBe(first.receiptId);

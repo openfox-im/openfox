@@ -28,41 +28,41 @@ import {
 } from "../types.js";
 import { getWallet, getOpenFoxDir, loadWalletPrivateKey } from "../identity/wallet.js";
 import {
-  TOSRpcClient,
-  type TOSAccountProfile,
-  type TOSSignerProfile,
-  formatTOSNetwork,
-  parseTOSAmount,
-  setTOSSignerMetadata,
-} from "../tos/client.js";
-import { explainTOSRpcError } from "../tos/errors.js";
+  ChainRpcClient,
+  type AccountProfile,
+  type SignerProfile,
+  formatNetwork,
+  parseAmount,
+  setSignerMetadata,
+} from "../chain/client.js";
+import { explainChainRpcError } from "../chain/errors.js";
 import {
-  deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey,
-  normalizeTOSAddress as normalizeAddress,
-  type TOSAddress,
-} from "../tos/address.js";
+  deriveAddressFromPrivateKey,
+  normalizeAddress,
+  type ChainAddress,
+} from "../chain/address.js";
 
 export interface WalletStatusSnapshot {
-  address: TOSAddress;
+  address: ChainAddress;
   rpcUrl?: string;
   chainId?: bigint;
   balanceWei?: bigint;
   nonce?: bigint;
-  signer?: TOSSignerProfile["signer"];
-  account?: TOSAccountProfile;
+  signer?: SignerProfile["signer"];
+  account?: AccountProfile;
 }
 
 export interface WalletLocalFundingResult {
   mode: "local";
-  from: TOSAddress;
-  to: TOSAddress;
+  from: ChainAddress;
+  to: ChainAddress;
   amountWei: bigint;
   txHash: HexAddress;
 }
 
 export interface WalletTestnetFundingResult {
   mode: "testnet";
-  to: TOSAddress;
+  to: ChainAddress;
   amountWei: bigint;
   provider: string;
   txHash?: HexAddress;
@@ -89,11 +89,11 @@ interface SignerMaterial {
 function buildIdentity(config: OpenFoxConfig): Promise<{
   identity: OpenFoxIdentity;
   privateKey: `0x${string}`;
-  address: TOSAddress;
+  address: ChainAddress;
 }> {
   return getWallet().then(({ account, privateKey }) => {
     const address = (config.walletAddress ||
-      deriveAddressFromPrivateKey(privateKey)) as TOSAddress;
+      deriveAddressFromPrivateKey(privateKey)) as ChainAddress;
     return {
       identity: {
         name: config.name,
@@ -117,7 +117,7 @@ function base64UrlToHex(value: string): HexAddress {
 }
 
 function createEd25519Account(params: {
-  address: TOSAddress;
+  address: ChainAddress;
   publicKey: HexAddress;
   privateKey: HexAddress;
 }): LocalAccount<"custom", Address> {
@@ -156,7 +156,7 @@ function buildRequestExpiry(): number {
 
 async function requestTestnetFaucetViaUrl(params: {
   config: OpenFoxConfig;
-  address: TOSAddress;
+  address: ChainAddress;
   amountWei: bigint;
   faucetUrl: string;
   reason: string;
@@ -190,7 +190,7 @@ async function requestTestnetFaucetViaUrl(params: {
     params.config.rpcUrl &&
     payload.status === "approved"
   ) {
-    const client = new TOSRpcClient({ rpcUrl: params.config.rpcUrl });
+    const client = new ChainRpcClient({ rpcUrl: params.config.rpcUrl });
     const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       const receipt = await client.getTransactionReceipt(payload.tx_hash as HexAddress);
@@ -218,7 +218,7 @@ export async function buildWalletStatusSnapshot(
   if (!rpcUrl) {
     return { address };
   }
-  const client = new TOSRpcClient({ rpcUrl });
+  const client = new ChainRpcClient({ rpcUrl });
   const [chainId, account, signer] = await Promise.all([
     client.getChainId(),
     client.getAccount(address),
@@ -240,7 +240,7 @@ export function formatWalletStatusReport(snapshot: WalletStatusSnapshot): string
     "=== OPENFOX WALLET ===",
     `Address: ${snapshot.address}`,
     `RPC: ${snapshot.rpcUrl || "(unset)"}`,
-    `Network: ${snapshot.chainId !== undefined ? formatTOSNetwork(snapshot.chainId) : "(unknown)"}`,
+    `Network: ${snapshot.chainId !== undefined ? formatNetwork(snapshot.chainId) : "(unknown)"}`,
     `Balance: ${snapshot.balanceWei !== undefined ? snapshot.balanceWei.toString() : "(unknown)"} wei`,
     `Pending nonce: ${snapshot.nonce !== undefined ? snapshot.nonce.toString() : "(unknown)"}`,
     `Signer type: ${snapshot.signer?.type || "(unknown)"}`,
@@ -252,7 +252,7 @@ export function formatWalletStatusReport(snapshot: WalletStatusSnapshot): string
 export async function fundWalletFromLocalDevnet(params: {
   config: OpenFoxConfig;
   amountWei?: bigint;
-  from?: TOSAddress | string;
+  from?: ChainAddress | string;
   password?: string;
   waitForReceipt?: boolean;
 }): Promise<WalletLocalFundingResult> {
@@ -261,7 +261,7 @@ export async function fundWalletFromLocalDevnet(params: {
   if (!rpcUrl) {
     throw new Error("Local devnet funding requires rpcUrl.");
   }
-  const client = new TOSRpcClient({ rpcUrl });
+  const client = new ChainRpcClient({ rpcUrl });
   let from = params.from || params.config.walletFunding?.localFunderAddress;
   if (!from) {
     try {
@@ -567,6 +567,6 @@ export async function bootstrapWalletSigner(params: {
 }
 
 export function formatWalletOperationError(error: unknown): string {
-  const explanation = explainTOSRpcError(error);
+  const explanation = explainChainRpcError(error);
   return `${explanation.summary}\n${explanation.recommendation}`;
 }

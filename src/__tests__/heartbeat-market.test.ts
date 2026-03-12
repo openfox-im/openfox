@@ -13,13 +13,13 @@ vi.mock("../identity/wallet.js", () => ({
   ),
 }));
 
-vi.mock("../tos/client.js", () => ({
-  TOSRpcClient: class {
+vi.mock("../chain/client.js", () => ({
+  ChainRpcClient: class {
     async getTransactionReceipt(txHash: string) {
       return getTransactionReceiptMock(txHash);
     }
   },
-  sendTOSNativeTransfer: vi.fn(async () => ({
+  sendNativeTransfer: vi.fn(async () => ({
     txHash:
       "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     receipt: null,

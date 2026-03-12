@@ -8,8 +8,8 @@ import {
   type SettlementReceipt,
 } from "tosdk";
 import {
-  sendTOSNativeTransfer,
-} from "../tos/client.js";
+  sendNativeTransfer,
+} from "../chain/client.js";
 import type {
   OpenFoxDatabase,
   SettlementConfig,
@@ -103,7 +103,7 @@ export function createNativeSettlementPublisher(params: {
       }
 
       const canonicalReceipt = canonicalizeSettlementReceipt(nextRecord.receipt);
-      const transfer = await sendTOSNativeTransfer({
+      const transfer = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: params.config.sinkAddress || params.publisherAddress,

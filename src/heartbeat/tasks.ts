@@ -26,7 +26,7 @@ import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { ModelRegistry } from "../inference/registry.js";
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import { createMarketContractDispatcher } from "../market/contracts.js";
-import { createX402PaymentManager } from "../tos/x402-server.js";
+import { createX402PaymentManager } from "../chain/x402-server.js";
 import { createInferenceClient } from "../runtime/inference.js";
 import { metricsInsertSnapshot, metricsPruneOld } from "../state/database.js";
 import { getWallet } from "../identity/wallet.js";

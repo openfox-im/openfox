@@ -5,8 +5,8 @@
  */
 
 import type { LocalAccount } from "tosdk/accounts";
-import { TOSRpcClient, buildTOSX402Payment, parseTOSAmount } from "../tos/client.js";
-import { normalizeTOSAddress as normalizeAddress, type TOSAddress } from "../tos/address.js";
+import { ChainRpcClient, buildX402Payment, parseAmount } from "../chain/client.js";
+import { normalizeAddress, type ChainAddress } from "../chain/address.js";
 import { loadConfig } from "../config.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import { ResilientHttpClient } from "./http-client.js";
@@ -145,7 +145,7 @@ function selectRequirement(parsed: PaymentRequiredResponse): PaymentRequirement 
 }
 
 export async function getWalletBalance(
-  address: TOSAddress,
+  address: ChainAddress,
   network?: PaymentNetworkId,
 ): Promise<number> {
   const result = await getWalletBalanceDetailed(address, network);
@@ -153,7 +153,7 @@ export async function getWalletBalance(
 }
 
 export async function getWalletBalanceDetailed(
-  address: TOSAddress,
+  address: ChainAddress,
   network?: PaymentNetworkId,
 ): Promise<WalletBalanceResult> {
   const rpcUrl = getChainRpcUrl();
@@ -167,7 +167,7 @@ export async function getWalletBalanceDetailed(
   }
 
   try {
-    const client = new TOSRpcClient({ rpcUrl });
+    const client = new ChainRpcClient({ rpcUrl });
     const chainId = await client.getChainId();
     const resolvedNetwork = network || (`tos:${chainId.toString()}` as PaymentNetworkId);
     const balance = await client.getBalance(normalizeAddress(address));
@@ -315,7 +315,7 @@ async function signPayment(
     throw new Error("native payment requested but wallet private key or rpcUrl is missing");
   }
 
-  return await buildTOSX402Payment({
+  return await buildX402Payment({
     privateKey,
     rpcUrl,
     requirement: {
@@ -334,5 +334,5 @@ function normalizeAmount(value: string): string {
   if (/^\d+$/.test(trimmed)) {
     return trimmed;
   }
-  return parseTOSAmount(trimmed).toString();
+  return parseAmount(trimmed).toString();
 }

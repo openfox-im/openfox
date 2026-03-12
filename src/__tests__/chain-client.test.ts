@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  deriveTOSAddressFromPrivateKey,
-  normalizeTOSAddress,
-} from "../tos/address.js";
+  deriveAddressFromPrivateKey,
+  normalizeAddress,
+} from "../chain/address.js";
 import {
-  grantTOSCapability,
-  recordTOSReputationScore,
-  registerTOSCapabilityName,
-  signTOSNativeTransfer,
-  TOS_SYSTEM_ACTION_ADDRESS,
-} from "../tos/client.js";
+  grantCapability,
+  recordReputationScore,
+  registerCapabilityName,
+  signNativeTransfer,
+  SYSTEM_ACTION_ADDRESS,
+} from "../chain/client.js";
 
 const TEST_PRIVATE_KEY =
   "0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8" as const;
@@ -18,23 +18,23 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("TOS address", () => {
-  it("derives 32-byte TOS address from secp256k1 private key", () => {
-    expect(deriveTOSAddressFromPrivateKey(TEST_PRIVATE_KEY)).toBe(
+describe("chain address", () => {
+  it("derives 32-byte chain address from secp256k1 private key", () => {
+    expect(deriveAddressFromPrivateKey(TEST_PRIVATE_KEY)).toBe(
       "0xfa7a3e1ddd55862136c8b192a94f5374fce5edbc8e2a8697c15331677e6ebf0b",
     );
   });
 
   it("normalizes short hex addresses by left-padding to 32 bytes", () => {
-    expect(normalizeTOSAddress("0x1234")).toBe(
+    expect(normalizeAddress("0x1234")).toBe(
       "0x0000000000000000000000000000000000000000000000000000000000001234",
     );
   });
 });
 
-describe("TOS signer tx", () => {
-  it("matches the TOS golden vector for secp256k1", async () => {
-    const signed = await signTOSNativeTransfer(TEST_PRIVATE_KEY, {
+describe("chain signer tx", () => {
+  it("matches the chain golden vector for secp256k1", async () => {
+    const signed = await signNativeTransfer(TEST_PRIVATE_KEY, {
       chainId: 1337n,
       nonce: 42n,
       gas: 50_000n,
@@ -94,10 +94,10 @@ describe("TOS signer tx", () => {
     }) as typeof fetch;
 
     try {
-      const result = await recordTOSReputationScore({
+      const result = await recordReputationScore({
         rpcUrl: "http://127.0.0.1:8545",
         privateKey: TEST_PRIVATE_KEY,
-        who: normalizeTOSAddress("0x42"),
+        who: normalizeAddress("0x42"),
         delta: "1",
         reason: "agent-discovery:success:sponsor.topup.testnet",
         refId: "agent-discovery:sponsor.topup.testnet:node-1:nonce-1",
@@ -105,7 +105,7 @@ describe("TOS signer tx", () => {
       });
 
       expect(sendRawSeen).toBe(true);
-      expect(result.signed.to).toBe(TOS_SYSTEM_ACTION_ADDRESS);
+      expect(result.signed.to).toBe(SYSTEM_ACTION_ADDRESS);
       expect(result.signed.value).toBe(0n);
       expect(result.signed.data.startsWith("0x")).toBe(true);
       expect(result.txHash).toBe(
@@ -153,7 +153,7 @@ describe("TOS signer tx", () => {
     }) as typeof fetch;
 
     try {
-      const result = await registerTOSCapabilityName({
+      const result = await registerCapabilityName({
         rpcUrl: "http://127.0.0.1:8545",
         privateKey: TEST_PRIVATE_KEY,
         name: "gateway.relay",
@@ -165,7 +165,7 @@ describe("TOS signer tx", () => {
         "tos_getTransactionCount",
         "tos_sendRawTransaction",
       ]);
-      expect(result.signed.to).toBe(TOS_SYSTEM_ACTION_ADDRESS);
+      expect(result.signed.to).toBe(SYSTEM_ACTION_ADDRESS);
       expect(result.signed.value).toBe(0n);
       expect(Buffer.from(result.signed.data.slice(2), "hex").toString("utf8")).toContain(
         '"action":"CAPABILITY_REGISTER"',
@@ -209,15 +209,15 @@ describe("TOS signer tx", () => {
     }) as typeof fetch;
 
     try {
-      const result = await grantTOSCapability({
+      const result = await grantCapability({
         rpcUrl: "http://127.0.0.1:8545",
         privateKey: TEST_PRIVATE_KEY,
-        target: normalizeTOSAddress("0x42"),
+        target: normalizeAddress("0x42"),
         bit: 7,
         waitForReceipt: false,
       });
 
-      expect(result.signed.to).toBe(TOS_SYSTEM_ACTION_ADDRESS);
+      expect(result.signed.to).toBe(SYSTEM_ACTION_ADDRESS);
       expect(Buffer.from(result.signed.data.slice(2), "hex").toString("utf8")).toContain(
         '"action":"CAPABILITY_GRANT"',
       );

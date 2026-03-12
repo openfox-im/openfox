@@ -13,7 +13,7 @@ import type {
   PaymasterAuthorizationRecord,
 } from "../types.js";
 import { getWallet } from "../identity/wallet.js";
-import { TOSRpcClient } from "../tos/client.js";
+import { ChainRpcClient } from "../chain/client.js";
 
 export interface PaymasterAuthorizationRetryResult {
   processed: number;
@@ -49,7 +49,7 @@ export function createPaymasterAuthorizationRetryManager(params: {
 }): {
   retryPending(limit?: number): Promise<PaymasterAuthorizationRetryResult>;
 } {
-  const rpcClient = new TOSRpcClient({ rpcUrl: params.rpcUrl });
+  const rpcClient = new ChainRpcClient({ rpcUrl: params.rpcUrl });
   const publicClient = createPublicClient({
     transport: httpTransport(params.rpcUrl),
   });

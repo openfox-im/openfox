@@ -12,7 +12,7 @@ import { SiweMessage } from "siwe";
 import { getWallet, getOpenFoxDir } from "./wallet.js";
 import type { ProvisionResult } from "../types.js";
 import { ResilientHttpClient } from "../runtime/http-client.js";
-import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "../tos/address.js";
+import { deriveAddressFromPrivateKey } from "../chain/address.js";
 
 const httpClient = new ResilientHttpClient();
 

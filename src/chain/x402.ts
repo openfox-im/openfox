@@ -2,12 +2,12 @@ import { Signature } from "@noble/secp256k1";
 import { keccak256, toHex } from "tosdk";
 import type { IncomingMessage, ServerResponse } from "http";
 import {
-  deriveTOSAddressFromPublicKey,
+  deriveAddressFromPublicKey,
   hexToBytes,
-  isTOSAddress,
-  normalizeTOSAddress,
+  isChainAddress,
+  normalizeAddress,
   type HexString,
-  type TOSAddress,
+  type ChainAddress,
 } from "./address.js";
 import {
   decodeRlpItem,
@@ -18,24 +18,24 @@ import {
   encodeRlpUint,
   hexToBytes as rlpHexToBytes,
 } from "./rlp.js";
-import { TOSRpcClient } from "./client.js";
+import { ChainRpcClient } from "./client.js";
 
-export interface TOSPaymentRequirement {
+export interface PaymentRequirement {
   scheme: "exact";
   network: string;
   maxAmountRequired: string;
-  payToAddress: TOSAddress;
+  payToAddress: ChainAddress;
   asset?: string;
   requiredDeadlineSeconds?: number;
   description?: string;
 }
 
-export interface TOSPaymentRequiredResponse {
+export interface PaymentRequiredResponse {
   x402Version: number;
-  accepts: TOSPaymentRequirement[];
+  accepts: PaymentRequirement[];
 }
 
-export interface TOSPaymentEnvelope {
+export interface PaymentEnvelope {
   x402Version: number;
   scheme: "exact";
   network: string;
@@ -44,14 +44,14 @@ export interface TOSPaymentEnvelope {
   };
 }
 
-export interface VerifiedTOSPayment {
-  envelope: TOSPaymentEnvelope;
+export interface VerifiedPayment {
+  envelope: PaymentEnvelope;
   rawTransaction: HexString;
   txHash: HexString;
   chainId: bigint;
   nonce: bigint;
-  from: TOSAddress;
-  to: TOSAddress;
+  from: ChainAddress;
+  to: ChainAddress;
   value: bigint;
 }
 
@@ -59,10 +59,10 @@ interface DecodedSignerTransaction {
   chainId: bigint;
   nonce: bigint;
   gas: bigint;
-  to: TOSAddress;
+  to: ChainAddress;
   value: bigint;
   data: HexString;
-  from: TOSAddress;
+  from: ChainAddress;
   signerType: string;
   v: bigint;
   r: bigint;
@@ -117,8 +117,8 @@ function decodeSignerTransaction(rawTransaction: HexString): DecodedSignerTransa
   const toBytes = items[3]?.data;
   const fromBytes = items[7]?.data;
   const signerType = bytesToText(items[8]?.data);
-  const to = normalizeTOSAddress(bytesToHex(toBytes ?? new Uint8Array()));
-  const from = normalizeTOSAddress(bytesToHex(fromBytes ?? new Uint8Array()));
+  const to = normalizeAddress(bytesToHex(toBytes ?? new Uint8Array()));
+  const from = normalizeAddress(bytesToHex(fromBytes ?? new Uint8Array()));
 
   return {
     chainId: bytesToBigInt(items[0]?.data),
@@ -164,7 +164,7 @@ function verifySignerTransaction(rawTransaction: HexString, tx: DecodedSignerTra
     .addRecoveryBit(recovery)
     .recoverPublicKey(hexToBytes(signHash))
     .toRawBytes(false);
-  const derived = deriveTOSAddressFromPublicKey(publicKey);
+  const derived = deriveAddressFromPublicKey(publicKey);
   if (derived !== tx.from) {
     throw new Error("signature does not match sender");
   }
@@ -174,19 +174,19 @@ function verifySignerTransaction(rawTransaction: HexString, tx: DecodedSignerTra
   }
 }
 
-export function encodeTOSPaymentRequiredHeader(response: TOSPaymentRequiredResponse): string {
+export function encodePaymentRequiredHeader(response: PaymentRequiredResponse): string {
   return Buffer.from(JSON.stringify(response)).toString("base64");
 }
 
-export function writeTOSPaymentRequired(
+export function writePaymentRequired(
   res: ServerResponse,
-  requirement: TOSPaymentRequirement,
+  requirement: PaymentRequirement,
 ): void {
-  const payload: TOSPaymentRequiredResponse = {
+  const payload: PaymentRequiredResponse = {
     x402Version: 1,
     accepts: [requirement],
   };
-  const encoded = encodeTOSPaymentRequiredHeader(payload);
+  const encoded = encodePaymentRequiredHeader(payload);
   res.statusCode = 402;
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Payment-Required", encoded);
@@ -194,20 +194,20 @@ export function writeTOSPaymentRequired(
   res.end(JSON.stringify(payload));
 }
 
-export function readTOSPaymentEnvelope(req: IncomingMessage): TOSPaymentEnvelope | null {
+export function readPaymentEnvelope(req: IncomingMessage): PaymentEnvelope | null {
   const header = req.headers["payment-signature"] || req.headers["x-payment"];
   const value = Array.isArray(header) ? header[0] : header;
   if (!value || typeof value !== "string") {
     return null;
   }
   const decoded = Buffer.from(value, "base64").toString("utf8");
-  return JSON.parse(decoded) as TOSPaymentEnvelope;
+  return JSON.parse(decoded) as PaymentEnvelope;
 }
 
-export function verifyTOSPayment(
-  requirement: TOSPaymentRequirement,
-  envelope: TOSPaymentEnvelope,
-): VerifiedTOSPayment {
+export function verifyPayment(
+  requirement: PaymentRequirement,
+  envelope: PaymentEnvelope,
+): VerifiedPayment {
   if (envelope.scheme !== "exact") {
     throw new Error(`unsupported payment scheme ${envelope.scheme}`);
   }
@@ -225,7 +225,7 @@ export function verifyTOSPayment(
   if (tx.chainId !== requiredChainId) {
     throw new Error("payment chainId mismatch");
   }
-  if (!isTOSAddress(tx.to) || normalizeTOSAddress(tx.to) !== normalizeTOSAddress(requirement.payToAddress)) {
+  if (!isChainAddress(tx.to) || normalizeAddress(tx.to) !== normalizeAddress(requirement.payToAddress)) {
     throw new Error("payment recipient mismatch");
   }
   const requiredValue = BigInt(requirement.maxAmountRequired);
@@ -244,10 +244,10 @@ export function verifyTOSPayment(
   };
 }
 
-export async function submitTOSPayment(
+export async function submitPayment(
   rpcUrl: string,
-  payment: VerifiedTOSPayment,
+  payment: VerifiedPayment,
 ): Promise<HexString> {
-  const client = new TOSRpcClient({ rpcUrl });
+  const client = new ChainRpcClient({ rpcUrl });
   return client.sendRawTransaction(payment.rawTransaction);
 }

@@ -2,11 +2,11 @@ import { createHmac } from "node:crypto";
 import { etc, sign as signSecp256k1 } from "@noble/secp256k1";
 import type { PrivateKeyAccount } from "tosdk";
 import { keccak256, parseUnits, toHex } from "tosdk";
-import { TOSRpcError } from "./errors.js";
+import { ChainRpcError } from "./errors.js";
 import {
-  deriveTOSAddressFromPrivateKey,
-  normalizeTOSAddress,
-  type TOSAddress,
+  deriveAddressFromPrivateKey,
+  normalizeAddress,
+  type ChainAddress,
   type HexString,
 } from "./address.js";
 import {
@@ -19,7 +19,7 @@ import {
   hexToBytes,
 } from "./rlp.js";
 
-export const TOS_SYSTEM_ACTION_ADDRESS = normalizeTOSAddress("0x1");
+export const SYSTEM_ACTION_ADDRESS = normalizeAddress("0x1");
 
 if (!etc.hmacSha256Sync) {
   etc.hmacSha256Sync = (key, ...messages) => {
@@ -31,47 +31,47 @@ if (!etc.hmacSha256Sync) {
   };
 }
 
-export interface TOSRpcClientOptions {
+export interface ChainRpcClientOptions {
   rpcUrl: string;
 }
 
-export interface TOSSignerDescriptor {
+export interface SignerDescriptor {
   type: string;
   value: string;
   defaulted: boolean;
 }
 
-export interface TOSAccountProfile {
-  address: TOSAddress;
+export interface AccountProfile {
+  address: ChainAddress;
   nonce: bigint;
   balance: bigint;
-  signer: TOSSignerDescriptor;
+  signer: SignerDescriptor;
   blockNumber: bigint;
 }
 
-export interface TOSSignerProfile {
-  address: TOSAddress;
-  signer: TOSSignerDescriptor;
+export interface SignerProfile {
+  address: ChainAddress;
+  signer: SignerDescriptor;
   blockNumber: bigint;
 }
 
-export interface TOSUnsignedTransaction {
+export interface UnsignedTransaction {
   chainId: bigint;
   nonce: bigint;
   gas: bigint;
-  to: TOSAddress;
+  to: ChainAddress;
   value: bigint;
   data?: HexString;
-  from: TOSAddress;
+  from: ChainAddress;
   signerType?: "secp256k1";
 }
 
-export interface TOSSystemAction {
+export interface SystemAction {
   action: string;
   payload?: Record<string, unknown>;
 }
 
-export interface TOSSignedTransaction extends TOSUnsignedTransaction {
+export interface SignedTransaction extends UnsignedTransaction {
   signHash: HexString;
   rawTransaction: HexString;
   transactionHash: HexString;
@@ -80,7 +80,7 @@ export interface TOSSignedTransaction extends TOSUnsignedTransaction {
   s: bigint;
 }
 
-export interface TOSPaymentEnvelope {
+export interface PaymentEnvelope {
   x402Version: number;
   scheme: "exact";
   network: string;
@@ -89,11 +89,11 @@ export interface TOSPaymentEnvelope {
   };
 }
 
-export interface TOSX402Requirement {
+export interface X402Requirement {
   scheme: "exact";
   network: string;
   maxAmountRequired: string;
-  payToAddress: TOSAddress;
+  payToAddress: ChainAddress;
   asset?: string;
   requiredDeadlineSeconds?: number;
 }
@@ -147,7 +147,7 @@ function bigIntFromSignatureBytes(bytes: Uint8Array): bigint {
   return BigInt(`0x${hex || "0"}`);
 }
 
-function encodeUnsignedPayload(tx: TOSUnsignedTransaction): Uint8Array {
+function encodeUnsignedPayload(tx: UnsignedTransaction): Uint8Array {
   return encodeRlpList([
     encodeRlpUint(tx.chainId),
     encodeRlpUint(tx.nonce),
@@ -161,7 +161,7 @@ function encodeUnsignedPayload(tx: TOSUnsignedTransaction): Uint8Array {
   ]);
 }
 
-function encodeSignedPayload(tx: TOSSignedTransaction): Uint8Array {
+function encodeSignedPayload(tx: SignedTransaction): Uint8Array {
   return encodeRlpList([
     encodeRlpUint(tx.chainId),
     encodeRlpUint(tx.nonce),
@@ -178,20 +178,20 @@ function encodeSignedPayload(tx: TOSSignedTransaction): Uint8Array {
   ]);
 }
 
-export function formatTOSNetwork(chainId: bigint | number): string {
+export function formatNetwork(chainId: bigint | number): string {
   const value = typeof chainId === "number" ? BigInt(chainId) : chainId;
   return `tos:${value.toString()}`;
 }
 
-export function parseTOSAmount(amount: string): bigint {
+export function parseAmount(amount: string): bigint {
   return parseUnits(amount, 18);
 }
 
-export class TOSRpcClient {
+export class ChainRpcClient {
   private readonly rpcUrl: string;
   private nextId = 1;
 
-  constructor(options: TOSRpcClientOptions) {
+  constructor(options: ChainRpcClientOptions) {
     this.rpcUrl = options.rpcUrl;
   }
 
@@ -214,7 +214,7 @@ export class TOSRpcClient {
     }
     const body = (await response.json()) as JsonRpcSuccess<T> | JsonRpcFailure;
     if ("error" in body) {
-      throw new TOSRpcError(
+      throw new ChainRpcError(
         `TOS RPC ${method} error ${body.error.code}: ${body.error.message}`,
         body.error.code,
       );
@@ -227,24 +227,24 @@ export class TOSRpcClient {
   }
 
   async getBalance(
-    address: TOSAddress,
+    address: ChainAddress,
     blockTag: string = "latest",
   ): Promise<bigint> {
     return parseHexQuantity(
       await this.call<string>("tos_getBalance", [
-        normalizeTOSAddress(address),
+        normalizeAddress(address),
         blockTag,
       ]),
     );
   }
 
   async getTransactionCount(
-    address: TOSAddress,
+    address: ChainAddress,
     blockTag: string = "pending",
   ): Promise<bigint> {
     return parseHexQuantity(
       await this.call<string>("tos_getTransactionCount", [
-        normalizeTOSAddress(address),
+        normalizeAddress(address),
         blockTag,
       ]),
     );
@@ -275,18 +275,18 @@ export class TOSRpcClient {
   }
 
   async getAccount(
-    address: TOSAddress,
+    address: ChainAddress,
     blockTag: string = "latest",
-  ): Promise<TOSAccountProfile> {
+  ): Promise<AccountProfile> {
     const raw = await this.call<{
-      address: TOSAddress;
+      address: ChainAddress;
       nonce: string;
       balance: string;
-      signer: TOSSignerDescriptor;
+      signer: SignerDescriptor;
       blockNumber: string;
-    }>("tos_getAccount", [normalizeTOSAddress(address), blockTag]);
+    }>("tos_getAccount", [normalizeAddress(address), blockTag]);
     return {
-      address: normalizeTOSAddress(raw.address),
+      address: normalizeAddress(raw.address),
       nonce: parseHexQuantity(raw.nonce),
       balance: parseHexQuantity(raw.balance),
       signer: raw.signer,
@@ -295,34 +295,34 @@ export class TOSRpcClient {
   }
 
   async getSigner(
-    address: TOSAddress,
+    address: ChainAddress,
     blockTag: string = "latest",
-  ): Promise<TOSSignerProfile> {
+  ): Promise<SignerProfile> {
     const raw = await this.call<{
-      address: TOSAddress;
-      signer: TOSSignerDescriptor;
+      address: ChainAddress;
+      signer: SignerDescriptor;
       blockNumber: string;
-    }>("tos_getSigner", [normalizeTOSAddress(address), blockTag]);
+    }>("tos_getSigner", [normalizeAddress(address), blockTag]);
     return {
-      address: normalizeTOSAddress(raw.address),
+      address: normalizeAddress(raw.address),
       signer: raw.signer,
       blockNumber: parseHexQuantity(raw.blockNumber),
     };
   }
 
-  async listPersonalAccounts(): Promise<TOSAddress[]> {
+  async listPersonalAccounts(): Promise<ChainAddress[]> {
     const accounts = await this.call<string[]>("personal_listAccounts", []);
-    return accounts.map((entry) => normalizeTOSAddress(entry));
+    return accounts.map((entry) => normalizeAddress(entry));
   }
 
-  async listAccounts(): Promise<TOSAddress[]> {
+  async listAccounts(): Promise<ChainAddress[]> {
     const accounts = await this.call<string[]>("tos_accounts", []);
-    return accounts.map((entry) => normalizeTOSAddress(entry));
+    return accounts.map((entry) => normalizeAddress(entry));
   }
 
   async sendManagedTransaction(params: {
-    from: TOSAddress;
-    to: TOSAddress;
+    from: ChainAddress;
+    to: ChainAddress;
     value: bigint;
     gas?: bigint;
     data?: HexString;
@@ -330,8 +330,8 @@ export class TOSRpcClient {
   }): Promise<HexString> {
     return this.call<HexString>("tos_sendTransaction", [
       {
-        from: normalizeTOSAddress(params.from),
-        to: normalizeTOSAddress(params.to),
+        from: normalizeAddress(params.from),
+        to: normalizeAddress(params.to),
         value: `0x${params.value.toString(16)}`,
         gas: `0x${(params.gas ?? 21_000n).toString(16)}`,
         ...(params.data ? { data: params.data } : {}),
@@ -341,8 +341,8 @@ export class TOSRpcClient {
   }
 
   async sendPersonalTransaction(params: {
-    from: TOSAddress;
-    to: TOSAddress;
+    from: ChainAddress;
+    to: ChainAddress;
     value: bigint;
     gas?: bigint;
     data?: HexString;
@@ -351,8 +351,8 @@ export class TOSRpcClient {
   }): Promise<HexString> {
     return this.call<HexString>("personal_sendTransaction", [
       {
-        from: normalizeTOSAddress(params.from),
-        to: normalizeTOSAddress(params.to),
+        from: normalizeAddress(params.from),
+        to: normalizeAddress(params.to),
         value: `0x${params.value.toString(16)}`,
         gas: `0x${(params.gas ?? 21_000n).toString(16)}`,
         ...(params.data ? { data: params.data } : {}),
@@ -363,17 +363,17 @@ export class TOSRpcClient {
   }
 }
 
-export async function signTOSNativeTransfer(
+export async function signNativeTransfer(
   privateKey: HexString,
-  tx: Omit<TOSUnsignedTransaction, "from" | "signerType"> & {
-    from?: TOSAddress;
+  tx: Omit<UnsignedTransaction, "from" | "signerType"> & {
+    from?: ChainAddress;
     signerType?: "secp256k1";
   },
-): Promise<TOSSignedTransaction> {
-  const from = tx.from ?? deriveTOSAddressFromPrivateKey(privateKey);
-  const normalizedTx: TOSUnsignedTransaction = {
+): Promise<SignedTransaction> {
+  const from = tx.from ?? deriveAddressFromPrivateKey(privateKey);
+  const normalizedTx: UnsignedTransaction = {
     ...tx,
-    to: normalizeTOSAddress(tx.to),
+    to: normalizeAddress(tx.to),
     from,
     data: tx.data ?? "0x",
     signerType: tx.signerType ?? "secp256k1",
@@ -392,7 +392,7 @@ export async function signTOSNativeTransfer(
   const s = bigIntFromSignatureBytes(compactSignature.slice(32, 64));
   const v = BigInt(signature.recovery);
 
-  const signed: TOSSignedTransaction = {
+  const signed: SignedTransaction = {
     ...normalizedTx,
     signHash,
     v,
@@ -410,10 +410,10 @@ export async function signTOSNativeTransfer(
   return signed;
 }
 
-export async function sendTOSNativeTransfer(params: {
+export async function sendNativeTransfer(params: {
   rpcUrl: string;
   privateKey: HexString;
-  to: TOSAddress | string;
+  to: ChainAddress | string;
   amountWei: bigint;
   gas?: bigint;
   data?: HexString;
@@ -421,22 +421,22 @@ export async function sendTOSNativeTransfer(params: {
   receiptTimeoutMs?: number;
   pollIntervalMs?: number;
 }): Promise<{
-  signed: TOSSignedTransaction;
+  signed: SignedTransaction;
   txHash: HexString;
   receipt?: Record<string, unknown> | null;
 }> {
-  const client = new TOSRpcClient({ rpcUrl: params.rpcUrl });
-  const from = deriveTOSAddressFromPrivateKey(params.privateKey);
+  const client = new ChainRpcClient({ rpcUrl: params.rpcUrl });
+  const from = deriveAddressFromPrivateKey(params.privateKey);
   const [chainId, nonce] = await Promise.all([
     client.getChainId(),
     client.getTransactionCount(from, "pending"),
   ]);
 
-  const signed = await signTOSNativeTransfer(params.privateKey, {
+  const signed = await signNativeTransfer(params.privateKey, {
     chainId,
     nonce,
     gas: params.gas ?? 21_000n,
-    to: normalizeTOSAddress(params.to),
+    to: normalizeAddress(params.to),
     value: params.amountWei,
     data: params.data ?? "0x",
     from,
@@ -462,7 +462,7 @@ export async function sendTOSNativeTransfer(params: {
   return { signed, txHash, receipt: null };
 }
 
-export async function sendTOSSystemAction(params: {
+export async function sendSystemAction(params: {
   rpcUrl: string;
   privateKey: HexString;
   action: string;
@@ -472,18 +472,18 @@ export async function sendTOSSystemAction(params: {
   receiptTimeoutMs?: number;
   pollIntervalMs?: number;
 }): Promise<{
-  signed: TOSSignedTransaction;
+  signed: SignedTransaction;
   txHash: HexString;
   receipt?: Record<string, unknown> | null;
 }> {
-  const body: TOSSystemAction = {
+  const body: SystemAction = {
     action: params.action,
     ...(params.payload ? { payload: params.payload } : {}),
   };
-  return sendTOSNativeTransfer({
+  return sendNativeTransfer({
     rpcUrl: params.rpcUrl,
     privateKey: params.privateKey,
-    to: TOS_SYSTEM_ACTION_ADDRESS,
+    to: SYSTEM_ACTION_ADDRESS,
     amountWei: 0n,
     gas: params.gas ?? 120_000n,
     data: utf8ToHex(JSON.stringify(body)),
@@ -493,10 +493,10 @@ export async function sendTOSSystemAction(params: {
   });
 }
 
-export async function recordTOSReputationScore(params: {
+export async function recordReputationScore(params: {
   rpcUrl: string;
   privateKey: HexString;
-  who: TOSAddress | string;
+  who: ChainAddress | string;
   delta: string;
   reason: string;
   refId: string;
@@ -505,16 +505,16 @@ export async function recordTOSReputationScore(params: {
   receiptTimeoutMs?: number;
   pollIntervalMs?: number;
 }): Promise<{
-  signed: TOSSignedTransaction;
+  signed: SignedTransaction;
   txHash: HexString;
   receipt?: Record<string, unknown> | null;
 }> {
-  return sendTOSSystemAction({
+  return sendSystemAction({
     rpcUrl: params.rpcUrl,
     privateKey: params.privateKey,
     action: "REPUTATION_RECORD_SCORE",
     payload: {
-      who: normalizeTOSAddress(params.who),
+      who: normalizeAddress(params.who),
       delta: params.delta,
       reason: params.reason,
       ref_id: params.refId,
@@ -526,7 +526,7 @@ export async function recordTOSReputationScore(params: {
   });
 }
 
-export async function setTOSSignerMetadata(params: {
+export async function setSignerMetadata(params: {
   rpcUrl: string;
   privateKey: HexString;
   signerType: string;
@@ -536,11 +536,11 @@ export async function setTOSSignerMetadata(params: {
   receiptTimeoutMs?: number;
   pollIntervalMs?: number;
 }): Promise<{
-  signed: TOSSignedTransaction;
+  signed: SignedTransaction;
   txHash: HexString;
   receipt?: Record<string, unknown> | null;
 }> {
-  return sendTOSSystemAction({
+  return sendSystemAction({
     rpcUrl: params.rpcUrl,
     privateKey: params.privateKey,
     action: "ACCOUNT_SET_SIGNER",
@@ -555,7 +555,7 @@ export async function setTOSSignerMetadata(params: {
   });
 }
 
-export async function registerTOSCapabilityName(params: {
+export async function registerCapabilityName(params: {
   rpcUrl: string;
   privateKey: HexString;
   name: string;
@@ -564,11 +564,11 @@ export async function registerTOSCapabilityName(params: {
   receiptTimeoutMs?: number;
   pollIntervalMs?: number;
 }): Promise<{
-  signed: TOSSignedTransaction;
+  signed: SignedTransaction;
   txHash: HexString;
   receipt?: Record<string, unknown> | null;
 }> {
-  return sendTOSSystemAction({
+  return sendSystemAction({
     rpcUrl: params.rpcUrl,
     privateKey: params.privateKey,
     action: "CAPABILITY_REGISTER",
@@ -582,26 +582,26 @@ export async function registerTOSCapabilityName(params: {
   });
 }
 
-export async function grantTOSCapability(params: {
+export async function grantCapability(params: {
   rpcUrl: string;
   privateKey: HexString;
-  target: TOSAddress | string;
+  target: ChainAddress | string;
   bit: number;
   gas?: bigint;
   waitForReceipt?: boolean;
   receiptTimeoutMs?: number;
   pollIntervalMs?: number;
 }): Promise<{
-  signed: TOSSignedTransaction;
+  signed: SignedTransaction;
   txHash: HexString;
   receipt?: Record<string, unknown> | null;
 }> {
-  return sendTOSSystemAction({
+  return sendSystemAction({
     rpcUrl: params.rpcUrl,
     privateKey: params.privateKey,
     action: "CAPABILITY_GRANT",
     payload: {
-      target: normalizeTOSAddress(params.target),
+      target: normalizeAddress(params.target),
       bit: params.bit,
     },
     gas: params.gas,
@@ -611,15 +611,15 @@ export async function grantTOSCapability(params: {
   });
 }
 
-export async function buildTOSX402Payment(params: {
+export async function buildX402Payment(params: {
   privateKey: HexString;
-  requirement: TOSX402Requirement;
+  requirement: X402Requirement;
   rpcUrl: string;
   gas?: bigint;
-}): Promise<TOSPaymentEnvelope> {
+}): Promise<PaymentEnvelope> {
   const value = BigInt(params.requirement.maxAmountRequired);
-  const client = new TOSRpcClient({ rpcUrl: params.rpcUrl });
-  const from = deriveTOSAddressFromPrivateKey(params.privateKey);
+  const client = new ChainRpcClient({ rpcUrl: params.rpcUrl });
+  const from = deriveAddressFromPrivateKey(params.privateKey);
   const [chainId, nonce] = await Promise.all([
     client.getChainId(),
     client.getTransactionCount(from, "pending"),
@@ -627,11 +627,11 @@ export async function buildTOSX402Payment(params: {
   const requiredChainId = parseChainIdFromNetwork(params.requirement.network);
   if (chainId !== requiredChainId) {
     throw new Error(
-      `TOS x402 network mismatch: wallet RPC is ${formatTOSNetwork(chainId)} but requirement expects ${params.requirement.network}`,
+      `TOS x402 network mismatch: wallet RPC is ${formatNetwork(chainId)} but requirement expects ${params.requirement.network}`,
     );
   }
 
-  const signed = await signTOSNativeTransfer(params.privateKey, {
+  const signed = await signNativeTransfer(params.privateKey, {
     chainId,
     nonce,
     gas: params.gas ?? 21_000n,
@@ -651,15 +651,15 @@ export async function buildTOSX402Payment(params: {
   };
 }
 
-export function encodeTOSX402PaymentHeader(
-  envelope: TOSPaymentEnvelope,
+export function encodeX402PaymentHeader(
+  envelope: PaymentEnvelope,
 ): string {
   return Buffer.from(JSON.stringify(envelope)).toString("base64");
 }
 
-export function getTOSAddressFromAccount(
+export function getAddressFromAccount(
   _account: PrivateKeyAccount,
   privateKey: HexString,
-): TOSAddress {
-  return deriveTOSAddressFromPrivateKey(privateKey);
+): ChainAddress {
+  return deriveAddressFromPrivateKey(privateKey);
 }

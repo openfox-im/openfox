@@ -27,8 +27,8 @@ import {
   type X402ServerPaymentResult,
   writeX402RequirementResponse,
   X402ServerPaymentRejectedError,
-} from "../tos/x402-server.js";
-import { normalizeTOSAddress as normalizeAddress, type TOSAddress } from "../tos/address.js";
+} from "../chain/x402-server.js";
+import { normalizeAddress, type ChainAddress } from "../chain/address.js";
 import {
   ensureRequestNotReplayed,
   normalizeNonce,
@@ -46,11 +46,11 @@ export interface PaymasterQuoteRequest {
   requester: {
     identity: {
       kind: "tos";
-      value: TOSAddress;
+      value: ChainAddress;
     };
   };
-  wallet_address?: TOSAddress;
-  target: TOSAddress;
+  wallet_address?: ChainAddress;
+  target: ChainAddress;
   value_wei?: string;
   data?: Hex;
   gas?: string;
@@ -62,14 +62,14 @@ export interface PaymasterAuthorizeRequest {
   requester: {
     identity: {
       kind: "tos";
-      value: TOSAddress;
+      value: ChainAddress;
     };
   };
-  wallet_address?: TOSAddress;
+  wallet_address?: ChainAddress;
   request_nonce: string;
   request_expires_at: number;
   execution_nonce: string;
-  target: TOSAddress;
+  target: ChainAddress;
   value_wei?: string;
   data?: Hex;
   gas?: string;
@@ -86,7 +86,7 @@ export interface StartPaymasterProviderServerParams {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
   db: OpenFoxDatabase;
-  address: TOSAddress;
+  address: ChainAddress;
   privateKey: Hex;
   paymasterConfig: PaymasterProviderConfig;
   paymentManager?: {
@@ -161,11 +161,11 @@ function stableStringify(value: unknown): string {
 }
 
 function buildQuoteId(params: {
-  requesterAddress: TOSAddress;
-  providerAddress: TOSAddress;
-  sponsorAddress: TOSAddress;
-  walletAddress: TOSAddress;
-  targetAddress: TOSAddress;
+  requesterAddress: ChainAddress;
+  providerAddress: ChainAddress;
+  sponsorAddress: ChainAddress;
+  walletAddress: ChainAddress;
+  targetAddress: ChainAddress;
   valueWei: string;
   dataHex: Hex;
   gas: string;
@@ -191,7 +191,7 @@ function buildQuoteId(params: {
 }
 
 function buildRequestKey(params: {
-  requesterAddress: TOSAddress;
+  requesterAddress: ChainAddress;
   capability: string;
   quoteId: string;
   nonce: string;
@@ -235,7 +235,7 @@ function normalizeSignerType(value: string | undefined): string {
 
 async function resolveSignerDescriptor(
   publicClient: ReturnType<typeof createPublicClient>,
-  address: TOSAddress,
+  address: ChainAddress,
 ): Promise<RpcSignerDescriptor> {
   const raw = await publicClient.request<{
     signer?: { type?: string; value?: string; defaulted?: boolean };
@@ -250,7 +250,7 @@ async function resolveSignerDescriptor(
 async function verifyExecutionAuthorization(params: {
   publicClient: ReturnType<typeof createPublicClient>;
   transaction: TransactionSerializableNative;
-  walletAddress: TOSAddress;
+  walletAddress: ChainAddress;
   signerType: string;
   executionSignature: Signature;
 }): Promise<boolean> {
@@ -366,8 +366,8 @@ async function submitSponsoredTransaction(params: {
 }
 
 function validateQuoteRequest(body: PaymasterQuoteRequest): {
-  requesterAddress: TOSAddress;
-  walletAddress: TOSAddress;
+  requesterAddress: ChainAddress;
+  walletAddress: ChainAddress;
 } {
   const requesterAddress = normalizeAddress(body.requester?.identity?.value);
   return {

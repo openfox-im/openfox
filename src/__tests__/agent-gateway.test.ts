@@ -27,10 +27,10 @@ import {
 } from "../agent-gateway/e2e.js";
 import { buildStableGatewayPathToken } from "../agent-gateway/types.js";
 import {
-  buildTOSX402Payment,
-  formatTOSNetwork,
-} from "../tos/client.js";
-import { deriveTOSAddressFromPrivateKey } from "../tos/address.js";
+  buildX402Payment,
+  formatNetwork,
+} from "../chain/client.js";
+import { deriveAddressFromPrivateKey } from "../chain/address.js";
 
 const getBalanceMock = vi.fn(async () => 10_000_000_000_000_000_000n);
 const getChainIdMock = vi.fn(async () => 1666n);
@@ -48,14 +48,14 @@ const sendTransferMock = vi.fn(async () => ({
   txHash: "0xgatewaytxhash",
 }));
 
-vi.mock("../tos/client.js", async () => {
+vi.mock("../chain/client.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../tos/client.js")>(
-      "../tos/client.js"
+    await vi.importActual<typeof import("../chain/client.js")>(
+      "../chain/client.js"
     );
   return {
     ...actual,
-    TOSRpcClient: class {
+    ChainRpcClient: class {
       async getBalance() {
         return getBalanceMock();
       }
@@ -72,7 +72,7 @@ vi.mock("../tos/client.js", async () => {
         return { status: "0x1" };
       }
     },
-    sendTOSNativeTransfer: (...args: unknown[]) => sendTransferMock(...args),
+    sendNativeTransfer: (...args: unknown[]) => sendTransferMock(...args),
   };
 });
 
@@ -803,7 +803,7 @@ describe("agent gateway", () => {
         agent_id: requesterAccount.address.toLowerCase(),
         identity: {
           kind: "tos",
-          value: deriveTOSAddressFromPrivateKey(REQUESTER_PRIVATE_KEY),
+          value: deriveAddressFromPrivateKey(REQUESTER_PRIVATE_KEY),
         },
       },
       request_nonce: "gateway-payment-nonce",
@@ -820,10 +820,10 @@ describe("agent gateway", () => {
       });
       expect(unpaid.status).toBe(402);
       const requirement = decodePaymentRequired(unpaid).accepts[0]!;
-      expect(requirement.network).toBe(formatTOSNetwork(1666n));
+      expect(requirement.network).toBe(formatNetwork(1666n));
       expect(requirement.maxAmountRequired).toBe("12345");
 
-      const payment = await buildTOSX402Payment({
+      const payment = await buildX402Payment({
         privateKey: REQUESTER_PRIVATE_KEY,
         rpcUrl: providerConfig.rpcUrl!,
         requirement,
@@ -1250,7 +1250,7 @@ describe("agent gateway", () => {
         agent_id: requesterAccount.address.toLowerCase(),
         identity: {
           kind: "tos",
-          value: deriveTOSAddressFromPrivateKey(REQUESTER_PRIVATE_KEY),
+          value: deriveAddressFromPrivateKey(REQUESTER_PRIVATE_KEY),
         },
       },
       request_nonce: "split-payment-nonce",
@@ -1271,7 +1271,7 @@ describe("agent gateway", () => {
       const requirement = decodePaymentRequired(unpaid).accepts[0]!;
       expect(requirement.maxAmountRequired).toBe("12345");
 
-      const payment = await buildTOSX402Payment({
+      const payment = await buildX402Payment({
         privateKey: REQUESTER_PRIVATE_KEY,
         rpcUrl: providerConfig.rpcUrl!,
         requirement,

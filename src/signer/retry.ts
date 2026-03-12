@@ -5,7 +5,7 @@ import type {
   OpenFoxDatabase,
   SignerExecutionRecord,
 } from "../types.js";
-import { TOSRpcClient, sendTOSNativeTransfer } from "../tos/client.js";
+import { ChainRpcClient, sendNativeTransfer } from "../chain/client.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 
 export interface SignerExecutionRetryResult {
@@ -42,7 +42,7 @@ export function createSignerExecutionRetryManager(params: {
 }): {
   retryPending(limit?: number): Promise<SignerExecutionRetryResult>;
 } {
-  const rpcClient = new TOSRpcClient({ rpcUrl: params.rpcUrl });
+  const rpcClient = new ChainRpcClient({ rpcUrl: params.rpcUrl });
 
   async function confirm(
     record: SignerExecutionRecord,
@@ -77,7 +77,7 @@ export function createSignerExecutionRetryManager(params: {
       return failed;
     }
     try {
-      const submitted = await sendTOSNativeTransfer({
+      const submitted = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey,
         to: record.targetAddress,

@@ -10,18 +10,18 @@ import type {
 import { createLogger } from "../observability/logger.js";
 import { resolvePath } from "../config.js";
 import {
-  TOSRpcClient as RpcClient,
-  formatTOSNetwork as formatNetwork,
-} from "../tos/client.js";
+  ChainRpcClient as RpcClient,
+  formatNetwork as formatNetwork,
+} from "../chain/client.js";
 import {
-  readTOSPaymentEnvelope,
-  submitTOSPayment,
-  verifyTOSPayment,
-  writeTOSPaymentRequired,
-  type TOSPaymentRequirement,
-  type VerifiedTOSPayment,
-} from "../tos/x402.js";
-import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
+  readPaymentEnvelope,
+  submitPayment,
+  verifyPayment,
+  writePaymentRequired,
+  type PaymentRequirement,
+  type VerifiedPayment,
+} from "../chain/x402.js";
+import { normalizeAddress } from "../chain/address.js";
 import {
   buildStorageServerUrl,
   type AgentDiscoveryStorageServerConfig,
@@ -256,14 +256,14 @@ async function requirePayment(params: {
   providerAddress: string;
   amountWei: string;
   description: string;
-}): Promise<VerifiedTOSPayment | null> {
+}): Promise<VerifiedPayment | null> {
   const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
     throw new Error("Chain RPC is required to run the storage server");
   }
   const client = new RpcClient({ rpcUrl });
   const chainId = params.config.chainId ? BigInt(params.config.chainId) : await client.getChainId();
-  const requirement: TOSPaymentRequirement = {
+  const requirement: PaymentRequirement = {
     scheme: "exact",
     network: formatNetwork(chainId),
     maxAmountRequired: params.amountWei,
@@ -272,13 +272,13 @@ async function requirePayment(params: {
     requiredDeadlineSeconds: 300,
     description: params.description,
   };
-  const envelope = readTOSPaymentEnvelope(params.req);
+  const envelope = readPaymentEnvelope(params.req);
   if (!envelope) {
-    writeTOSPaymentRequired(params.res, requirement);
+    writePaymentRequired(params.res, requirement);
     return null;
   }
-  const verified = verifyTOSPayment(requirement, envelope);
-  await submitTOSPayment(rpcUrl, verified);
+  const verified = verifyPayment(requirement, envelope);
+  await submitPayment(rpcUrl, verified);
   return verified;
 }
 

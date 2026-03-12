@@ -12,13 +12,13 @@ const sendTransferMock = vi.fn(async () => ({
   txHash: "0xtxhash",
 }));
 
-vi.mock("../tos/client.js", () => ({
-  TOSRpcClient: class {
+vi.mock("../chain/client.js", () => ({
+  ChainRpcClient: class {
     async getBalance() {
       return getBalanceMock();
     }
   },
-  sendTOSNativeTransfer: (...args: unknown[]) => sendTransferMock(...args),
+  sendNativeTransfer: (...args: unknown[]) => sendTransferMock(...args),
 }));
 
 const TEST_PRIVATE_KEY =

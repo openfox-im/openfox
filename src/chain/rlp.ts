@@ -1,5 +1,5 @@
-import type { TOSAddress, HexString } from "./address.js";
-import { tosAddressBytes } from "./address.js";
+import type { ChainAddress, HexString } from "./address.js";
+import { addressBytes } from "./address.js";
 
 function strip0x(value: string): string {
   return value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
@@ -83,11 +83,11 @@ export function encodeRlpList(values: Uint8Array[]): Uint8Array {
   return concatBytes([Uint8Array.from([0xf7 + lenBytes.length]), lenBytes, payload]);
 }
 
-export function encodeRlpAddress(address?: TOSAddress | null): Uint8Array {
+export function encodeRlpAddress(address?: ChainAddress | null): Uint8Array {
   if (!address) {
     return encodeRlpBytes(new Uint8Array());
   }
-  return encodeRlpBytes(tosAddressBytes(address));
+  return encodeRlpBytes(addressBytes(address));
 }
 
 export function encodeRlpUint(value: bigint | number): Uint8Array {

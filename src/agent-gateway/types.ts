@@ -4,7 +4,7 @@ import type {
   AgentGatewayServerConfig,
   OpenFoxIdentity,
 } from "../types.js";
-import type { TOSPaymentEnvelope } from "../tos/client.js";
+import type { PaymentEnvelope } from "../chain/client.js";
 import { createHash } from "crypto";
 
 export interface AgentGatewayIdentityRef {
@@ -49,7 +49,7 @@ export interface AgentGatewaySessionOpen {
   type: "session_open";
   auth: AgentGatewaySessionAuth;
   routes: AgentGatewayRouteRegistration[];
-  payment?: TOSPaymentEnvelope;
+  payment?: PaymentEnvelope;
 }
 
 export interface AgentGatewaySessionResume {
@@ -57,7 +57,7 @@ export interface AgentGatewaySessionResume {
   previous_session_id: string;
   auth: AgentGatewaySessionAuth;
   routes?: AgentGatewayRouteRegistration[];
-  payment?: TOSPaymentEnvelope;
+  payment?: PaymentEnvelope;
 }
 
 export interface AgentGatewaySessionOpenAck {

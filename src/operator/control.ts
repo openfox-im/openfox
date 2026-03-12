@@ -14,7 +14,7 @@ import {
 } from "../state/database.js";
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import { createMarketContractDispatcher } from "../market/contracts.js";
-import { createX402PaymentManager } from "../tos/x402-server.js";
+import { createX402PaymentManager } from "../chain/x402-server.js";
 import { createSignerExecutionRetryManager } from "../signer/retry.js";
 import { createPaymasterAuthorizationRetryManager } from "../paymaster/retry.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";

@@ -8,10 +8,10 @@ import {
 import type { VerifiedAgentProvider } from "../agent-discovery/types.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
 import {
-  buildTOSX402Payment as buildPayment,
-  recordTOSReputationScore as recordReputationScore,
-  type TOSPaymentEnvelope,
-} from "../tos/client.js";
+  buildX402Payment as buildPayment,
+  recordReputationScore as recordReputationScore,
+  type PaymentEnvelope,
+} from "../chain/client.js";
 import { resolveVerifiedGatewayBootnodes } from "./bootnodes.js";
 import { signGatewaySessionAuth } from "./auth.js";
 import {
@@ -252,7 +252,7 @@ async function buildSessionPayment(params: {
   config: OpenFoxConfig;
   target: GatewayTarget;
   privateKey?: `0x${string}`;
-}): Promise<TOSPaymentEnvelope | undefined> {
+}): Promise<PaymentEnvelope | undefined> {
   const payment = targetPaymentMetadata(params.target);
   if (
     payment.paymentDirection !== "provider_pays" &&

@@ -15,8 +15,8 @@ import type {
   MarketContractTargetConfig,
   OpenFoxDatabase,
 } from "../types.js";
-import { TOSRpcClient, sendTOSNativeTransfer } from "../tos/client.js";
-import { normalizeTOSAddress } from "../tos/address.js";
+import { ChainRpcClient, sendNativeTransfer } from "../chain/client.js";
+import { normalizeAddress } from "../chain/address.js";
 
 export interface MarketContractDispatchResult {
   callback: MarketContractCallbackRecord | null;
@@ -129,7 +129,7 @@ export function createMarketContractDispatcher(params: {
   now?: () => Date;
 }): MarketContractDispatcher {
   const now = params.now ?? (() => new Date());
-  const rpcClient = new TOSRpcClient({ rpcUrl: params.rpcUrl });
+  const rpcClient = new ChainRpcClient({ rpcUrl: params.rpcUrl });
 
   async function confirmPendingReceipt(
     binding: MarketBindingRecord,
@@ -158,7 +158,7 @@ export function createMarketContractDispatcher(params: {
   ): Promise<MarketContractCallbackRecord> {
     const timestamp = now().toISOString();
     try {
-      const transfer = await sendTOSNativeTransfer({
+      const transfer = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: callback.contractAddress,
@@ -224,7 +224,7 @@ export function createMarketContractDispatcher(params: {
         return { callback: null, action: "disabled" };
       }
 
-      const contractAddress = normalizeTOSAddress(target.contractAddress);
+      const contractAddress = normalizeAddress(target.contractAddress);
       const existing =
         params.db.getMarketContractCallbackByBindingId(record.bindingId) ??
         buildBaseCallbackRecord({

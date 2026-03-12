@@ -1,12 +1,12 @@
 import { keccak256, toHex, type Hex } from "tosdk";
-import { normalizeTOSAddress, type TOSAddress } from "../tos/address.js";
+import { normalizeAddress, type ChainAddress } from "../chain/address.js";
 import type {
   SignerProviderConfig,
   SignerProviderPolicyConfig,
   SignerProviderTrustTier,
 } from "../types.js";
 
-const SYSTEM_ACTION_ADDRESS = normalizeTOSAddress("0x1");
+const SYSTEM_ACTION_ADDRESS = normalizeAddress("0x1");
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") {
@@ -41,14 +41,14 @@ function selectorFromData(dataHex: Hex): Hex | null {
 }
 
 export function getPolicyWalletAddress(
-  providerAddress: TOSAddress,
+  providerAddress: ChainAddress,
   policy: SignerProviderPolicyConfig,
-): TOSAddress {
-  return normalizeTOSAddress(policy.walletAddress || providerAddress);
+): ChainAddress {
+  return normalizeAddress(policy.walletAddress || providerAddress);
 }
 
 export function hashSignerPolicy(params: {
-  providerAddress: TOSAddress;
+  providerAddress: ChainAddress;
   policy: SignerProviderPolicyConfig;
 }): Hex {
   const walletAddress = getPolicyWalletAddress(params.providerAddress, params.policy);
@@ -58,7 +58,7 @@ export function hashSignerPolicy(params: {
     delegate_identity: params.policy.delegateIdentity || null,
     trust_tier: params.policy.trustTier,
     allowed_targets: params.policy.allowedTargets.map((entry) =>
-      normalizeTOSAddress(entry),
+      normalizeAddress(entry),
     ),
     allowed_function_selectors: params.policy.allowedFunctionSelectors.map((entry) =>
       normalizeSelector(entry),
@@ -71,16 +71,16 @@ export function hashSignerPolicy(params: {
 }
 
 export function buildSignerScopeHash(params: {
-  walletAddress: TOSAddress;
-  targetAddress: TOSAddress;
+  walletAddress: ChainAddress;
+  targetAddress: ChainAddress;
   valueWei: string;
   dataHex: Hex;
   gas: string;
   trustTier: SignerProviderTrustTier;
 }): Hex {
   const normalized = {
-    wallet_address: normalizeTOSAddress(params.walletAddress),
-    target_address: normalizeTOSAddress(params.targetAddress),
+    wallet_address: normalizeAddress(params.walletAddress),
+    target_address: normalizeAddress(params.targetAddress),
     value_wei: params.valueWei,
     data_hex: params.dataHex.toLowerCase(),
     gas: params.gas,
@@ -90,15 +90,15 @@ export function buildSignerScopeHash(params: {
 }
 
 export function validateSignerPolicyRequest(params: {
-  providerAddress: TOSAddress;
+  providerAddress: ChainAddress;
   config: SignerProviderConfig;
   targetAddress: string;
   valueWei: string;
   dataHex?: string;
   gas?: string;
 }): {
-  walletAddress: TOSAddress;
-  targetAddress: TOSAddress;
+  walletAddress: ChainAddress;
+  targetAddress: ChainAddress;
   valueWei: string;
   dataHex: Hex;
   gas: string;
@@ -107,7 +107,7 @@ export function validateSignerPolicyRequest(params: {
 } {
   const policy = params.config.policy;
   const walletAddress = getPolicyWalletAddress(params.providerAddress, policy);
-  const targetAddress = normalizeTOSAddress(params.targetAddress);
+  const targetAddress = normalizeAddress(params.targetAddress);
   const value = BigInt(params.valueWei || "0");
   if (value < 0n) {
     throw new Error("value_wei must be non-negative");
@@ -133,7 +133,7 @@ export function validateSignerPolicyRequest(params: {
   }
   if (
     !policy.allowedTargets
-      .map((entry) => normalizeTOSAddress(entry))
+      .map((entry) => normalizeAddress(entry))
       .includes(targetAddress)
   ) {
     throw new Error("target is not allowed by signer policy");

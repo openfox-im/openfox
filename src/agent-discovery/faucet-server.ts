@@ -2,13 +2,13 @@ import http, { type IncomingMessage, type ServerResponse } from "http";
 import { URL } from "url";
 import { createLogger } from "../observability/logger.js";
 import {
-  normalizeTOSAddress as normalizeAddress,
-  isTOSAddress as isAddress,
-} from "../tos/address.js";
+  normalizeAddress,
+  isChainAddress as isAddress,
+} from "../chain/address.js";
 import {
-  sendTOSNativeTransfer as sendNativeTransfer,
-  TOSRpcClient as RpcClient,
-} from "../tos/client.js";
+  sendNativeTransfer as sendNativeTransfer,
+  ChainRpcClient as RpcClient,
+} from "../chain/client.js";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 import {
   buildFaucetServerUrl,

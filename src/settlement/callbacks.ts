@@ -15,10 +15,10 @@ import type {
   SettlementRecord,
 } from "../types.js";
 import {
-  TOSRpcClient,
-  sendTOSNativeTransfer,
-} from "../tos/client.js";
-import { normalizeTOSAddress } from "../tos/address.js";
+  ChainRpcClient,
+  sendNativeTransfer,
+} from "../chain/client.js";
+import { normalizeAddress } from "../chain/address.js";
 
 export interface SettlementCallbackDispatchResult {
   callback: SettlementCallbackRecord | null;
@@ -111,7 +111,7 @@ export function createNativeSettlementCallbackDispatcher(params: {
   now?: () => Date;
 }): SettlementCallbackDispatcher {
   const now = params.now ?? (() => new Date());
-  const rpcClient = new TOSRpcClient({ rpcUrl: params.rpcUrl });
+  const rpcClient = new ChainRpcClient({ rpcUrl: params.rpcUrl });
 
   async function confirmPendingReceipt(
     callback: SettlementCallbackRecord,
@@ -137,7 +137,7 @@ export function createNativeSettlementCallbackDispatcher(params: {
   ): Promise<SettlementCallbackRecord> {
     const timestamp = now().toISOString();
     try {
-      const transfer = await sendTOSNativeTransfer({
+      const transfer = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: callback.contractAddress,
@@ -195,7 +195,7 @@ export function createNativeSettlementCallbackDispatcher(params: {
       return { callback: null, action: "disabled" };
     }
 
-    const contractAddress = normalizeTOSAddress(target.contractAddress);
+    const contractAddress = normalizeAddress(target.contractAddress);
     const existing =
       params.db.getSettlementCallbackByReceiptId(record.receiptId) ??
       buildBaseCallbackRecord({

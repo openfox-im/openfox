@@ -1441,9 +1441,9 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestTestnetFaucet } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
-        const { parseTOSAmount: parseAmount } = await import("../tos/client.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
+        const { parseAmount } = await import("../chain/client.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
@@ -1515,8 +1515,8 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestObservationOnce } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
@@ -1594,8 +1594,8 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestOracleResolution } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
@@ -1680,8 +1680,8 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestNewsFetch } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
@@ -1769,8 +1769,8 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestProofVerify } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
@@ -1871,8 +1871,8 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestStoragePut } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();
@@ -1965,8 +1965,8 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
       execute: async (args, ctx) => {
         const { requestStorageGet } =
           await import("../agent-discovery/client.js");
-        const { deriveTOSAddressFromPrivateKey: deriveAddressFromPrivateKey } =
-          await import("../tos/address.js");
+        const { deriveAddressFromPrivateKey } =
+          await import("../chain/address.js");
         const { loadWalletPrivateKey } = await import("../identity/wallet.js");
 
         const privateKey = loadWalletPrivateKey();

@@ -16,13 +16,13 @@ import {
   type StorageRenewalRecord,
 } from "../types.js";
 import { resolvePath } from "../config.js";
-import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
+import { normalizeAddress } from "../chain/address.js";
 import {
   createX402PaymentManager,
   hashX402RequestPayload,
   writeX402RequirementResponse,
   X402ServerPaymentRejectedError,
-} from "../tos/x402-server.js";
+} from "../chain/x402-server.js";
 import {
   ensureRequestNotReplayed,
   normalizeNonce,

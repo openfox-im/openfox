@@ -6,7 +6,7 @@ import { DEFAULT_TREASURY_POLICY } from "../types.js";
 import { getWallet, getOpenFoxDir } from "../identity/wallet.js";
 import { createConfig, saveConfig } from "../config.js";
 import { writeDefaultHeartbeatConfig } from "../heartbeat/config.js";
-import { deriveTOSAddressFromPrivateKey as deriveAddressFromPrivateKey } from "../tos/address.js";
+import { deriveAddressFromPrivateKey } from "../chain/address.js";
 import { showBanner } from "./banner.js";
 import {
   promptRequired,

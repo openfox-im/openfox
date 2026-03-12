@@ -15,8 +15,8 @@ import {
   createX402PaymentManager,
   hashX402RequestPayload,
   writeX402RequirementResponse,
-} from "../tos/x402-server.js";
-import { normalizeTOSAddress as normalizeAddress } from "../tos/address.js";
+} from "../chain/x402-server.js";
+import { normalizeAddress } from "../chain/address.js";
 import {
   buildSentimentAnalysisServerUrl,
   type SentimentAnalysisRequest,
