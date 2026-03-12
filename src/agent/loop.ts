@@ -6,6 +6,7 @@
  */
 
 import path from "node:path";
+import { execSync } from "node:child_process";
 import type {
   OpenFoxIdentity,
   OpenFoxConfig,
@@ -309,7 +310,7 @@ export async function runAgentLoop(
   onStateChange?.("waking");
 
   // Get financial state
-  let financial = await getFinancialState(runtime, identity.address, db);
+  let financial = await getFinancialState(runtime, identity.address, db, config.modelStrategy?.inferenceModel || config.inferenceModelRef);
 
   // Check if this is the first run
   const isFirstRun = db.getTurnCount() === 0;
@@ -377,7 +378,7 @@ export async function runAgentLoop(
       }
 
       // Refresh financial state periodically
-      financial = await getFinancialState(runtime, identity.address, db);
+      financial = await getFinancialState(runtime, identity.address, db, config.modelStrategy?.inferenceModel || config.inferenceModelRef);
 
       // Check survival tier
       // api_unreachable: creditsCents === -1 means API failed with no cache.
@@ -849,10 +850,18 @@ async function getFinancialState(
   runtime: RuntimeClient,
   address: string,
   db?: OpenFoxDatabase,
+  inferenceModelRef?: string,
 ): Promise<FinancialState> {
   let creditsCents = _lastKnownCredits;
   let walletBalance = _lastKnownWalletBalance;
 
+  // Subscription-based providers (e.g. claude-code) don't use runtime credits.
+  // Report a synthetic high balance so the agent doesn't enter critical/low_compute.
+  const modelRef = inferenceModelRef || "";
+  if (modelRef.startsWith("claude-code/")) {
+    creditsCents = 2500; // synthetic $25.00 — subscription, no real cost
+    _lastKnownCredits = creditsCents;
+  } else {
   try {
     creditsCents = await runtime.getCreditsBalance();
     if (creditsCents > 0) _lastKnownCredits = creditsCents;
@@ -883,6 +892,7 @@ async function getFinancialState(
       lastChecked: new Date().toISOString(),
     };
   }
+  } // end else (non-subscription provider)
 
   try {
     walletBalance = await getWalletBalance(address as `0x${string}`);
@@ -947,7 +957,13 @@ function syncProviderEnvironment(
   if (config.runtimeApiKey && !process.env.OPENFOX_API_KEY) {
     process.env.OPENFOX_API_KEY = config.runtimeApiKey;
   }
-  if (!process.env.OPENAI_API_KEY && config.runtimeApiKey && config.runtimeApiUrl) {
+  // Only proxy runtime credentials as OPENAI_API_KEY when the configured
+  // inference model actually targets the runtime (not claude-code, anthropic, etc.)
+  const inferenceRef = config.modelStrategy?.inferenceModel || config.inferenceModelRef || "";
+  const isRuntimeModel = !inferenceRef.startsWith("claude-code/") &&
+    !inferenceRef.startsWith("anthropic/") &&
+    !inferenceRef.startsWith("ollama/");
+  if (!process.env.OPENAI_API_KEY && config.runtimeApiKey && config.runtimeApiUrl && isRuntimeModel) {
     process.env.OPENAI_API_KEY = config.runtimeApiKey;
     process.env.OPENAI_BASE_URL = `${config.runtimeApiUrl.replace(/\/$/, "")}/v1`;
   }
@@ -963,6 +979,15 @@ function syncModelAvailability(
   const ollamaEnabled = !!(process.env.OLLAMA_BASE_URL || ollamaBaseUrl);
   const runtimeEnabled = !!(config.runtimeApiKey && config.runtimeApiUrl);
 
+  // Check if Claude Code CLI is available for claude-code provider
+  let claudeCodeEnabled = false;
+  try {
+    execSync("which claude", { stdio: "ignore" });
+    claudeCodeEnabled = true;
+  } catch {
+    claudeCodeEnabled = false;
+  }
+
   for (const entry of modelRegistry.getAll()) {
     if (entry.provider === "openai") {
       modelRegistry.setEnabled(entry.modelId, openaiEnabled);
@@ -972,6 +997,8 @@ function syncModelAvailability(
       modelRegistry.setEnabled(entry.modelId, ollamaEnabled);
     } else if (entry.provider === "runtime") {
       modelRegistry.setEnabled(entry.modelId, runtimeEnabled);
+    } else if (entry.provider === "claude-code") {
+      modelRegistry.setEnabled(entry.modelId, claudeCodeEnabled);
     }
   }
 }

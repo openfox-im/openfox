@@ -6655,7 +6655,13 @@ function hasConfiguredInference(config: {
   ollamaBaseUrl?: string;
   runtimeApiKey?: string;
   runtimeApiUrl?: string;
+  inferenceModelRef?: string;
+  modelStrategy?: { inferenceModel?: string };
 }): boolean {
+  // claude-code provider uses the locally installed CLI (no API key needed)
+  const modelRef = config.inferenceModelRef || config.modelStrategy?.inferenceModel || "";
+  if (modelRef.startsWith("claude-code/")) return true;
+
   return Boolean(
     config.openaiApiKey ||
     config.anthropicApiKey ||

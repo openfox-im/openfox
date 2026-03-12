@@ -741,15 +741,21 @@ describe("Static Model Baseline", () => {
     expect(ids).toContain("gpt-5.3");
   });
 
-  it("all models have positive pricing", () => {
+  it("all models have positive pricing (except subscription-based)", () => {
     for (const model of STATIC_MODEL_BASELINE) {
-      expect(model.costPer1kInput).toBeGreaterThan(0);
-      expect(model.costPer1kOutput).toBeGreaterThan(0);
+      // claude-code models are subscription-based (zero marginal cost)
+      if (model.provider === "claude-code") {
+        expect(model.costPer1kInput).toBe(0);
+        expect(model.costPer1kOutput).toBe(0);
+      } else {
+        expect(model.costPer1kInput).toBeGreaterThan(0);
+        expect(model.costPer1kOutput).toBeGreaterThan(0);
+      }
     }
   });
 
   it("all models have valid provider", () => {
-    const validProviders = ["openai", "anthropic", "runtime", "other"];
+    const validProviders = ["openai", "anthropic", "runtime", "ollama", "claude-code", "other"];
     for (const model of STATIC_MODEL_BASELINE) {
       expect(validProviders).toContain(model.provider);
     }

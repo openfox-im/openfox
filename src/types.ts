@@ -3904,6 +3904,7 @@ export type ModelProvider =
   | "anthropic"
   | "runtime"
   | "ollama"
+  | "claude-code"
   | "other";
 
 export type InferenceTaskType =

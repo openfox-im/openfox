@@ -397,10 +397,11 @@ async function chatViaClaudeCode(params: {
 
       let stdout = "";
       let stderr = "";
+      const cliTimeout = 300_000; // 5 minutes — Sonnet via CLI can be slow
       const timer = setTimeout(() => {
         child.kill("SIGKILL");
-        reject(new Error("Claude Code CLI timed out after 120s"));
-      }, 120_000);
+        reject(new Error(`Claude Code CLI timed out after ${cliTimeout / 1000}s`));
+      }, cliTimeout);
 
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");
