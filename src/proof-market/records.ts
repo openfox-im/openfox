@@ -40,10 +40,19 @@ export interface ZkTlsBundleRecord {
   sourceUrl: string;
   resultUrl?: string | null;
   bundleUrl?: string | null;
+  attestationUrl?: string | null;
   bundleFormat: string;
+  verificationMode: "fallback_integrity" | "native_attestation";
+  nativeProofStatus: "native_attested" | "fallback_only";
+  zktlsAttestationSha256?: `0x${string}` | null;
   originClaims: ZkTlsBundleOriginClaims;
   verifierMaterialReferences: ProofMaterialReference[];
   integrity: ZkTlsBundleIntegrityRecord;
+  workerProvenance?: {
+    worker: string;
+    backend: string;
+    native: boolean;
+  } | null;
   bundle: Record<string, unknown>;
   metadata?: Record<string, unknown> | null;
   createdAt: string;
@@ -52,7 +61,10 @@ export interface ZkTlsBundleRecord {
 
 export interface ZkTlsBundleSummarySnapshot {
   totalBundles: number;
+  nativeAttestedBundles: number;
+  fallbackBundles: number;
   backendKinds: Record<string, number>;
+  verificationModes: Record<string, number>;
   sourcePolicies: Record<string, number>;
   uniqueHosts: number;
   latestRecordId: string | null;
@@ -62,9 +74,9 @@ export interface ZkTlsBundleSummarySnapshot {
 }
 
 export type ProofVerificationMode =
-  | "fallback"
-  | "worker_backed"
-  | "cryptographic";
+  | "fallback_integrity"
+  | "native_attestation"
+  | "committee_verified";
 
 export interface ProofVerificationRecord {
   recordId: string;
@@ -84,6 +96,13 @@ export interface ProofVerificationRecord {
   verifierProfile?: string | null;
   verifierReceiptSha256: `0x${string}`;
   verifierMaterialReference?: ProofMaterialReference | null;
+  attestationVerification?: Record<string, unknown> | null;
+  consensusVerification?: Record<string, unknown> | null;
+  workerProvenance?: {
+    worker: string;
+    backend: string;
+    native: boolean;
+  } | null;
   boundSubjectHashes: {
     subjectSha256?: `0x${string}` | null;
     bundleSha256?: `0x${string}` | null;
@@ -103,8 +122,9 @@ export interface ProofVerificationSummarySnapshot {
   verdicts: Record<string, number>;
   verifierClasses: Record<string, number>;
   verificationModes: Record<string, number>;
-  realProofVerifications: number;
-  fallbackVerifications: number;
+  nativeAttestationVerifications: number;
+  committeeVerifiedResults: number;
+  fallbackIntegrityVerifications: number;
   latestRecordId: string | null;
   latestCreatedAt: string | null;
   items: ProofVerificationRecord[];
@@ -200,7 +220,14 @@ export function buildZkTlsBundleSummary(
   );
   return {
     totalBundles: items.length,
+    nativeAttestedBundles: items.filter(
+      (item) => item.verificationMode === "native_attestation",
+    ).length,
+    fallbackBundles: items.filter(
+      (item) => item.verificationMode === "fallback_integrity",
+    ).length,
     backendKinds: countBy(items, (item) => item.providerBackend.kind),
+    verificationModes: countBy(items, (item) => item.verificationMode),
     sourcePolicies: countBy(items, (item) => item.originClaims.sourcePolicyId || "(unspecified)"),
     uniqueHosts: hosts.size,
     latestRecordId: latest?.recordId ?? null,
@@ -209,7 +236,7 @@ export function buildZkTlsBundleSummary(
     summary:
       items.length === 0
         ? "No zkTLS bundle records stored."
-        : `${items.length} zkTLS bundle record(s), ${hosts.size} unique host(s), policies=${Object.entries(
+        : `${items.length} zkTLS bundle record(s), native=${items.filter((item) => item.verificationMode === "native_attestation").length}, fallback=${items.filter((item) => item.verificationMode === "fallback_integrity").length}, ${hosts.size} unique host(s), policies=${Object.entries(
             countBy(items, (item) => item.originClaims.sourcePolicyId || "(unspecified)"),
           )
             .map(([policy, count]) => `${policy}=${count}`)
@@ -223,6 +250,8 @@ export function buildZkTlsBundleSummaryReport(
   return [
     "=== OPENFOX ZKTLS SUMMARY ===",
     `Bundles:         ${snapshot.totalBundles}`,
+    `Native:          ${snapshot.nativeAttestedBundles}`,
+    `Fallback:        ${snapshot.fallbackBundles}`,
     `Unique hosts:    ${snapshot.uniqueHosts}`,
     `Latest record:   ${snapshot.latestRecordId || "(none)"}`,
     `Latest created:  ${snapshot.latestCreatedAt || "(none)"}`,
@@ -231,6 +260,13 @@ export function buildZkTlsBundleSummaryReport(
         ? "(none)"
         : Object.entries(snapshot.backendKinds)
             .map(([kind, count]) => `${kind}=${count}`)
+            .join(", ")
+    }`,
+    `Modes:           ${
+      Object.keys(snapshot.verificationModes).length === 0
+        ? "(none)"
+        : Object.entries(snapshot.verificationModes)
+            .map(([mode, count]) => `${mode}=${count}`)
             .join(", ")
     }`,
     `Source policies: ${
@@ -282,28 +318,30 @@ export function buildProofVerificationSummary(
   const verifierClasses = countBy(items, (item) => item.verifierClass);
   const verificationModes = countBy(items, (item) => item.verificationMode);
   const verdicts = countBy(items, (item) => item.verdict);
-  const realProofVerifications = items.filter(
-    (item) =>
-      item.verificationMode !== "fallback" &&
-      item.verifierClass === "cryptographic_proof_verification",
+  const nativeAttestationVerifications = items.filter(
+    (item) => item.verificationMode === "native_attestation",
   ).length;
-  const fallbackVerifications = items.filter(
-    (item) => item.verificationMode === "fallback",
+  const committeeVerifiedResults = items.filter(
+    (item) => item.verificationMode === "committee_verified",
+  ).length;
+  const fallbackIntegrityVerifications = items.filter(
+    (item) => item.verificationMode === "fallback_integrity",
   ).length;
   return {
     totalResults: items.length,
     verdicts,
     verifierClasses,
     verificationModes,
-    realProofVerifications,
-    fallbackVerifications,
+    nativeAttestationVerifications,
+    committeeVerifiedResults,
+    fallbackIntegrityVerifications,
     latestRecordId: latest?.recordId ?? null,
     latestCreatedAt: latest?.createdAt ?? null,
     items,
     summary:
       items.length === 0
         ? "No proof verification records stored."
-        : `${items.length} verification record(s), fallback=${fallbackVerifications}, proof_class=${realProofVerifications}, verdicts=${Object.entries(
+        : `${items.length} verification record(s), fallback=${fallbackIntegrityVerifications}, native=${nativeAttestationVerifications}, committee=${committeeVerifiedResults}, verdicts=${Object.entries(
             verdicts,
           )
             .map(([verdict, count]) => `${verdict}=${count}`)
@@ -317,8 +355,9 @@ export function buildProofVerificationSummaryReport(
   return [
     "=== OPENFOX PROOF VERIFICATION SUMMARY ===",
     `Results:         ${snapshot.totalResults}`,
-    `Real proof:      ${snapshot.realProofVerifications}`,
-    `Fallback:        ${snapshot.fallbackVerifications}`,
+    `Native:          ${snapshot.nativeAttestationVerifications}`,
+    `Committee:       ${snapshot.committeeVerifiedResults}`,
+    `Fallback:        ${snapshot.fallbackIntegrityVerifications}`,
     `Latest record:   ${snapshot.latestRecordId || "(none)"}`,
     `Latest created:  ${snapshot.latestCreatedAt || "(none)"}`,
     `Verdicts:        ${

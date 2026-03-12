@@ -1,6 +1,6 @@
 {
   "role": "proof_verifier",
-  "default_verifier_class": "cryptographic_proof_verification",
+  "default_verifier_class": "m_of_n_consensus_verification",
   "allow_fallback": true,
   "max_payload_chars": 32768,
   "bounded_subject_hashes": true

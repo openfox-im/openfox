@@ -17,6 +17,7 @@ export async function run(input, context) {
       request_id: input?.request?.request_nonce || `newsfetch-${Date.now()}`,
       request: input?.request ?? {},
       capture: input?.capture ?? {},
+      proof: input?.proof ?? null,
       options: {
         sourcePolicyId:
           input?.request?.source_policy_id ||
@@ -58,14 +59,59 @@ export async function run(input, context) {
     http_status: capture.httpStatus,
     content_type: capture.contentType,
     article_sha256: capture.articleSha256,
+    zktls_attestation_sha256: input?.proof?.attestationSha256 || null,
+    zktls_attestation: input?.proof?.attestation || null,
     headline: capture.headline || null,
     publisher: capture.publisher || null,
     article_preview: capture.articleText || null,
   };
+  const encoded = JSON.stringify(bundle);
   return {
     format: "skill_zktls_bundle_v1",
     bundle,
-    bundleSha256: `0x${createHash("sha256").update(JSON.stringify(bundle)).digest("hex")}`,
+    bundleSha256: `0x${createHash("sha256").update(encoded).digest("hex")}`,
+    originClaims: {
+      sourceUrl: request.source_url,
+      canonicalUrl: capture.canonicalUrl || request.source_url,
+      sourcePolicyId:
+        request.source_policy_id ||
+        context?.config?.agentDiscovery?.newsFetchServer?.defaultSourcePolicyId ||
+        null,
+      sourcePolicyHost:
+        (() => {
+          try {
+            return new URL(capture.canonicalUrl || request.source_url).hostname.toLowerCase();
+          } catch {
+            return null;
+          }
+        })(),
+      publisherHint: request.publisher_hint || null,
+      headlineHint: request.headline_hint || null,
+      publisher: capture.publisher || null,
+      headline: capture.headline || null,
+      fetchedAt,
+      httpStatus: capture.httpStatus,
+      contentType: capture.contentType,
+    },
+    verifierMaterialReferences: input?.proof?.attestation
+      ? [
+          {
+            kind: "tlsn.attestation",
+            ref: `inline://attestation/${input?.proof?.attestationSha256 || "unknown"}`,
+            hash: input?.proof?.attestationSha256 || null,
+            metadata: {
+              serverName: input?.proof?.serverName || null,
+              sentLen: input?.proof?.sentLen ?? null,
+              recvLen: input?.proof?.recvLen ?? null,
+            },
+          },
+        ]
+      : [],
+    integrity: {
+      bundleSha256: `0x${createHash("sha256").update(encoded).digest("hex")}`,
+      articleSha256: capture.articleSha256 || null,
+      sourceResponseSha256: capture.articleSha256 || null,
+    },
     backend: "skill:zktls.bundle",
   };
 }

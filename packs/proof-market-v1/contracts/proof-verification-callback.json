@@ -4,7 +4,7 @@
   "method": "POST",
   "body": {
     "record_id": "proof:1",
-    "verifier_class": "cryptographic_proof_verification",
+    "verifier_class": "m_of_n_consensus_verification",
     "verdict": "valid",
     "receipt_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   }

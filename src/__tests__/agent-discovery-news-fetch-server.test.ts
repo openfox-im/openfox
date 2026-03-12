@@ -241,10 +241,14 @@ describe.sequential("agent discovery news.fetch server", () => {
       expect(firstBody.status).toBe("ok");
       expect(firstBody.headline).toBe("Bounded Capture Headline");
       expect(firstBody.article_sha256).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(firstBody.zktls_bundle_format).toBe("skill_zktls_bundle_v1");
+      expect(firstBody.zktls_bundle_format).toBe("bounded_http_capture_v0");
+      expect(firstBody.verification_mode).toBe("fallback_integrity");
+      expect(firstBody.native_proof_status).toBe("fallback_only");
+      expect(firstBody.zktls_attestation_sha256).toBeUndefined();
+      expect(firstBody.zktls_attestation_url).toBeUndefined();
       expect((firstBody.metadata as Record<string, unknown>).provider_backend).toEqual({
-        kind: "skills",
-        stages: ["newsfetch.capture", "zktls.bundle"],
+        kind: "builtin",
+        stages: ["builtin:news.fetch"],
       });
 
       const second = await postPaid(server.url, body, config.rpcUrl!);
@@ -256,8 +260,12 @@ describe.sequential("agent discovery news.fetch server", () => {
       expect(records).toHaveLength(1);
       expect(records[0]?.originClaims.sourcePolicyId ?? null).toBeNull();
       expect(records[0]?.integrity.bundleSha256).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(records[0]?.verificationMode).toBe("fallback_integrity");
+      expect(records[0]?.nativeProofStatus).toBe("fallback_only");
       const summary = buildZkTlsBundleSummary(db, 10);
       expect(summary.totalBundles).toBe(1);
+      expect(summary.nativeAttestedBundles).toBe(0);
+      expect(summary.fallbackBundles).toBe(1);
       expect(summary.sourcePolicies["(unspecified)"]).toBe(1);
     } finally {
       await server.close();
@@ -336,6 +344,10 @@ describe.sequential("agent discovery news.fetch server", () => {
       expect(response.status).toBe("ok");
       expect(response.zktls_bundle_format).toBe("zktls_bundle_v1");
       expect(response.zktls_bundle_sha256).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(response.verification_mode).toBe("native_attestation");
+      expect(response.native_proof_status).toBe("native_attested");
+      expect(response.zktls_attestation_sha256).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(String(response.zktls_attestation_url)).toContain("/news/fetch/attestation/");
       expect((response.metadata as Record<string, unknown>).bundle).toMatchObject({
         backend: "rust_fixture_zktls_v0",
         source_policy_id: "news.fetch",
@@ -344,6 +356,8 @@ describe.sequential("agent discovery news.fetch server", () => {
       expect(records).toHaveLength(1);
       expect(records[0]?.verifierMaterialReferences[0]?.kind).toBeTruthy();
       expect(records[0]?.integrity.bundleSha256).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(records[0]?.verificationMode).toBe("native_attestation");
+      expect(records[0]?.nativeProofStatus).toBe("native_attested");
     } finally {
       await server.close();
       db.close();

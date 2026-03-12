@@ -39,6 +39,7 @@ import { formatSkillBackendStage } from "./provider-skill-spec.js";
 import { runSkillBackend } from "../skills/backend-runner.js";
 import {
   parseNewsFetchCaptureSkillResult,
+  parseZkTlsProveSkillResult,
   parseZkTlsBundleSkillResult,
 } from "./skill-backend-contracts.js";
 import {
@@ -84,6 +85,15 @@ interface NewsFetchBackendResult {
   bundleFormat: string;
   bundleSha256: `0x${string}`;
   bundle: Record<string, unknown>;
+  verificationMode: "fallback_integrity" | "native_attestation";
+  nativeProofStatus: "native_attested" | "fallback_only";
+  zktlsAttestationSha256?: `0x${string}`;
+  zktlsAttestation?: string;
+  workerProvenance?: {
+    worker: string;
+    backend: string;
+    native: boolean;
+  };
   backendSummary: {
     kind: "skills" | "builtin";
     stages: string[];
@@ -147,6 +157,10 @@ function buildNewsFetchResultPath(jobId: string): string {
 
 function buildNewsFetchBundlePath(jobId: string): string {
   return `/news/fetch/bundle/${jobId}`;
+}
+
+function buildNewsFetchAttestationPath(jobId: string): string {
+  return `/news/fetch/attestation/${jobId}`;
 }
 
 function loadStoredNewsFetchJob(
@@ -393,6 +407,8 @@ async function runBuiltinNewsFetchBackend(params: {
     bundleFormat: "bounded_http_capture_v0",
     bundleSha256,
     bundle,
+    verificationMode: "fallback_integrity",
+    nativeProofStatus: "fallback_only",
     backendSummary: {
       kind: "builtin",
       stages: ["builtin:news.fetch"],
@@ -432,9 +448,11 @@ async function runSkillNewsFetchBackend(params: {
   sourcePolicyHost?: string;
 }): Promise<NewsFetchBackendResult> {
   const skillsDir = params.config.skillsDir || "~/.openfox/skills";
-  const [captureStage, bundleStage] = params.newsFetchConfig.skillStages;
-  if (!captureStage || !bundleStage) {
-    throw new Error("news.fetch skillStages must define capture and bundle stages");
+  const [captureStage, proveStage, bundleStage] = params.newsFetchConfig.skillStages;
+  if (!captureStage || !proveStage || !bundleStage) {
+    throw new Error(
+      "news.fetch skillStages must define capture, prove, and bundle stages",
+    );
   }
   const capture = parseNewsFetchCaptureSkillResult(await runSkillBackend({
     skillsDir,
@@ -455,6 +473,21 @@ async function runSkillNewsFetchBackend(params: {
       now: () => new Date(),
     },
   }));
+  const proof = parseZkTlsProveSkillResult(await runSkillBackend({
+    skillsDir,
+    skillName: proveStage.skill,
+    backendName: proveStage.backend,
+    input: {
+      request: params.request,
+      fetchedAt: params.fetchedAt,
+      capture,
+    },
+    context: {
+      config: params.config,
+      db: params.db,
+      now: () => new Date(),
+    },
+  }));
   const bundled = parseZkTlsBundleSkillResult(await runSkillBackend({
     skillsDir,
     skillName: bundleStage.skill,
@@ -463,6 +496,7 @@ async function runSkillNewsFetchBackend(params: {
       request: params.request,
       fetchedAt: params.fetchedAt,
       capture,
+      proof,
     },
     context: {
       config: params.config,
@@ -481,6 +515,15 @@ async function runSkillNewsFetchBackend(params: {
     bundleFormat: bundled.format,
     bundleSha256: bundled.bundleSha256,
     bundle: bundled.bundle,
+    verificationMode: "native_attestation",
+    nativeProofStatus: "native_attested",
+    zktlsAttestationSha256: proof.attestationSha256,
+    zktlsAttestation: proof.attestation,
+    workerProvenance: {
+      worker: "zktls.prove",
+      backend: formatSkillBackendStage(proveStage),
+      native: true,
+    },
     backendSummary: {
       kind: "skills",
       stages: params.newsFetchConfig.skillStages.map(formatSkillBackendStage),
@@ -580,6 +623,7 @@ export async function startAgentDiscoveryNewsFetchServer(
   const healthzPath = `${path}/healthz`;
   const resultPathPrefix = "/news/fetch/result/";
   const bundlePathPrefix = "/news/fetch/bundle/";
+  const attestationPathPrefix = "/news/fetch/attestation/";
   const requestPaths = new Set([path, "/news/fetch"]);
 
   const server = http.createServer(async (req, res) => {
@@ -628,6 +672,29 @@ export async function startAgentDiscoveryNewsFetchServer(
           return;
         }
         json(res, 200, bundle);
+        return;
+      }
+      if (req.method === "GET" && url.pathname.startsWith(attestationPathPrefix)) {
+        const jobId = url.pathname.slice(attestationPathPrefix.length).trim();
+        if (!jobId) {
+          json(res, 400, { error: "missing job id" });
+          return;
+        }
+        const job = loadStoredNewsFetchJob(db, jobId);
+        if (!job) {
+          json(res, 404, { error: "job not found" });
+          return;
+        }
+        const attestation = job.response.metadata?.zktls_attestation;
+        if (typeof attestation !== "string" || attestation.length === 0) {
+          json(res, 404, { error: "attestation not found" });
+          return;
+        }
+        json(res, 200, {
+          attestation,
+          attestation_sha256: job.response.zktls_attestation_sha256 ?? null,
+          verification_mode: job.response.verification_mode ?? "fallback_integrity",
+        });
         return;
       }
       if (requestPaths.has(url.pathname) && req.method === "HEAD") {
@@ -745,9 +812,18 @@ export async function startAgentDiscoveryNewsFetchServer(
         headline: result.headline,
         article_sha256: result.articleSha256,
         article_text: result.articleText,
+        verification_mode: result.verificationMode,
+        native_proof_status: result.nativeProofStatus,
         zktls_bundle_format: result.bundleFormat,
         zktls_bundle_sha256: result.bundleSha256,
         zktls_bundle_url: buildNewsFetchBundlePath(jobId),
+        ...(result.zktlsAttestationSha256
+          ? { zktls_attestation_sha256: result.zktlsAttestationSha256 }
+          : {}),
+        ...(result.zktlsAttestation
+          ? { zktls_attestation_url: buildNewsFetchAttestationPath(jobId) }
+          : {}),
+        ...(result.workerProvenance ? { worker_provenance: result.workerProvenance } : {}),
         metadata: {
           publisher_hint: body.publisher_hint || null,
           headline_hint: body.headline_hint || null,
@@ -755,7 +831,10 @@ export async function startAgentDiscoveryNewsFetchServer(
           source_policy_host: result.sourcePolicyHost || null,
           http_status: result.httpStatus,
           content_type: result.contentType,
+          verification_mode: result.verificationMode,
+          native_proof_status: result.nativeProofStatus,
           provider_backend: result.backendSummary,
+          ...(result.zktlsAttestation ? { zktls_attestation: result.zktlsAttestation } : {}),
           bundle: result.bundle,
         },
       };
@@ -783,8 +862,21 @@ export async function startAgentDiscoveryNewsFetchServer(
           hash: result.bundleSha256,
           metadata: {
             sourcePolicyId: result.sourcePolicyId ?? null,
+            verificationMode: result.verificationMode,
           },
         },
+        ...(result.zktlsAttestationSha256
+          ? [
+              {
+                kind: "tlsnotary_attestation",
+                ref: buildNewsFetchAttestationPath(jobId),
+                hash: result.zktlsAttestationSha256,
+                metadata: {
+                  sourcePolicyId: result.sourcePolicyId ?? null,
+                },
+              },
+            ]
+          : []),
         ...result.verifierMaterialReferences,
       ];
       storeZkTlsBundleRecord(db, {
@@ -797,10 +889,17 @@ export async function startAgentDiscoveryNewsFetchServer(
         sourceUrl: sourceUrl.toString(),
         resultUrl: buildNewsFetchResultPath(jobId),
         bundleUrl: buildNewsFetchBundlePath(jobId),
+        attestationUrl: result.zktlsAttestation
+          ? buildNewsFetchAttestationPath(jobId)
+          : null,
         bundleFormat: result.bundleFormat,
+        verificationMode: result.verificationMode,
+        nativeProofStatus: result.nativeProofStatus,
+        zktlsAttestationSha256: result.zktlsAttestationSha256 ?? null,
         originClaims: result.originClaims,
         verifierMaterialReferences,
         integrity: result.integrity,
+        workerProvenance: result.workerProvenance ?? null,
         bundle: result.bundle,
         metadata: response.metadata ?? null,
         createdAt: new Date().toISOString(),

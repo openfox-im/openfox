@@ -47,18 +47,22 @@ describe("doctor report formatting", () => {
       paymasterSignerParityAligned: true,
       newsFetchProviderEnabled: true,
       newsFetchBackendMode: "skills_first",
-      newsFetchSkillStages: ["newsfetch.capture", "zktls.bundle"],
+      newsFetchSkillStages: ["newsfetch.capture", "zktls.prove", "zktls.bundle"],
       newsFetchWorkerConfigured: true,
       newsFetchSourcePolicyCount: 2,
       newsFetchDefaultSourcePolicyId: "times-homepage-headline-v1",
       proofVerifyProviderEnabled: true,
       proofVerifyBackendMode: "skills_first",
-      proofVerifySkillStages: ["proofverify.verify"],
+      proofVerifySkillStages: [
+        "proofverify.verify-attestations",
+        "proofverify.verify-consensus",
+      ],
       proofVerifyWorkerConfigured: true,
       proofVerifySupportedVerifierClasses: [
         "structural_verification",
         "bundle_integrity_verification",
-        "cryptographic_proof_verification",
+        "tlsnotary_attestation_verification",
+        "m_of_n_consensus_verification",
       ],
       discoveryStorageProviderEnabled: true,
       discoveryStoragePutBackendMode: "skills_first",
@@ -169,7 +173,7 @@ describe("doctor report formatting", () => {
           id: "news-fetch-backend-skills",
           severity: "ok" as const,
           summary:
-            "news.fetch is using skills_first with newsfetch.capture -> zktls.bundle.",
+            "news.fetch is using skills_first with newsfetch.capture -> zktls.prove -> zktls.bundle.",
         },
         {
           id: "artifacts-enabled",
@@ -192,10 +196,10 @@ describe("doctor report formatting", () => {
       "Paymaster provider enabled: yes (3 quotes, 2 authorizations, 1 pending, sponsor funded=yes, signer parity=aligned)",
     );
     expect(health).toContain(
-      "news.fetch backend: skills_first (newsfetch.capture -> zktls.bundle)",
+      "news.fetch backend: skills_first (newsfetch.capture -> zktls.prove -> zktls.bundle)",
     );
     expect(health).toContain(
-      "proof.verify backend: skills_first (proofverify.verify)",
+      "proof.verify backend: skills_first (proofverify.verify-attestations -> proofverify.verify-consensus)",
     );
     expect(health).toContain(
       "discovery storage backend: put=skills_first (storage-object.put), get=skills_first (storage-object.get)",
@@ -218,7 +222,7 @@ describe("doctor report formatting", () => {
     expect(doctor).toContain("Run `openfox service install`.");
     expect(doctor).toContain("Artifact pipeline is enabled (2 recent artifacts, 1 anchored).");
     expect(doctor).toContain(
-      "news.fetch is using skills_first with newsfetch.capture -> zktls.bundle.",
+      "news.fetch is using skills_first with newsfetch.capture -> zktls.prove -> zktls.bundle.",
     );
     expect(health).toContain("alerts=3 recent/2 unread");
 

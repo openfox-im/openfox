@@ -130,5 +130,33 @@ export function lintBundledPack(rootPath: string): BundledPackLintResult {
       errors.push(`missing contract example: ${relative}`);
     }
   }
+  const inspectJson = (relative: string): void => {
+    const filePath = path.join(resolvedRoot, relative);
+    if (!fs.existsSync(filePath)) return;
+    let text = "";
+    try {
+      text = fs.readFileSync(filePath, "utf8");
+    } catch {
+      errors.push(`unable to read JSON export: ${relative}`);
+      return;
+    }
+    if (text.includes("cryptographic_proof_verification")) {
+      errors.push(
+        `legacy verifier class cryptographic_proof_verification is not allowed: ${relative}`,
+      );
+    }
+    if (text.includes('"verificationMode": "fallback"') || text.includes('"verificationMode":"fallback"')) {
+      errors.push(`legacy verification mode fallback is not allowed: ${relative}`);
+    }
+    if (
+      text.includes('"verificationMode": "cryptographic"') ||
+      text.includes('"verificationMode":"cryptographic"')
+    ) {
+      errors.push(`legacy verification mode cryptographic is not allowed: ${relative}`);
+    }
+  };
+  for (const relative of [...(manifest.policies ?? []), ...(manifest.contracts ?? []), ...(manifest.manifests ?? [])]) {
+    if (relative.endsWith(".json")) inspectJson(relative);
+  }
   return { rootPath: resolvedRoot, manifestPath, errors, warnings };
 }

@@ -4,6 +4,7 @@ import {
   parseProofVerifySkillResult,
   parseStorageGetSkillResult,
   parseStoragePutSkillResult,
+  parseZkTlsProveSkillResult,
   parseZkTlsBundleSkillResult,
 } from "../agent-discovery/skill-backend-contracts.js";
 
@@ -31,6 +32,22 @@ describe("skill backend contracts", () => {
         bundle: {},
       }),
     ).toThrow(/bundleSha256/);
+  });
+
+  it("accepts valid zkTLS prove output", () => {
+    expect(
+      parseZkTlsProveSkillResult({
+        attestation: "{\"proof\":\"ok\"}",
+        attestationSha256: "0x" + "d".repeat(64),
+        serverName: "example.com",
+        sentLen: 128,
+        recvLen: 512,
+      }),
+    ).toMatchObject({
+      serverName: "example.com",
+      sentLen: 128,
+      recvLen: 512,
+    });
   });
 
   it("rejects invalid proof verifier verdicts", () => {

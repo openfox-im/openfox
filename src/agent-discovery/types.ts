@@ -14,6 +14,7 @@ import type {
   AgentDiscoverySelectionPolicy,
   AgentDiscoverySentimentAnalysisServerConfig,
   AgentDiscoveryStorageServerConfig,
+  VerificationSurfaceMode,
 } from "../types.js";
 
 export type {
@@ -31,6 +32,7 @@ export type {
   AgentDiscoverySelectionPolicy,
   AgentDiscoverySentimentAnalysisServerConfig,
   AgentDiscoveryStorageServerConfig,
+  VerificationSurfaceMode,
 };
 
 export interface AgentDiscoveryIdentityRef {
@@ -298,9 +300,18 @@ export interface NewsFetchInvocationResponse {
   headline?: string;
   article_sha256?: string;
   article_text?: string;
+  verification_mode?: VerificationSurfaceMode;
+  native_proof_status?: "native_attested" | "fallback_only";
   zktls_bundle_format?: string;
   zktls_bundle_sha256?: string;
   zktls_bundle_url?: string;
+  zktls_attestation_sha256?: string;
+  zktls_attestation_url?: string;
+  worker_provenance?: {
+    worker: string;
+    backend: string;
+    native: boolean;
+  };
   integration_message?: string;
   metadata?: Record<string, unknown>;
 }
@@ -336,7 +347,16 @@ export interface ProofVerifyInvocationResponse {
   subject_sha256?: string;
   proof_bundle_sha256?: string;
   verifier_profile?: string;
+  verification_mode?: VerificationSurfaceMode;
+  verifier_class?: ProofVerifierClass;
   verifier_receipt_sha256?: string;
+  attestation_verification?: Record<string, unknown>;
+  consensus_verification?: Record<string, unknown>;
+  worker_provenance?: {
+    worker: string;
+    backend: string;
+    native: boolean;
+  };
   integration_message?: string;
   summary?: string;
   metadata?: Record<string, unknown>;

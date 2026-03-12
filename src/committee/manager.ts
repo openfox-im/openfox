@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import type { OpenFoxDatabase } from "../types.js";
+import type { OpenFoxDatabase, VerificationSurfaceMode } from "../types.js";
 
 export type CommitteeKind = "evidence" | "oracle";
 export type CommitteeDecision = "accept" | "reject" | "inconclusive";
@@ -24,6 +24,7 @@ export interface CommitteeVoteRecord {
   runId: string;
   memberId: string;
   decision: CommitteeDecision;
+  verificationMode?: VerificationSurfaceMode | null;
   resultHash?: `0x${string}` | null;
   reasonCode?: string | null;
   signature?: `0x${string}` | null;
@@ -43,6 +44,7 @@ export interface CommitteePayoutAllocation {
 export interface CommitteeTallySnapshot {
   tallyId: string;
   runId: string;
+  verificationMode: VerificationSurfaceMode;
   acceptedCount: number;
   rejectedCount: number;
   inconclusiveCount: number;
@@ -78,6 +80,7 @@ export interface CommitteeSummarySnapshot {
   quorumFailed: number;
   paid: number;
   disagreements: number;
+  verificationModes: Record<string, number>;
   totalPayoutWei: string;
   latestRunId: string | null;
   latestUpdatedAt: string | null;
@@ -198,9 +201,19 @@ function buildTally(run: CommitteeRunRecord, votes: CommitteeVoteRecord[]): Comm
   const quorumReached = winningAcceptCount >= run.thresholdM;
   const disagreement =
     distinctAcceptedHashes > 1 || rejectedVotes.length > 0 || inconclusiveVotes.length > 0;
+  const hasNativeAttestation = votes.some(
+    (vote) =>
+      vote.verificationMode === "native_attestation" ||
+      vote.verificationMode === "committee_verified",
+  );
   return {
     tallyId: `committee-tally:${run.runId}:${votes.length}:${run.rerunCount}`,
     runId: run.runId,
+    verificationMode: quorumReached
+      ? "committee_verified"
+      : hasNativeAttestation
+        ? "native_attestation"
+        : "fallback_integrity",
     acceptedCount: acceptedVotes.length,
     rejectedCount: rejectedVotes.length,
     inconclusiveCount: inconclusiveVotes.length,
@@ -345,6 +358,14 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
         runId: input.runId,
         memberId: input.memberId,
         decision: input.decision,
+        verificationMode:
+          input.metadata &&
+          typeof input.metadata.verificationMode === "string" &&
+          (input.metadata.verificationMode === "fallback_integrity" ||
+            input.metadata.verificationMode === "native_attestation" ||
+            input.metadata.verificationMode === "committee_verified")
+            ? (input.metadata.verificationMode as VerificationSurfaceMode)
+            : null,
         resultHash: input.resultHash ?? null,
         reasonCode: input.reasonCode ?? null,
         signature: input.signature ?? null,
@@ -439,6 +460,11 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
       const quorumFailed = items.filter((item) => item.status === "quorum_failed").length;
       const paid = items.filter((item) => item.status === "paid").length;
       const disagreements = items.filter((item) => item.tally?.disagreement === true).length;
+      const verificationModes = items.reduce<Record<string, number>>((acc, item) => {
+        const mode = item.tally?.verificationMode;
+        if (mode) acc[mode] = (acc[mode] || 0) + 1;
+        return acc;
+      }, {});
       const totalPayoutWei = items
         .reduce((acc, item) => {
           const allocations = item.tally?.payoutAllocations ?? [];
@@ -452,6 +478,7 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
         quorumFailed,
         paid,
         disagreements,
+        verificationModes,
         totalPayoutWei,
         latestRunId: latest?.runId ?? null,
         latestUpdatedAt: latest?.updatedAt ?? null,
@@ -459,7 +486,9 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
         summary:
           items.length === 0
             ? "No committee runs recorded."
-            : `${items.length} committee run(s), quorum_met=${quorumMet}, quorum_failed=${quorumFailed}, paid=${paid}, disagreements=${disagreements}.`,
+            : `${items.length} committee run(s), quorum_met=${quorumMet}, quorum_failed=${quorumFailed}, paid=${paid}, disagreements=${disagreements}, modes=${Object.entries(verificationModes)
+                .map(([mode, count]) => `${mode}=${count}`)
+                .join(", ") || "none"}.`,
       };
     },
   };
@@ -475,6 +504,13 @@ export function buildCommitteeSummaryReport(
     `Quorum failed:   ${snapshot.quorumFailed}`,
     `Paid:            ${snapshot.paid}`,
     `Disagreements:   ${snapshot.disagreements}`,
+    `Modes:           ${
+      Object.keys(snapshot.verificationModes).length === 0
+        ? "(none)"
+        : Object.entries(snapshot.verificationModes)
+            .map(([mode, count]) => `${mode}=${count}`)
+            .join(", ")
+    }`,
     `Total payout:    ${snapshot.totalPayoutWei} wei`,
     `Latest run:      ${snapshot.latestRunId || "(none)"}`,
     `Latest updated:  ${snapshot.latestUpdatedAt || "(none)"}`,

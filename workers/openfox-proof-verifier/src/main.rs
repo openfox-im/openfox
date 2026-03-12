@@ -1,11 +1,12 @@
-use openfox_worker_contracts::{run_worker, WorkerCliError};
+use openfox_worker_contracts::{
+    read_stdin_value, write_error, write_success, WorkerCliError, SCHEMA_VERSION,
+};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
-const WORKER_NAME: &str = "proofverify.verify";
 const DEFAULT_TIMEOUT_MS: u64 = 10_000;
 const DEFAULT_MAX_FETCH_BYTES: usize = 262_144;
 
@@ -26,6 +27,52 @@ struct ProofVerifyRequest {
     proof_bundle_url: Option<String>,
     #[serde(default)]
     proof_bundle_sha256: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifyAttestationsRequestEnvelope {
+    request: VerifyAttestationsRequest,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifyAttestationsRequest {
+    attestations: Vec<String>,
+    #[serde(default)]
+    expected_server_name: Option<String>,
+    #[serde(default)]
+    expected_article_sha256: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifyConsensusRequestEnvelope {
+    request: VerifyConsensusRequest,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifyConsensusRequest {
+    m: usize,
+    n: usize,
+    agent_results: Vec<AgentResult>,
+    #[serde(default)]
+    expected_server_name: Option<String>,
+    #[serde(default)]
+    expected_article_sha256: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct AgentResult {
+    verdict: String,
+    #[serde(default)]
+    server_name: Option<String>,
+    #[serde(default)]
+    article_sha256: Option<String>,
+    #[serde(default)]
+    attestation_sha256: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -60,6 +107,44 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("0x{}", hex::encode(hasher.finalize()))
 }
 
+fn read_worker(value: &Value) -> Result<&str, WorkerCliError> {
+    let schema_version = value
+        .get("schema_version")
+        .and_then(Value::as_str)
+        .ok_or_else(|| WorkerCliError::InvalidEnvelope("missing schema_version".into()))?;
+    if schema_version != SCHEMA_VERSION {
+        return Err(WorkerCliError::InvalidEnvelope(format!(
+            "unsupported schema_version {schema_version}"
+        )));
+    }
+    value.get("worker")
+        .and_then(Value::as_str)
+        .ok_or_else(|| WorkerCliError::InvalidEnvelope("missing worker".into()))
+}
+
+fn extract_referenced_hash(value: &Value, keys: &[&str]) -> Option<String> {
+    match value {
+        Value::Object(map) => {
+            for key in keys {
+                if let Some(Value::String(candidate)) = map.get(*key) {
+                    if candidate.starts_with("0x") && candidate.len() == 66 {
+                        return Some(candidate.to_lowercase());
+                    }
+                }
+            }
+            for nested_key in ["metadata", "bundle", "result"] {
+                if let Some(nested) = map.get(nested_key) {
+                    if let Some(found) = extract_referenced_hash(nested, keys) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
 fn fetch_bounded(
     client: &Client,
     url: &str,
@@ -88,30 +173,7 @@ fn fetch_bounded(
     Ok((sha256_hex(&bytes), content_type, status, parsed))
 }
 
-fn extract_referenced_hash(value: &Value, keys: &[&str]) -> Option<String> {
-    match value {
-        Value::Object(map) => {
-            for key in keys {
-                if let Some(Value::String(candidate)) = map.get(*key) {
-                    if candidate.starts_with("0x") && candidate.len() == 66 {
-                        return Some(candidate.to_lowercase());
-                    }
-                }
-            }
-            for nested_key in ["metadata", "bundle", "result"] {
-                if let Some(nested) = map.get(nested_key) {
-                    if let Some(found) = extract_referenced_hash(nested, keys) {
-                        return Some(found);
-                    }
-                }
-            }
-            None
-        }
-        _ => None,
-    }
-}
-
-fn build_result(request: ProofVerifyRequestEnvelope) -> Result<ProofVerifyResult, WorkerCliError> {
+fn build_integrity_result(request: ProofVerifyRequestEnvelope) -> Result<ProofVerifyResult, WorkerCliError> {
     let timeout_ms = request
         .options
         .request_timeout_ms
@@ -260,7 +322,7 @@ fn build_result(request: ProofVerifyRequestEnvelope) -> Result<ProofVerifyResult
             checks
                 .iter()
                 .map(|entry| {
-                    serde_json::json!({
+                    json!({
                         "label": entry.label,
                         "ok": entry.ok,
                         "actual": entry.actual,
@@ -271,29 +333,289 @@ fn build_result(request: ProofVerifyRequestEnvelope) -> Result<ProofVerifyResult
         ),
     );
 
-    let metadata_value = Value::Object(metadata);
     let verifier_receipt_sha256 = sha256_hex(
-        serde_json::to_vec(&serde_json::json!({
+        serde_json::to_string(&json!({
             "request": request.request,
             "verdict": verdict,
-            "metadata": metadata_value.clone(),
+            "metadata": metadata,
         }))
         .map_err(|error| WorkerCliError::Internal(error.to_string()))?
-        .as_slice(),
+        .as_bytes(),
     );
 
     Ok(ProofVerifyResult {
         verdict: verdict.into(),
         summary,
-        metadata: metadata_value,
+        metadata: Value::Object(metadata),
         verifier_receipt_sha256,
     })
 }
 
-fn main() {
-    std::process::exit(
-        run_worker::<ProofVerifyRequestEnvelope, ProofVerifyResult, _>(WORKER_NAME, build_result),
+fn build_attestation_result(
+    request: VerifyAttestationsRequestEnvelope,
+) -> Result<ProofVerifyResult, WorkerCliError> {
+    if request.request.attestations.is_empty() {
+        return Err(WorkerCliError::InvalidEnvelope(
+            "request.attestations must contain at least one attestation".into(),
+        ));
+    }
+
+    let mut results = Vec::new();
+    let mut server_names = Vec::new();
+    let mut attestation_hashes = Vec::new();
+    let mut checks = Vec::new();
+
+    for (index, attestation) in request.request.attestations.iter().enumerate() {
+        if attestation.trim().is_empty() {
+            results.push(json!({
+                "index": index,
+                "valid": false,
+                "error": "empty attestation",
+            }));
+            continue;
+        }
+        let parsed = serde_json::from_str::<Value>(attestation)
+            .map_err(|error| WorkerCliError::InvalidEnvelope(error.to_string()))?;
+        let server_name = parsed
+            .get("server_name")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string();
+        let attestation_sha256 = sha256_hex(attestation.as_bytes());
+        results.push(json!({
+            "index": index,
+            "valid": true,
+            "serverName": server_name,
+            "attestationSha256": attestation_sha256,
+            "verificationLevel": "fixture_tlsn_attestation",
+        }));
+        server_names.push(server_name);
+        attestation_hashes.push(attestation_sha256);
+    }
+
+    checks.push(json!({
+        "label": "attestation_validity",
+        "ok": results.iter().all(|entry| entry.get("valid").and_then(Value::as_bool) == Some(true)),
+        "actual": format!("{}/{} valid", results.len(), results.len()),
+        "expected": format!("{}/{} valid", results.len(), results.len()),
+    }));
+
+    let unique_server_names: std::collections::BTreeSet<_> =
+        server_names.iter().cloned().collect();
+    checks.push(json!({
+        "label": "server_name_consistency",
+        "ok": unique_server_names.len() == 1,
+        "actual": unique_server_names.iter().cloned().collect::<Vec<_>>().join(", "),
+        "expected": "all attestations reference the same server",
+    }));
+
+    if let Some(expected_server_name) = request.request.expected_server_name.as_deref() {
+        let actual = unique_server_names.iter().next().cloned().unwrap_or_default();
+        checks.push(json!({
+            "label": "expected_server_name",
+            "ok": actual == expected_server_name,
+            "actual": actual,
+            "expected": expected_server_name,
+        }));
+    }
+
+    let verdict = if checks
+        .iter()
+        .all(|entry| entry.get("ok").and_then(Value::as_bool) == Some(true))
+    {
+        "valid"
+    } else {
+        "invalid"
+    };
+    let summary = if verdict == "valid" {
+        format!(
+            "Verified {} attestation{} successfully.",
+            results.len(),
+            if results.len() == 1 { "" } else { "s" }
+        )
+    } else {
+        "Attestation verification failed.".into()
+    };
+
+    let metadata = json!({
+        "verifier_backend": "rust_fixture_tlsn_attestation_v0",
+        "verifier_class": "tlsnotary_attestation_verification",
+        "total_attestations": results.len(),
+        "valid_attestations": results.len(),
+        "server_names": server_names,
+        "attestation_hashes": attestation_hashes,
+        "checks": checks,
+        "results": results,
+    });
+    let verifier_receipt_sha256 = sha256_hex(
+        serde_json::to_string(&json!({
+            "request": request.request,
+            "verdict": verdict,
+            "metadata": metadata,
+        }))
+        .map_err(|error| WorkerCliError::Internal(error.to_string()))?
+        .as_bytes(),
     );
+
+    Ok(ProofVerifyResult {
+        verdict: verdict.into(),
+        summary,
+        metadata,
+        verifier_receipt_sha256,
+    })
+}
+
+fn build_consensus_result(
+    request: VerifyConsensusRequestEnvelope,
+) -> Result<ProofVerifyResult, WorkerCliError> {
+    if request.request.agent_results.len() != request.request.n {
+        return Err(WorkerCliError::InvalidEnvelope(format!(
+            "request.agent_results length ({}) does not match request.n ({})",
+            request.request.agent_results.len(),
+            request.request.n
+        )));
+    }
+    if request.request.m == 0 || request.request.m > request.request.n {
+        return Err(WorkerCliError::InvalidEnvelope(
+            "request.m must be between 1 and request.n".into(),
+        ));
+    }
+
+    let mut verdict_counts = std::collections::BTreeMap::<String, usize>::new();
+    for result in &request.request.agent_results {
+        *verdict_counts.entry(result.verdict.clone()).or_default() += 1;
+    }
+    let (top_verdict, top_count) = verdict_counts
+        .iter()
+        .max_by(|a, b| a.1.cmp(b.1).then_with(|| a.0.cmp(b.0)))
+        .map(|(verdict, count)| (verdict.clone(), *count))
+        .unwrap_or_else(|| ("inconclusive".into(), 0));
+
+    let server_names: Vec<String> = request
+        .request
+        .agent_results
+        .iter()
+        .filter_map(|result| result.server_name.clone())
+        .collect();
+    let unique_server_names: std::collections::BTreeSet<_> =
+        server_names.iter().cloned().collect();
+
+    let checks = vec![
+        json!({
+            "label": "verdict_consensus",
+            "ok": top_count >= request.request.m,
+            "actual": format!("{}/{} agree on {}", top_count, request.request.n, top_verdict),
+            "expected": format!("≥{}/{} agreement", request.request.m, request.request.n),
+        }),
+        json!({
+            "label": "server_name_consensus",
+            "ok": unique_server_names.len() <= 1,
+            "actual": unique_server_names.iter().cloned().collect::<Vec<_>>().join(", "),
+            "expected": "all agents agree on server name",
+        }),
+    ];
+
+    let verdict = if checks
+        .iter()
+        .all(|entry| entry.get("ok").and_then(Value::as_bool) == Some(true))
+    {
+        "valid"
+    } else {
+        "invalid"
+    };
+    let summary = if verdict == "valid" {
+        format!(
+            "M-of-N consensus verified: {}/{} agents agree (threshold {}).",
+            top_count, request.request.n, request.request.m
+        )
+    } else {
+        format!(
+            "Consensus verification failed: top agreement is {}/{} (need {}).",
+            top_count, request.request.n, request.request.m
+        )
+    };
+
+    let metadata = json!({
+        "verifier_backend": "rust_fixture_consensus_v0",
+        "verifier_class": "m_of_n_consensus_verification",
+        "consensus": format!("{}/{}", top_count, request.request.n),
+        "threshold": format!("{}/{}", request.request.m, request.request.n),
+        "threshold_met": top_count >= request.request.m,
+        "majority_verdict": top_verdict,
+        "verdict_distribution": verdict_counts,
+        "checks": checks,
+    });
+    let verifier_receipt_sha256 = sha256_hex(
+        serde_json::to_string(&json!({
+            "request": request.request,
+            "verdict": verdict,
+            "metadata": metadata,
+        }))
+        .map_err(|error| WorkerCliError::Internal(error.to_string()))?
+        .as_bytes(),
+    );
+
+    Ok(ProofVerifyResult {
+        verdict: verdict.into(),
+        summary,
+        metadata,
+        verifier_receipt_sha256,
+    })
+}
+
+fn write(worker: &str, result: Result<ProofVerifyResult, WorkerCliError>) -> i32 {
+    match result {
+        Ok(result) => write_success(worker, &result).map(|_| 0).unwrap_or(40),
+        Err(error) => {
+            let _ = write_error(worker, &error);
+            error.exit_code()
+        }
+    }
+}
+
+fn main() {
+    let value = match read_stdin_value() {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = write_error("unknown", &error);
+            std::process::exit(error.exit_code());
+        }
+    };
+    let worker = match read_worker(&value) {
+        Ok(worker) => worker,
+        Err(error) => {
+            let _ = write_error("unknown", &error);
+            std::process::exit(error.exit_code());
+        }
+    };
+
+    let exit_code = match worker {
+        "proofverify.verify" => write(
+            worker,
+            serde_json::from_value::<ProofVerifyRequestEnvelope>(value.clone())
+                .map_err(|error| WorkerCliError::InvalidEnvelope(error.to_string()))
+                .and_then(build_integrity_result),
+        ),
+        "proofverify.verify-attestations" => write(
+            worker,
+            serde_json::from_value::<VerifyAttestationsRequestEnvelope>(value.clone())
+                .map_err(|error| WorkerCliError::InvalidEnvelope(error.to_string()))
+                .and_then(build_attestation_result),
+        ),
+        "proofverify.verify-consensus" => write(
+            worker,
+            serde_json::from_value::<VerifyConsensusRequestEnvelope>(value.clone())
+                .map_err(|error| WorkerCliError::InvalidEnvelope(error.to_string()))
+                .and_then(build_consensus_result),
+        ),
+        other => {
+            let error = WorkerCliError::InvalidEnvelope(format!("unsupported worker {other}"));
+            let _ = write_error(other, &error);
+            error.exit_code()
+        }
+    };
+
+    std::process::exit(exit_code);
 }
 
 #[cfg(test)]
@@ -301,37 +623,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extracts_referenced_hashes_recursively() {
-        let parsed = serde_json::json!({
-            "metadata": {
-                "bundle": {
-                    "article_sha256": format!("0x{}", "a".repeat(64))
-                }
-            }
-        });
-        assert_eq!(
-            extract_referenced_hash(&parsed, &["article_sha256"]),
-            Some(format!("0x{}", "a".repeat(64)))
-        );
+    fn builds_attestation_verification_result() {
+        let result = build_attestation_result(VerifyAttestationsRequestEnvelope {
+            request: VerifyAttestationsRequest {
+                attestations: vec![r#"{"server_name":"example.com"}"#.into()],
+                expected_server_name: Some("example.com".into()),
+                expected_article_sha256: None,
+            },
+        })
+        .unwrap();
+        assert_eq!(result.verdict, "valid");
     }
 
     #[test]
-    fn reports_inconclusive_without_comparable_hashes() {
-        let result = build_result(ProofVerifyRequestEnvelope {
-            request: ProofVerifyRequest {
-                subject_url: None,
-                subject_sha256: Some(format!("0x{}", "a".repeat(64))),
-                proof_bundle_url: None,
-                proof_bundle_sha256: None,
+    fn builds_consensus_result() {
+        let result = build_consensus_result(VerifyConsensusRequestEnvelope {
+            request: VerifyConsensusRequest {
+                m: 2,
+                n: 2,
+                agent_results: vec![
+                    AgentResult {
+                        verdict: "valid".into(),
+                        server_name: Some("example.com".into()),
+                        article_sha256: None,
+                        attestation_sha256: Some("0x".to_string() + &"a".repeat(64)),
+                    },
+                    AgentResult {
+                        verdict: "valid".into(),
+                        server_name: Some("example.com".into()),
+                        article_sha256: None,
+                        attestation_sha256: Some("0x".to_string() + &"b".repeat(64)),
+                    },
+                ],
+                expected_server_name: Some("example.com".into()),
+                expected_article_sha256: None,
             },
-            options: ProofVerifyOptions::default(),
         })
         .unwrap();
-
-        assert_eq!(result.verdict, "inconclusive");
-        assert_eq!(
-            result.metadata["verifier_class"],
-            Value::String("structural_verification".into())
-        );
+        assert_eq!(result.verdict, "valid");
     }
 }

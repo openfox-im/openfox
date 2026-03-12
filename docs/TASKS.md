@@ -402,6 +402,29 @@ building OpenFox into a TOS-native agent platform.
   - Goal: Package reusable evidence/oracle flows with templates, skills,
     operator commands, owner-facing summaries, and end-to-end packaged
     validation.
+- [x] Task 90: Promote `zktls.prove` into the default verified `news.fetch` path
+  - Status: Complete
+  - Goal: Move the default verified-news capture path from
+    `newsfetch.capture -> zktls.bundle` to
+    `newsfetch.capture -> zktls.prove -> zktls.bundle`, while keeping the
+    current bundle-only fallback available as an explicit degraded mode.
+- [x] Task 91: Promote native attestation and consensus verification into the default `proof.verify` path
+  - Status: Complete
+  - Goal: Move the default verified proof path from `proofverify.verify` to
+    `proofverify.verify-attestations -> proofverify.verify-consensus`, while
+    preserving the current bounded hash/reference verifier as an explicit
+    fallback mode.
+- [x] Task 92: Bind native proof outputs into committees, proof markets, and `news.get`
+  - Status: Complete
+  - Goal: Make committee, proof-market, and public feed flows consume native
+    attestation-backed verification outputs by default instead of treating
+    them as optional side paths.
+- [x] Task 93: Make fallback, native attestation, and committee-backed verified modes explicit
+  - Status: Complete
+  - Goal: Give operators and downstream products a clear, machine-readable
+    distinction between fallback integrity mode, native attestation mode, and
+    full committee-backed verified mode across CLI, APIs, reports, and public
+    feed surfaces.
 
 ## Task 53 Breakdown
 
@@ -1236,3 +1259,89 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add reusable `tosdk` helpers and example packs for proof retrieval and verification consumption.
 - [x] Add operator packs for proof-market and verification-market public deployments.
 - [x] Add end-to-end packaged deployment validation for proof capture, verification, storage, and retrieval on a public multi-node topology.
+
+## Task 90 Breakdown
+
+- Product mapping:
+  - This task productizes the native `zktls` backend already present in
+    `OpenSkills`.
+  - It upgrades `news.fetch` from a bundle-first integrity surface into a
+    default native attestation capture surface for verified-news and evidence
+    products.
+- [x] Change the default verified `news.fetch` stage chain from
+  `newsfetch.capture -> zktls.bundle` to
+  `newsfetch.capture -> zktls.prove -> zktls.bundle`.
+- [x] Keep the current bundle-only path as an explicit fallback/degraded mode
+  instead of the default verified path.
+- [x] Persist attestation references, worker provenance, and native proof
+  status as first-class fields in durable `news.fetch` records.
+- [x] Add operator-visible and requester-visible output that clearly states
+  when a result was produced through real native attestation rather than
+  bounded bundle fallback.
+- [x] Add end-to-end tests that exercise the native `zktls.prove` path as the
+  default verified route and verify fallback behavior only when explicitly
+  selected or when native capability is unavailable.
+
+## Task 91 Breakdown
+
+- Product mapping:
+  - This task productizes the native `proofverify` backends already present in
+    `OpenSkills`.
+  - It upgrades `proof.verify` from bounded hash/reference verification into a
+    default native attestation and consensus verification surface.
+- [x] Change the default verified `proof.verify` stage chain from
+  `proofverify.verify` to
+  `proofverify.verify-attestations -> proofverify.verify-consensus`.
+- [x] Keep the current `proofverify.verify` path as an explicit fallback mode
+  instead of the default verified path.
+- [x] Persist native attestation verification outputs and consensus results as
+  first-class proof-market records, not just generic verifier metadata.
+- [x] Make requester and operator summaries default to native verifier
+  terminology when native backends are used, and fallback terminology only
+  when the degraded path is selected.
+- [x] Add end-to-end tests that prove the native attestation and consensus
+  route is the default verified path.
+
+## Task 92 Breakdown
+
+- Product mapping:
+  - This task completes the transition from "native backend exists" to
+    "native backend drives the main product loop".
+  - It makes committee-backed verified-news and proof-market products consume
+    native verification outputs by default.
+- [x] Update committee workflows so native attestation verification receipts
+  and consensus outputs are the default inputs to tally and aggregation.
+- [x] Update proof-market records and summaries so they distinguish
+  attestation-backed verification from fallback verification at the record
+  model level.
+- [x] Update `news.get`, evidence summaries, proof summaries, and packaged
+  verified-news/evidence templates so they default to native-backed proof
+  outputs.
+- [x] Ensure payout, quorum, and publication state can explicitly state whether
+  a result is:
+  - native-attested only
+  - committee-threshold verified
+  - fallback-only
+- [x] Add packaged end-to-end tests for a native-backed verified-news flow.
+
+## Task 93 Breakdown
+
+- Product mapping:
+  - This task is about product clarity and operator safety.
+  - It prevents "native backend exists somewhere" from being confused with
+    "the deployed surface is actually running in verified mode".
+- [x] Define one canonical mode taxonomy used everywhere:
+  - `fallback_integrity`
+  - `native_attestation`
+  - `committee_verified`
+- [x] Surface that taxonomy consistently in:
+  - `status`
+  - `doctor`
+  - operator APIs
+  - owner reports
+  - public proof/news/evidence summaries
+- [x] Add pack/template validation that rejects verified-news or proof-market
+  deployments which claim a stronger mode than their configured backend chain
+  actually supports.
+- [x] Add tests that guarantee no public-facing summary silently collapses
+  native-attested and fallback-only results into the same status label.

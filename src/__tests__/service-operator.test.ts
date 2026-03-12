@@ -267,9 +267,14 @@ describe("service operator", () => {
     expect(snapshot.providerSurfaces.newsFetch?.backendMode).toBe("skills_first");
     expect(snapshot.providerSurfaces.newsFetch?.skillStages).toEqual([
       "newsfetch.capture",
+      "zktls.prove",
       "zktls.bundle",
     ]);
     expect(snapshot.providerSurfaces.proofVerify?.backendMode).toBe("skills_first");
+    expect(snapshot.providerSurfaces.proofVerify?.skillStages).toEqual([
+      "proofverify.verify-attestations",
+      "proofverify.verify-consensus",
+    ]);
     expect(snapshot.providerSurfaces.discoveryStorage?.putBackendMode).toBe("skills_first");
     expect(snapshot.providerSurfaces.discoveryStorage?.getSkillStages).toEqual([
       "storage-object.get",

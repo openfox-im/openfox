@@ -7,6 +7,7 @@ import {
   listBundledTemplates,
   readBundledTemplateReadme,
 } from "../commands/templates.js";
+import { lintBundledPack } from "../commands/packs.js";
 
 describe("bundled templates", () => {
   let tempDir = "";
@@ -94,5 +95,35 @@ describe("bundled templates", () => {
     expect(
       fs.existsSync(path.join(verificationOutput, "operator.openfox.json")),
     ).toBe(true);
+  });
+
+  it("rejects proof packs with legacy verifier classes", () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-pack-"));
+    const packRoot = path.join(tempDir, "legacy-pack");
+    fs.mkdirSync(path.join(packRoot, "policies"), { recursive: true });
+    fs.mkdirSync(path.join(packRoot, "contracts"), { recursive: true });
+    fs.writeFileSync(
+      path.join(packRoot, "pack.json"),
+      JSON.stringify({
+        name: "legacy-pack",
+        version: "1.0.0",
+        policies: ["policies/proof-verifier.json"],
+        contracts: ["contracts/proof-verification-callback.json"],
+      }),
+    );
+    fs.writeFileSync(path.join(packRoot, "README.md"), "# Legacy Pack\n");
+    fs.writeFileSync(
+      path.join(packRoot, "policies", "proof-verifier.json"),
+      JSON.stringify({ default_verifier_class: "cryptographic_proof_verification" }),
+    );
+    fs.writeFileSync(
+      path.join(packRoot, "contracts", "proof-verification-callback.json"),
+      JSON.stringify({ verifier_class: "cryptographic_proof_verification" }),
+    );
+
+    const lint = lintBundledPack(packRoot);
+    expect(lint.errors.some((entry) => entry.includes("legacy verifier class"))).toBe(
+      true,
+    );
   });
 });

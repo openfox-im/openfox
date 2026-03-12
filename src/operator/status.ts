@@ -52,9 +52,12 @@ export interface RuntimeStatusSnapshot {
   proofMarket:
     | {
         zktlsBundles: number;
+        nativeAttestedBundles: number;
+        fallbackBundles: number;
         proofVerifications: number;
-        cryptographicProofVerifications: number;
-        fallbackVerifications: number;
+        nativeAttestationVerifications: number;
+        committeeVerifiedResults: number;
+        fallbackIntegrityVerifications: number;
         evidenceCommitteeRuns: number;
         evidenceCommitteeQuorumMet: number;
         oracleCommitteeRuns: number;
@@ -615,10 +618,14 @@ export function buildRuntimeStatusSnapshot(
       oracleCommitteeSummary.totalRuns > 0
         ? {
             zktlsBundles: zktlsSummary.totalBundles,
+            nativeAttestedBundles: zktlsSummary.nativeAttestedBundles,
+            fallbackBundles: zktlsSummary.fallbackBundles,
             proofVerifications: proofSummary.totalResults,
-            cryptographicProofVerifications:
-              proofSummary.realProofVerifications,
-            fallbackVerifications: proofSummary.fallbackVerifications,
+            nativeAttestationVerifications:
+              proofSummary.nativeAttestationVerifications,
+            committeeVerifiedResults: proofSummary.committeeVerifiedResults,
+            fallbackIntegrityVerifications:
+              proofSummary.fallbackIntegrityVerifications,
             evidenceCommitteeRuns: evidenceCommitteeSummary.totalRuns,
             evidenceCommitteeQuorumMet: evidenceCommitteeSummary.quorumMet,
             oracleCommitteeRuns: oracleCommitteeSummary.totalRuns,
@@ -724,9 +731,12 @@ export function buildRuntimeStatusReport(snapshot: RuntimeStatusSnapshot): strin
   const proofMarket = snapshot.proofMarket as
     | {
         zktlsBundles: number;
+        nativeAttestedBundles: number;
+        fallbackBundles: number;
         proofVerifications: number;
-        cryptographicProofVerifications: number;
-        fallbackVerifications: number;
+        nativeAttestationVerifications: number;
+        committeeVerifiedResults: number;
+        fallbackIntegrityVerifications: number;
         evidenceCommitteeRuns: number;
         evidenceCommitteeQuorumMet: number;
         oracleCommitteeRuns: number;
@@ -757,7 +767,7 @@ Providers:  ${providerReputation ? `${providerReputation.totalProviders} tracked
 Settlement: ${settlement?.enabled ? `enabled (${settlement.receiptCount} recent receipt${settlement.receiptCount === 1 ? "" : "s"}, ${settlement.callbacks.pendingCount} pending callback${settlement.callbacks.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Market:     ${market?.enabled ? `enabled (${market.recentBindings.length} recent binding${market.recentBindings.length === 1 ? "" : "s"}, ${market.pendingCount} pending callback${market.pendingCount === 1 ? "" : "s"})` : "disabled"}
 Scout:      ${(snapshot.opportunityScout as { enabled?: boolean } | null)?.enabled ? "enabled" : "disabled"}
-Proofs:     ${proofMarket ? `${proofMarket.zktlsBundles} zkTLS bundle${proofMarket.zktlsBundles === 1 ? "" : "s"}, ${proofMarket.proofVerifications} verification${proofMarket.proofVerifications === 1 ? "" : "s"} (${proofMarket.cryptographicProofVerifications} cryptographic / ${proofMarket.fallbackVerifications} fallback), committees=${proofMarket.evidenceCommitteeRuns + proofMarket.oracleCommitteeRuns}` : "disabled"}
+Proofs:     ${proofMarket ? `${proofMarket.zktlsBundles} zkTLS bundle${proofMarket.zktlsBundles === 1 ? "" : "s"} (${proofMarket.nativeAttestedBundles} native / ${proofMarket.fallbackBundles} fallback), ${proofMarket.proofVerifications} verification${proofMarket.proofVerifications === 1 ? "" : "s"} (${proofMarket.nativeAttestationVerifications} native / ${proofMarket.committeeVerifiedResults} committee / ${proofMarket.fallbackIntegrityVerifications} fallback), committees=${proofMarket.evidenceCommitteeRuns + proofMarket.oracleCommitteeRuns}` : "disabled"}
 Creator:    ${snapshot.creator}
 Sandbox:    ${snapshot.sandboxId}
 State:      ${snapshot.state}

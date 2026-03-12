@@ -22,6 +22,14 @@ export interface ZkTlsBundleSkillResult {
   integrity?: Record<string, unknown>;
 }
 
+export interface ZkTlsProveSkillResult {
+  attestation: string;
+  attestationSha256: `0x${string}`;
+  serverName: string;
+  sentLen: number;
+  recvLen: number;
+}
+
 export interface ProofVerifySkillResult {
   verdict: ProofVerifyInvocationResponse["verdict"];
   summary: string;
@@ -94,13 +102,35 @@ export function parseZkTlsBundleSkillResult(
   };
 }
 
+export function parseZkTlsProveSkillResult(
+  value: unknown,
+): ZkTlsProveSkillResult {
+  const record = asRecord(value, "zktls.prove result");
+  return {
+    attestation: requireString(record.attestation, "attestation"),
+    attestationSha256: requireHex64(
+      record.attestationSha256,
+      "attestationSha256",
+    ),
+    serverName: requireString(record.serverName, "serverName"),
+    sentLen: requireNumber(
+      record.sentLen ?? record.sentBytes,
+      "sentLen",
+    ),
+    recvLen: requireNumber(
+      record.recvLen ?? record.receivedBytes,
+      "recvLen",
+    ),
+  };
+}
+
 export function parseProofVerifySkillResult(
   value: unknown,
 ): ProofVerifySkillResult {
-  const record = asRecord(value, "proofverify.verify result");
+  const record = asRecord(value, "proofverify result");
   const verdict = requireString(record.verdict, "verdict");
   if (verdict !== "valid" && verdict !== "invalid" && verdict !== "inconclusive") {
-    throw new Error(`proofverify.verify result.verdict is invalid: ${verdict}`);
+    throw new Error(`proofverify result.verdict is invalid: ${verdict}`);
   }
   return {
     verdict,

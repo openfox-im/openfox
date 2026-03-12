@@ -1,0 +1,34 @@
+{
+  "backend": "proofverify.verify-consensus",
+  "contractVersion": "v1",
+  "description": "Verify M-of-N consensus over attestation verification outputs.",
+  "input": {
+    "request": {
+      "m": "number (optional)",
+      "n": "number (optional)",
+      "agentResults": "object[] (optional)",
+      "expectedServerName": "string (optional)",
+      "expectedArticleSha256": "0x-prefixed 32-byte hex (optional)"
+    },
+    "attestationVerification": {
+      "verdict": "valid | invalid | inconclusive",
+      "metadata": "object"
+    }
+  },
+  "output": {
+    "verdict": "valid | invalid | inconclusive",
+    "verdictReason": "string",
+    "summary": "string",
+    "metadata": {
+      "verifier_backend": "skill:proofverify.verify-consensus",
+      "verifier_class": "m_of_n_consensus_verification",
+      "consensus": "string",
+      "threshold": "string",
+      "threshold_met": "boolean",
+      "majority_verdict": "string",
+      "verdict_distribution": "object",
+      "checks": "array"
+    },
+    "verifierReceiptSha256": "0x-prefixed 32-byte hex"
+  }
+}

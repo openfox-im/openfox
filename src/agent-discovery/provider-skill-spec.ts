@@ -19,6 +19,11 @@ export const NEWSFETCH_CAPTURE_STAGE = {
   backend: "capture",
 } as const satisfies SkillBackendStageConfig;
 
+export const ZKTLS_PROVE_STAGE = {
+  skill: "zktls",
+  backend: "prove",
+} as const satisfies SkillBackendStageConfig;
+
 export const ZKTLS_BUNDLE_STAGE = {
   skill: "zktls",
   backend: "bundle",
@@ -27,6 +32,16 @@ export const ZKTLS_BUNDLE_STAGE = {
 export const PROOFVERIFY_VERIFY_STAGE = {
   skill: "proofverify",
   backend: "verify",
+} as const satisfies SkillBackendStageConfig;
+
+export const PROOFVERIFY_VERIFY_ATTESTATIONS_STAGE = {
+  skill: "proofverify",
+  backend: "verify-attestations",
+} as const satisfies SkillBackendStageConfig;
+
+export const PROOFVERIFY_VERIFY_CONSENSUS_STAGE = {
+  skill: "proofverify",
+  backend: "verify-consensus",
 } as const satisfies SkillBackendStageConfig;
 
 export const STORAGE_OBJECT_PUT_STAGE = {
@@ -41,11 +56,13 @@ export const STORAGE_OBJECT_GET_STAGE = {
 
 export const DEFAULT_NEWS_FETCH_SKILL_STAGES = [
   NEWSFETCH_CAPTURE_STAGE,
+  ZKTLS_PROVE_STAGE,
   ZKTLS_BUNDLE_STAGE,
 ] as const satisfies readonly SkillBackendStageConfig[];
 
 export const DEFAULT_PROOF_VERIFY_SKILL_STAGES = [
-  PROOFVERIFY_VERIFY_STAGE,
+  PROOFVERIFY_VERIFY_ATTESTATIONS_STAGE,
+  PROOFVERIFY_VERIFY_CONSENSUS_STAGE,
 ] as const satisfies readonly SkillBackendStageConfig[];
 
 export const DEFAULT_STORAGE_PUT_SKILL_STAGES = [

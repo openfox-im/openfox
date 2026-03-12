@@ -144,10 +144,16 @@ export interface AgentDiscoveryNewsFetchServerConfig {
   zktlsWorker?: ProviderCliWorkerConfig | null;
 }
 
+export type VerificationSurfaceMode =
+  | "fallback_integrity"
+  | "native_attestation"
+  | "committee_verified";
+
 export type ProofVerifierClass =
   | "structural_verification"
   | "bundle_integrity_verification"
-  | "cryptographic_proof_verification";
+  | "tlsnotary_attestation_verification"
+  | "m_of_n_consensus_verification";
 
 export interface AgentDiscoveryProofVerifyServerConfig {
   enabled: boolean;
@@ -418,7 +424,8 @@ export const DEFAULT_AGENT_DISCOVERY_PROOF_VERIFY_SERVER_CONFIG: AgentDiscoveryP
     supportedVerifierClasses: [
       "structural_verification",
       "bundle_integrity_verification",
-      "cryptographic_proof_verification",
+      "tlsnotary_attestation_verification",
+      "m_of_n_consensus_verification",
     ],
     verifierWorker: null,
   };
@@ -955,7 +962,9 @@ export interface OwnerReportInput {
           estimatedCostWei: string;
           zktlsBundles?: number;
           proofVerifications?: number;
-          cryptographicVerifications?: number;
+          nativeAttestedVerifications?: number;
+          committeeVerifiedResults?: number;
+          fallbackOnlyVerifications?: number;
           committeeRuns?: number;
           committeeQuorumMet?: number;
           summary: string;

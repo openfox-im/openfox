@@ -620,12 +620,16 @@ describe("operator api", () => {
       requesterIdentity: "tos:requester",
       providerBackend: {
         kind: "skills",
-        stages: ["newsfetch.capture", "zktls.bundle"],
+        stages: ["newsfetch.capture", "zktls.prove", "zktls.bundle"],
       },
       sourceUrl: "https://example.com/article",
       resultUrl: "/news/fetch/result/job-1",
       bundleUrl: "/news/fetch/bundle/job-1",
+      attestationUrl: "/news/fetch/attestation/job-1",
       bundleFormat: "zktls_bundle_v1",
+      verificationMode: "native_attestation",
+      nativeProofStatus: "native_attested",
+      zktlsAttestationSha256: `0x${"1".repeat(64)}`,
       originClaims: {
         sourceUrl: "https://example.com/article",
         canonicalUrl: "https://example.com/article",
@@ -661,7 +665,7 @@ describe("operator api", () => {
       requesterIdentity: "tos:requester",
       providerBackend: { kind: "builtin", stages: ["proofverify.verify"] },
       verifierClass: "bundle_integrity_verification",
-      verificationMode: "fallback",
+      verificationMode: "fallback_integrity",
       verdict: "valid",
       verdictReason: "all_checks_passed",
       summary: "fallback verification succeeded",
@@ -690,9 +694,12 @@ describe("operator api", () => {
       requestKey: "request-2",
       capability: "proof.verify",
       requesterIdentity: "tos:requester",
-      providerBackend: { kind: "skills", stages: ["proofverify.verify"] },
-      verifierClass: "cryptographic_proof_verification",
-      verificationMode: "cryptographic",
+      providerBackend: {
+        kind: "skills",
+        stages: ["proofverify.verify-attestations", "proofverify.verify-consensus"],
+      },
+      verifierClass: "m_of_n_consensus_verification",
+      verificationMode: "committee_verified",
       verdict: "valid",
       verdictReason: "proof_verified",
       summary: "cryptographic verification succeeded",
@@ -878,12 +885,14 @@ describe("operator api", () => {
     expect(proof.status).toBe(200);
     const proofJson = (await proof.json()) as {
       totalResults: number;
-      fallbackVerifications: number;
-      realProofVerifications: number;
+      fallbackIntegrityVerifications: number;
+      nativeAttestationVerifications: number;
+      committeeVerifiedResults: number;
     };
     expect(proofJson.totalResults).toBe(2);
-    expect(proofJson.fallbackVerifications).toBe(1);
-    expect(proofJson.realProofVerifications).toBe(1);
+    expect(proofJson.fallbackIntegrityVerifications).toBe(1);
+    expect(proofJson.nativeAttestationVerifications).toBe(0);
+    expect(proofJson.committeeVerifiedResults).toBe(1);
 
     const proofRecord = await fetch(
       `${server.url}/proof/summary?recordId=${encodeURIComponent("proof:2")}`,

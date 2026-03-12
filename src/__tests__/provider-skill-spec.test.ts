@@ -51,12 +51,20 @@ describe("provider skill spec", () => {
         backend: "newsfetch.capture",
       },
       {
+        path: "../../skills/zktls/references/prove-contract.json",
+        backend: "zktls.prove",
+      },
+      {
         path: "../../skills/zktls/references/bundle-contract.json",
         backend: "zktls.bundle",
       },
       {
-        path: "../../skills/proofverify/references/verify-contract.json",
-        backend: "proofverify.verify",
+        path: "../../skills/proofverify/references/verify-attestations-contract.json",
+        backend: "proofverify.verify-attestations",
+      },
+      {
+        path: "../../skills/proofverify/references/verify-consensus-contract.json",
+        backend: "proofverify.verify-consensus",
       },
       {
         path: "../../skills/storage-object/references/put-contract.json",

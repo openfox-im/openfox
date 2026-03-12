@@ -5,6 +5,7 @@ import type {
   OpenFoxConfig,
   OpenFoxDatabase,
   OpenFoxIdentity,
+  ProofVerifierClass,
 } from "../types.js";
 import { createLogger } from "../observability/logger.js";
 import {
@@ -36,7 +37,10 @@ import { fetchBoundedUrl, validateHttpTargetUrl } from "./http-fetch.js";
 import { executeProviderBackend } from "./provider-backends.js";
 import { formatSkillBackendStage } from "./provider-skill-spec.js";
 import { runSkillBackend } from "../skills/backend-runner.js";
-import { parseProofVerifySkillResult } from "./skill-backend-contracts.js";
+import {
+  parseProofVerifySkillResult,
+  type ProofVerifySkillResult,
+} from "./skill-backend-contracts.js";
 import {
   storeProofVerificationRecord,
   type ProofMaterialReference,
@@ -72,6 +76,15 @@ interface ProofVerifyBackendResult {
   summary: string;
   metadata: Record<string, unknown>;
   verifierReceiptSha256: `0x${string}`;
+  verificationMode: "fallback_integrity" | "native_attestation" | "committee_verified";
+  verifierClass: ProofVerifierClass;
+  attestationVerification?: Record<string, unknown> | null;
+  consensusVerification?: Record<string, unknown> | null;
+  workerProvenance?: {
+    worker: string;
+    backend: string;
+    native: boolean;
+  } | null;
   backendSummary: {
     kind: "skills" | "builtin";
     stages: string[];
@@ -227,7 +240,7 @@ async function verifyRequestBackend(
   const checks: Array<{ label: string; ok: boolean; actual?: string; expected?: string }> = [];
   const metadata: Record<string, unknown> = {
     verifier_backend: "bounded_receipt_verifier_v0",
-    verification_mode: "fallback",
+    verification_mode: "fallback_integrity",
   };
 
   if (request.subject_url) {
@@ -308,7 +321,7 @@ async function verifyRequestBackend(
   if (checks.length > 0) {
     verdict = checks.every((entry) => entry.ok) ? "valid" : "invalid";
   }
-  const verifierClass: string =
+  const verifierClass: ProofVerifierClass =
     request.proof_bundle_url || request.proof_bundle_sha256
       ? "bundle_integrity_verification"
       : "structural_verification";
@@ -331,6 +344,8 @@ async function verifyRequestBackend(
     summary,
     metadata,
     verifierReceiptSha256,
+    verificationMode: "fallback_integrity",
+    verifierClass,
     backendSummary: {
       kind: "builtin",
       stages: ["builtin:proof.verify"],
@@ -343,10 +358,10 @@ async function verifyRequestBackend(
           : "insufficient_comparable_hashes",
     verifierMaterialReference: request.proof_bundle_url
       ? {
-            kind: verifierClass,
-            ref: request.proof_bundle_url,
-            hash:
-              request.proof_bundle_sha256 && /^0x[0-9a-f]{64}$/i.test(request.proof_bundle_sha256)
+          kind: verifierClass,
+          ref: request.proof_bundle_url,
+          hash:
+            request.proof_bundle_sha256 && /^0x[0-9a-f]{64}$/i.test(request.proof_bundle_sha256)
               ? (request.proof_bundle_sha256 as `0x${string}`)
               : null,
           metadata: {
@@ -368,6 +383,56 @@ async function verifyRequestBackend(
   };
 }
 
+function buildConsensusAgentResults(
+  attestationVerification: ProofVerifySkillResult,
+  request: ProofVerifyInvocationRequest,
+): Array<Record<string, unknown>> {
+  const metadata =
+    attestationVerification.metadata &&
+    typeof attestationVerification.metadata === "object" &&
+    !Array.isArray(attestationVerification.metadata)
+      ? (attestationVerification.metadata as Record<string, unknown>)
+      : {};
+  const resultEntries = Array.isArray(metadata.results)
+    ? metadata.results.filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) && typeof entry === "object" && !Array.isArray(entry),
+      )
+    : [];
+  if (resultEntries.length > 0) {
+    return resultEntries.map((entry) => ({
+      verdict: entry.valid === true ? "valid" : "invalid",
+      serverName:
+        typeof entry.serverName === "string"
+          ? entry.serverName
+          : typeof entry.server_name === "string"
+            ? entry.server_name
+            : undefined,
+      articleSha256: request.subject_sha256 || undefined,
+      attestationSha256:
+        typeof entry.attestationSha256 === "string"
+          ? entry.attestationSha256
+          : typeof entry.attestation_sha256 === "string"
+            ? entry.attestation_sha256
+            : undefined,
+    }));
+  }
+  return [
+    {
+      verdict: attestationVerification.verdict,
+      serverName:
+        Array.isArray(metadata.server_names) && metadata.server_names.length > 0
+          ? metadata.server_names[0]
+          : undefined,
+      articleSha256: request.subject_sha256 || undefined,
+      attestationSha256:
+        Array.isArray(metadata.attestation_hashes) && metadata.attestation_hashes.length > 0
+          ? metadata.attestation_hashes[0]
+          : undefined,
+    },
+  ];
+}
+
 async function runSkillProofVerifyBackend(params: {
   request: ProofVerifyInvocationRequest;
   proofVerifyConfig: AgentDiscoveryProofVerifyServerConfig;
@@ -375,14 +440,16 @@ async function runSkillProofVerifyBackend(params: {
   db: OpenFoxDatabase;
 }): Promise<ProofVerifyBackendResult> {
   const skillsDir = params.config.skillsDir || "~/.openfox/skills";
-  const [verifyStage] = params.proofVerifyConfig.skillStages;
-  if (!verifyStage) {
-    throw new Error("proof.verify skillStages must define a verify stage");
+  const [attestationStage, consensusStage] = params.proofVerifyConfig.skillStages;
+  if (!attestationStage || !consensusStage) {
+    throw new Error(
+      "proof.verify skillStages must define attestation and consensus stages",
+    );
   }
-  const result = parseProofVerifySkillResult(await runSkillBackend({
+  const attestationVerification = parseProofVerifySkillResult(await runSkillBackend({
     skillsDir,
-    skillName: verifyStage.skill,
-    backendName: verifyStage.backend,
+    skillName: attestationStage.skill,
+    backendName: attestationStage.backend,
     input: {
       request: params.request,
       options: {
@@ -397,69 +464,173 @@ async function runSkillProofVerifyBackend(params: {
       now: () => new Date(),
     },
   }));
+  const attestationAgentResults = buildConsensusAgentResults(
+    attestationVerification,
+    params.request,
+  );
+  const consensusInputRequest = {
+    ...params.request,
+    agentResults: attestationAgentResults,
+    m: attestationAgentResults.length,
+    n: attestationAgentResults.length,
+    expectedServerName:
+      typeof params.request.subject_url === "string"
+        ? new URL(params.request.subject_url).hostname
+        : undefined,
+    expectedArticleSha256: params.request.subject_sha256,
+  };
+  const consensusVerification = parseProofVerifySkillResult(await runSkillBackend({
+    skillsDir,
+    skillName: consensusStage.skill,
+    backendName: consensusStage.backend,
+    input: {
+      request: consensusInputRequest,
+      attestationVerification,
+    },
+    context: {
+      config: params.config,
+      db: params.db,
+      now: () => new Date(),
+    },
+  }));
+  const attestationMetadata =
+    attestationVerification.metadata &&
+    typeof attestationVerification.metadata === "object"
+      ? attestationVerification.metadata
+      : {};
+  const validAttestations =
+    typeof attestationMetadata.valid_attestations === "number"
+      ? attestationMetadata.valid_attestations
+      : attestationAgentResults.filter((item) => item.verdict === "valid").length;
+  const totalAttestations =
+    typeof attestationMetadata.total_attestations === "number"
+      ? attestationMetadata.total_attestations
+      : attestationAgentResults.length;
+  const verificationMode =
+    attestationVerification.verdict === "valid" &&
+    consensusVerification.verdict === "valid" &&
+    totalAttestations > 1
+      ? "committee_verified"
+      : attestationVerification.verdict === "valid"
+        ? "native_attestation"
+        : "fallback_integrity";
+  const verifierClass =
+    verificationMode === "committee_verified"
+      ? "m_of_n_consensus_verification"
+      : "tlsnotary_attestation_verification";
+  const finalVerdict =
+    verificationMode === "committee_verified"
+      ? consensusVerification.verdict
+      : attestationVerification.verdict;
+  const finalSummary =
+    verificationMode === "committee_verified"
+      ? `${attestationVerification.summary} ${consensusVerification.summary}`.trim()
+      : attestationVerification.summary;
+  const finalReceipt =
+    verificationMode === "committee_verified"
+      ? consensusVerification.verifierReceiptSha256
+      : attestationVerification.verifierReceiptSha256;
   return {
-    ...result,
+    verdict: finalVerdict,
+    summary: finalSummary,
     metadata: {
-      ...result.metadata,
-      verification_mode: "worker_backed",
+      ...attestationVerification.metadata,
+      attestation_verification_receipt_sha256:
+        attestationVerification.verifierReceiptSha256,
+      consensus_verification_receipt_sha256:
+        consensusVerification.verifierReceiptSha256,
+      verification_mode: verificationMode,
+      verifier_class: verifierClass,
+      valid_attestations: validAttestations,
+      total_attestations: totalAttestations,
+      consensus_threshold_met: consensusVerification.verdict === "valid",
+    },
+    verifierReceiptSha256: finalReceipt,
+    verificationMode,
+    verifierClass,
+    attestationVerification: {
+      verdict: attestationVerification.verdict,
+      summary: attestationVerification.summary,
+      metadata: attestationVerification.metadata,
+      verifierReceiptSha256: attestationVerification.verifierReceiptSha256,
+    },
+    consensusVerification: {
+      verdict: consensusVerification.verdict,
+      summary: consensusVerification.summary,
+      metadata: consensusVerification.metadata,
+      verifierReceiptSha256: consensusVerification.verifierReceiptSha256,
+    },
+    workerProvenance: {
+      worker:
+        verificationMode === "committee_verified"
+          ? "proofverify.verify-consensus"
+          : "proofverify.verify-attestations",
+      backend:
+        verificationMode === "committee_verified"
+          ? formatSkillBackendStage(consensusStage)
+          : formatSkillBackendStage(attestationStage),
+      native: true,
     },
     backendSummary: {
       kind: "skills",
       stages: params.proofVerifyConfig.skillStages.map(formatSkillBackendStage),
     },
-    verdictReason: result.verdictReason || "worker_verdict",
+    verdictReason:
+      verificationMode === "committee_verified"
+        ? consensusVerification.verdictReason || "committee_consensus_verdict"
+        : attestationVerification.verdictReason || "native_attestation_verdict",
     verifierMaterialReference:
-      result.verifierMaterialReference &&
-      typeof result.verifierMaterialReference === "object"
+      attestationVerification.verifierMaterialReference &&
+      typeof attestationVerification.verifierMaterialReference === "object"
         ? {
             kind:
-              typeof result.verifierMaterialReference.kind === "string" &&
-              result.verifierMaterialReference.kind.trim()
-                ? result.verifierMaterialReference.kind.trim()
+              typeof attestationVerification.verifierMaterialReference.kind === "string" &&
+              attestationVerification.verifierMaterialReference.kind.trim()
+                ? attestationVerification.verifierMaterialReference.kind.trim()
                 : "worker_material",
             ref:
-              typeof result.verifierMaterialReference.ref === "string" &&
-              result.verifierMaterialReference.ref.trim()
-                ? result.verifierMaterialReference.ref.trim()
+              typeof attestationVerification.verifierMaterialReference.ref === "string" &&
+              attestationVerification.verifierMaterialReference.ref.trim()
+                ? attestationVerification.verifierMaterialReference.ref.trim()
                 : "inline://unknown",
             hash:
-              typeof result.verifierMaterialReference.hash === "string" &&
-              /^0x[0-9a-f]{64}$/i.test(result.verifierMaterialReference.hash)
-                ? (result.verifierMaterialReference.hash as `0x${string}`)
+              typeof attestationVerification.verifierMaterialReference.hash === "string" &&
+              /^0x[0-9a-f]{64}$/i.test(attestationVerification.verifierMaterialReference.hash)
+                ? (attestationVerification.verifierMaterialReference.hash as `0x${string}`)
                 : null,
             metadata:
-              result.verifierMaterialReference.metadata &&
-              typeof result.verifierMaterialReference.metadata === "object" &&
-              !Array.isArray(result.verifierMaterialReference.metadata)
-                ? (result.verifierMaterialReference.metadata as Record<string, unknown>)
+              attestationVerification.verifierMaterialReference.metadata &&
+              typeof attestationVerification.verifierMaterialReference.metadata === "object" &&
+              !Array.isArray(attestationVerification.verifierMaterialReference.metadata)
+                ? (attestationVerification.verifierMaterialReference.metadata as Record<string, unknown>)
                 : null,
           }
         : null,
     boundSubjectHashes: {
       subjectSha256:
-        result.boundSubjectHashes &&
-        typeof result.boundSubjectHashes.subjectSha256 === "string" &&
-        /^0x[0-9a-f]{64}$/i.test(result.boundSubjectHashes.subjectSha256)
-          ? (result.boundSubjectHashes.subjectSha256 as `0x${string}`)
+        attestationVerification.boundSubjectHashes &&
+        typeof attestationVerification.boundSubjectHashes.subjectSha256 === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(attestationVerification.boundSubjectHashes.subjectSha256)
+          ? (attestationVerification.boundSubjectHashes.subjectSha256 as `0x${string}`)
           : params.request.subject_sha256 &&
               /^0x[0-9a-f]{64}$/i.test(params.request.subject_sha256)
             ? (params.request.subject_sha256 as `0x${string}`)
             : null,
       bundleSha256:
-        result.boundSubjectHashes &&
-        typeof result.boundSubjectHashes.bundleSha256 === "string" &&
-        /^0x[0-9a-f]{64}$/i.test(result.boundSubjectHashes.bundleSha256)
-          ? (result.boundSubjectHashes.bundleSha256 as `0x${string}`)
+        attestationVerification.boundSubjectHashes &&
+        typeof attestationVerification.boundSubjectHashes.bundleSha256 === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(attestationVerification.boundSubjectHashes.bundleSha256)
+          ? (attestationVerification.boundSubjectHashes.bundleSha256 as `0x${string}`)
           : params.request.proof_bundle_sha256 &&
               /^0x[0-9a-f]{64}$/i.test(params.request.proof_bundle_sha256)
             ? (params.request.proof_bundle_sha256 as `0x${string}`)
             : null,
       responseHash:
-        result.boundSubjectHashes &&
-        typeof result.boundSubjectHashes.responseHash === "string" &&
-        /^0x[0-9a-f]{64}$/i.test(result.boundSubjectHashes.responseHash)
-          ? (result.boundSubjectHashes.responseHash as `0x${string}`)
-          : result.verifierReceiptSha256,
+        consensusVerification.boundSubjectHashes &&
+        typeof consensusVerification.boundSubjectHashes.responseHash === "string" &&
+        /^0x[0-9a-f]{64}$/i.test(consensusVerification.boundSubjectHashes.responseHash)
+          ? (consensusVerification.boundSubjectHashes.responseHash as `0x${string}`)
+          : finalReceipt,
     },
   };
 }
@@ -632,7 +803,18 @@ export async function startAgentDiscoveryProofVerifyServer(
           ? { proof_bundle_sha256: body.proof_bundle_sha256 }
           : {}),
         ...(body.verifier_profile ? { verifier_profile: body.verifier_profile } : {}),
+        verification_mode: verification.verificationMode,
+        verifier_class: verification.verifierClass,
         verifier_receipt_sha256: verification.verifierReceiptSha256,
+        ...(verification.attestationVerification
+          ? { attestation_verification: verification.attestationVerification }
+          : {}),
+        ...(verification.consensusVerification
+          ? { consensus_verification: verification.consensusVerification }
+          : {}),
+        ...(verification.workerProvenance
+          ? { worker_provenance: verification.workerProvenance }
+          : {}),
         summary: verification.summary,
         metadata: {
           ...verification.metadata,
@@ -648,20 +830,8 @@ export async function startAgentDiscoveryProofVerifyServer(
         capability: body.capability,
         createdAt: new Date().toISOString(),
       });
-      const verifierClass =
-        typeof verification.metadata.verifier_class === "string" &&
-        verification.metadata.verifier_class.length > 0
-          ? verification.metadata.verifier_class
-          : proofVerifyConfig.supportedVerifierClasses?.includes("cryptographic_proof_verification")
-            ? "cryptographic_proof_verification"
-            : "structural_verification";
-      const verificationMode =
-        typeof verification.metadata.verification_mode === "string" &&
-        (verification.metadata.verification_mode === "fallback" ||
-          verification.metadata.verification_mode === "worker_backed" ||
-          verification.metadata.verification_mode === "cryptographic")
-          ? verification.metadata.verification_mode
-          : "fallback";
+      const verifierClass = verification.verifierClass;
+      const verificationMode = verification.verificationMode;
       storeProofVerificationRecord(db, {
         recordId: `proof:${resultId}`,
         resultId,
@@ -690,6 +860,9 @@ export async function startAgentDiscoveryProofVerifyServer(
                 metadata: null,
               }
             : null),
+        attestationVerification: verification.attestationVerification ?? null,
+        consensusVerification: verification.consensusVerification ?? null,
+        workerProvenance: verification.workerProvenance ?? null,
         boundSubjectHashes: verification.boundSubjectHashes,
         request: {
           subjectUrl: body.subject_url ?? null,

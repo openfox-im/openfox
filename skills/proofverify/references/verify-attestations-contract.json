@@ -1,0 +1,34 @@
+{
+  "backend": "proofverify.verify-attestations",
+  "contractVersion": "v1",
+  "description": "Verify native TLSNotary-style attestations extracted from a proof bundle.",
+  "input": {
+    "request": {
+      "subject_url": "string (optional)",
+      "subject_sha256": "0x-prefixed 32-byte hex (optional)",
+      "proof_bundle_url": "string (optional)",
+      "proof_bundle_sha256": "0x-prefixed 32-byte hex (optional)"
+    },
+    "options": {
+      "allowPrivateTargets": "boolean (optional)",
+      "requestTimeoutMs": "number (optional)",
+      "maxFetchBytes": "number (optional)"
+    }
+  },
+  "output": {
+    "verdict": "valid | invalid | inconclusive",
+    "verdictReason": "string",
+    "summary": "string",
+    "metadata": {
+      "verifier_backend": "skill:proofverify.verify-attestations",
+      "verifier_class": "tlsnotary_attestation_verification",
+      "total_attestations": "number",
+      "valid_attestations": "number",
+      "server_names": "string[]",
+      "attestation_hashes": "string[]",
+      "checks": "array",
+      "results": "array"
+    },
+    "verifierReceiptSha256": "0x-prefixed 32-byte hex"
+  }
+}

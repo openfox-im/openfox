@@ -26,6 +26,7 @@ describe("committee manager", () => {
       runId: run.runId,
       memberId: "agent-a",
       decision: "accept",
+      metadata: { verificationMode: "native_attestation" },
       resultHash: `0x${"1".repeat(64)}`,
       payoutAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     });
@@ -33,6 +34,7 @@ describe("committee manager", () => {
       runId: run.runId,
       memberId: "agent-b",
       decision: "accept",
+      metadata: { verificationMode: "native_attestation" },
       resultHash: `0x${"1".repeat(64)}`,
       payoutAddress: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     });
@@ -45,6 +47,7 @@ describe("committee manager", () => {
     const tallied = manager.tally(run.runId);
     expect(tallied.status).toBe("quorum_met");
     expect(tallied.tally?.quorumReached).toBe(true);
+    expect(tallied.tally?.verificationMode).toBe("committee_verified");
     expect(tallied.tally?.winningResultHash).toBe(`0x${"1".repeat(64)}`);
     expect(tallied.tally?.payoutAllocations).toEqual([
       {
@@ -67,6 +70,7 @@ describe("committee manager", () => {
     expect(summary.totalRuns).toBe(1);
     expect(summary.quorumMet).toBe(1);
     expect(summary.paid).toBe(1);
+    expect(summary.verificationModes).toEqual({ committee_verified: 1 });
     expect(summary.totalPayoutWei).toBe("9");
     db.close();
   });
@@ -88,6 +92,7 @@ describe("committee manager", () => {
       runId: run.runId,
       memberId: "a",
       decision: "accept",
+      metadata: { verificationMode: "fallback_integrity" },
       resultHash: `0x${"2".repeat(64)}`,
     });
     manager.recordVote({
@@ -100,6 +105,7 @@ describe("committee manager", () => {
     const failed = manager.tally(run.runId);
     expect(failed.status).toBe("quorum_failed");
     expect(failed.tally?.disagreement).toBe(true);
+    expect(failed.tally?.verificationMode).toBe("fallback_integrity");
 
     const rerun = manager.rerun(run.runId);
     expect(rerun.rerunCount).toBe(1);

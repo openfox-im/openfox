@@ -33,7 +33,9 @@ export interface EvidenceWorkflowSummarySnapshot {
   estimatedCostWei: string;
   zktlsBundles: number;
   proofVerifications: number;
-  cryptographicVerifications: number;
+  nativeAttestedVerifications: number;
+  committeeVerifiedResults: number;
+  fallbackOnlyVerifications: number;
   committeeRuns: number;
   committeeQuorumMet: number;
   latestRunId: string | null;
@@ -82,7 +84,9 @@ export function buildEvidenceWorkflowSummary(params: {
     estimatedCostWei,
     zktlsBundles: zktls.totalBundles,
     proofVerifications: proofs.totalResults,
-    cryptographicVerifications: proofs.realProofVerifications,
+    nativeAttestedVerifications: proofs.nativeAttestationVerifications,
+    committeeVerifiedResults: proofs.committeeVerifiedResults,
+    fallbackOnlyVerifications: proofs.fallbackIntegrityVerifications,
     committeeRuns: committees.totalRuns,
     committeeQuorumMet: committees.quorumMet,
     latestRunId: latest?.runId ?? null,
@@ -107,7 +111,7 @@ export function buildEvidenceWorkflowSummaryReport(
     `Aggregates:      ${snapshot.aggregatePublished}`,
     `Estimated cost:  ${snapshot.estimatedCostWei} wei`,
     `zkTLS bundles:   ${snapshot.zktlsBundles}`,
-    `Proof results:   ${snapshot.proofVerifications} (${snapshot.cryptographicVerifications} cryptographic)`,
+    `Proof results:   ${snapshot.proofVerifications} (${snapshot.nativeAttestedVerifications} native, ${snapshot.committeeVerifiedResults} committee, ${snapshot.fallbackOnlyVerifications} fallback)`,
     `Committees:      ${snapshot.committeeRuns} (${snapshot.committeeQuorumMet} quorum met)`,
     `Latest run:      ${snapshot.latestRunId || "(none)"}`,
     `Latest updated:  ${snapshot.latestUpdatedAt || "(none)"}`,

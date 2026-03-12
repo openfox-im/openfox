@@ -229,6 +229,7 @@ describe.sequential("agent discovery proof.verify server", () => {
           JSON.stringify({
             article_sha256: SUBJECT_SHA,
             verifier_backend: "bounded_http_capture_v0",
+            zktls_attestation: JSON.stringify({ server_name: "news.example" }),
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -258,25 +259,28 @@ describe.sequential("agent discovery proof.verify server", () => {
       expect(response.verdict).toBe("valid");
       expect(response.verifier_receipt_sha256).toMatch(/^0x[0-9a-f]{64}$/);
       expect((response.metadata as Record<string, unknown>).provider_backend).toEqual({
-        kind: "skills",
-        stages: ["proofverify.verify"],
+        kind: "builtin",
+        stages: ["builtin:proof.verify"],
       });
+      expect(response.verification_mode).toBe("fallback_integrity");
+      expect(response.verifier_class).toBe("bundle_integrity_verification");
       expect(submittedPayments).toBe(1);
       const records = listProofVerificationRecords(db, 10);
       expect(records).toHaveLength(1);
-      expect(records[0]?.verificationMode).toBe("worker_backed");
+      expect(records[0]?.verificationMode).toBe("fallback_integrity");
       expect(records[0]?.verdictReason).toBe("all_checks_passed");
       expect(records[0]?.boundSubjectHashes.subjectSha256).toBe(SUBJECT_SHA);
       const summary = buildProofVerificationSummary(db, 10);
       expect(summary.totalResults).toBe(1);
-      expect(summary.fallbackVerifications).toBe(0);
+      expect(summary.nativeAttestationVerifications).toBe(0);
+      expect(summary.fallbackIntegrityVerifications).toBe(1);
     } finally {
       await server.close();
       db.close();
     }
   });
 
-  it("can route proofverify.verify through a configured CLI worker", async () => {
+  it("can route proofverify native stages through configured CLI workers", async () => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-proof-verify-worker-"));
     process.env.HOME = tempHome;
     process.env.TOS_RPC_URL = "http://127.0.0.1:8545";
@@ -314,6 +318,7 @@ describe.sequential("agent discovery proof.verify server", () => {
             article_sha256: SUBJECT_SHA,
             proof_bundle_sha256: `0x${"e".repeat(64)}`,
             verifier_backend: "bounded_http_capture_v0",
+            zktls_attestation: JSON.stringify({ server_name: "127.0.0.1" }),
           }),
         );
         return;
@@ -372,13 +377,15 @@ describe.sequential("agent discovery proof.verify server", () => {
       expect(response.verdict).toBe("valid");
       expect(response.verifier_receipt_sha256).toMatch(/^0x[0-9a-f]{64}$/);
       expect((response.metadata as Record<string, unknown>).verifier_class).toBe(
-        "bundle_integrity_verification",
+        "tlsnotary_attestation_verification",
       );
+      expect(response.verification_mode).toBe("native_attestation");
+      expect(response.verifier_class).toBe("tlsnotary_attestation_verification");
       const records = listProofVerificationRecords(db, 10);
       expect(records).toHaveLength(1);
-      expect(records[0]?.verificationMode).toBe("worker_backed");
-      expect(records[0]?.verifierClass).toBe("bundle_integrity_verification");
-      expect(records[0]?.verifierMaterialReference?.kind).toBe("bundle_integrity_verification");
+      expect(records[0]?.verificationMode).toBe("native_attestation");
+      expect(records[0]?.verifierClass).toBe("tlsnotary_attestation_verification");
+      expect(records[0]?.workerProvenance?.worker).toBe("proofverify.verify-attestations");
       expect(records[0]?.boundSubjectHashes.subjectSha256).toBe(SUBJECT_SHA);
     } finally {
       await new Promise<void>((resolve, reject) =>
@@ -476,6 +483,9 @@ describe.sequential("agent discovery proof.verify server", () => {
       );
       expect(invalid.success).toBe(true);
       expect((invalid.response as Record<string, unknown>).verdict).toBe("invalid");
+      expect((invalid.response as Record<string, unknown>).verification_mode).toBe(
+        "fallback_integrity",
+      );
 
       const inconclusive = await postPaid(
         server.url,
@@ -506,6 +516,7 @@ describe.sequential("agent discovery proof.verify server", () => {
       const summary = buildProofVerificationSummary(db, 10);
       expect(summary.verdicts.invalid).toBe(1);
       expect(summary.verdicts.inconclusive).toBe(1);
+      expect(summary.fallbackIntegrityVerifications).toBe(2);
     } finally {
       await new Promise<void>((resolve, reject) =>
         invalidFixture.close((error) => (error ? reject(error) : resolve())),
