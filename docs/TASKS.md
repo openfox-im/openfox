@@ -1155,6 +1155,20 @@ building OpenFox into a TOS-native agent platform.
 - Product mapping:
   - This task supports third-party verified-news and evidence-market products.
   - It is not limited to an OpenFox-operated media property.
+- Implementation direction:
+  - Treat `zktls.bundle` as a Rust-first CLI worker backend.
+  - Prefer the upstream `tlsn` Rust crates from TLSNotary as the first real
+    backend candidate.
+  - Do not treat `tlsn-js` or `tlsn-wasm` as the primary Node.js execution
+    path for v1 backend integration.
+  - Do not implement the real zkTLS engine as a Node.js/TypeScript in-process
+    prover.
+  - Keep OpenFox responsible for the provider shell only:
+    payment, anti-replay, persistence, operator visibility, and backend
+    selection.
+  - Invoke the real backend through a bounded CLI worker contract using
+    `stdin/stdout`, deterministic exit codes, and explicit timeout and size
+    limits.
 - [ ] Define a versioned `zktls.bundle` backend contract with canonical input/output schemas.
 - [ ] Add a real zkTLS backend adapter behind the existing `news.fetch` provider shell.
 - [ ] Add bounded source-policy configuration for allowlisted major news and public-information sites.
@@ -1167,6 +1181,17 @@ building OpenFox into a TOS-native agent platform.
 - Product mapping:
   - This task supports third-party verified-news, evidence, and proof-aware market products.
   - It upgrades the reusable verifier substrate, not a one-off application flow.
+- Implementation direction:
+  - Treat `proofverify.verify` as a Rust-first CLI worker backend.
+  - Prefer Rust verifier implementations that can consume TLSNotary-style
+    attestation bundles and related verifier material as the first real backend
+    class.
+  - Do not implement the real proof verifier as a Node.js/TypeScript
+    cryptographic engine.
+  - Use TypeScript only for request shaping, worker invocation, result mapping,
+    persistence, and operator surfaces.
+  - Support multiple verifier classes behind one bounded CLI contract rather
+    than introducing a second public protocol.
 - [ ] Define canonical verifier backend classes for structural verification, bundle integrity verification, and cryptographic proof verification.
 - [ ] Add real verifier-backend adapters behind the existing `proof.verify` provider shell.
 - [ ] Persist verifier class, verifier-material reference, verdict reason, and bound subject hashes in durable verification records.
