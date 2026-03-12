@@ -41,7 +41,8 @@ import type {
   PaymasterQuoteRecord,
 } from "./types.js";
 import { DEFAULT_TREASURY_POLICY } from "./types.js";
-import { createLogger, setGlobalLogLevel } from "./observability/logger.js";
+import { createLogger, setGlobalLogLevel, StructuredLogger } from "./observability/logger.js";
+import { prettySink } from "./observability/pretty-sink.js";
 import {
   clearLocalAgentDiscoveryCard,
   discoverCapabilityProviders,
@@ -712,6 +713,7 @@ Environment:
   }
 
   if (args.includes("--run")) {
+    StructuredLogger.setSink(prettySink);
     await run();
     return;
   }
