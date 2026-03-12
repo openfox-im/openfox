@@ -1149,3 +1149,51 @@ building OpenFox into a TOS-native agent platform.
 - [x] Add operator-facing result summaries for evidence cost, quorum, verification, and publication state.
 - [x] Connect evidence/oracle outcomes into owner-facing action loops and reporting.
 - [x] Add end-to-end validation for packaged evidence/oracle market deployments.
+
+## Task 86 Breakdown
+
+- Product mapping:
+  - This task supports third-party verified-news and evidence-market products.
+  - It is not limited to an OpenFox-operated media property.
+- [ ] Define a versioned `zktls.bundle` backend contract with canonical input/output schemas.
+- [ ] Add a real zkTLS backend adapter behind the existing `news.fetch` provider shell.
+- [ ] Add bounded source-policy configuration for allowlisted major news and public-information sites.
+- [ ] Persist zkTLS bundle metadata, origin claims, verifier-material references, and integrity hashes in durable local state.
+- [ ] Surface zkTLS backend readiness, source-policy coverage, and bundle health through service status, `doctor`, and operator APIs.
+- [ ] Add end-to-end tests for paid `news.fetch -> zktls.bundle` runs with deterministic fixtures and replay/idempotency coverage.
+
+## Task 87 Breakdown
+
+- Product mapping:
+  - This task supports third-party verified-news, evidence, and proof-aware market products.
+  - It upgrades the reusable verifier substrate, not a one-off application flow.
+- [ ] Define canonical verifier backend classes for structural verification, bundle integrity verification, and cryptographic proof verification.
+- [ ] Add real verifier-backend adapters behind the existing `proof.verify` provider shell.
+- [ ] Persist verifier class, verifier-material reference, verdict reason, and bound subject hashes in durable verification records.
+- [ ] Surface verifier readiness, unsupported proof classes, and degraded verifier state through service status, `doctor`, and operator APIs.
+- [ ] Add requester-side summaries that distinguish fallback verification from real proof verification.
+- [ ] Add end-to-end tests for invalid, inconclusive, and valid proof bundle paths.
+
+## Task 88 Breakdown
+
+- Product mapping:
+  - This task supports threshold-backed verified-news, evidence markets, and bounded oracle products.
+  - It provides the reusable coordinator-side committee layer that third-party products can compose.
+- [ ] Define canonical committee assignment, vote, tally, and aggregate schemas for evidence and oracle committee workflows.
+- [ ] Add deterministic coordinator-side `M-of-N` tallying with bounded member assignment, quorum, and payout rules.
+- [ ] Persist committee runs, member votes, quorum state, and payout allocations in durable local state.
+- [ ] Add coordinator CLI surfaces for committee list/get/tally/payout inspection.
+- [ ] Connect committee outcomes into owner reports, operator summaries, and market result surfaces.
+- [ ] Add end-to-end tests for partial quorum, disagreement, failed members, and bounded re-run behavior.
+
+## Task 89 Breakdown
+
+- Product mapping:
+  - This task supports public proof-backed feeds such as `news.get`, evidence retrieval products, and reusable verification lanes for external builders.
+  - It completes the public proof and verification substrate rather than a single product.
+- [ ] Define canonical public proof bundle classes for zkTLS bundles, committee votes, aggregates, verifier receipts, and proof material references.
+- [ ] Extend storage and artifact policy packs for proof-oriented replication, durability, and retention rules.
+- [ ] Add public search and index surfaces for proof and verification artifacts.
+- [ ] Add reusable `tosdk` helpers and example packs for proof retrieval and verification consumption.
+- [ ] Add operator packs for proof-market and verification-market public deployments.
+- [ ] Add end-to-end packaged deployment validation for proof capture, verification, storage, and retrieval on a public multi-node topology.

@@ -1944,3 +1944,198 @@ Delivered so far:
 - `openfox evidence summary`
 - `openfox oracle list|get|summary`
 - owner reports now include evidence/oracle cost and outcome summaries
+
+### Phase 42: Stronger zkTLS Backend Integration
+
+Status: planned
+
+Goal:
+
+- replace the current bounded `news.fetch` capture path with a stronger
+  cryptographic evidence path that can produce verifiable source-origin bundles
+  for major news and public-information sites
+- provide the source-origin infrastructure needed by third-party verified news
+  and evidence-market products built on OpenFox
+
+Delivered surface:
+
+- a versioned `zktls.bundle` backend contract for `news.fetch`
+- provider-visible backend capabilities and source-policy metadata
+- durable zkTLS receipt objects and bundle manifests
+- stronger operator diagnostics for zkTLS readiness and source-policy coverage
+- reusable substrate for products such as bounded verified-news feeds and
+  evidence capture markets
+
+Implementation tasks:
+
+- define one stable `zktls.bundle` backend contract with structured input and
+  output schemas
+- add a provider-side zkTLS backend adapter behind the existing `news.fetch`
+  shell instead of introducing a second public protocol
+- add source-policy configuration for bounded allowlisted major news and public
+  sites
+- persist zkTLS bundle metadata, origin claims, verifier material references,
+  and integrity hashes in durable local state
+- expose zkTLS backend mode, source-policy, and bundle health through service
+  status, `doctor`, and operator APIs
+- add end-to-end tests for paid `news.fetch -> zktls.bundle` runs against
+  deterministic fixtures and bounded replay/idempotency cases
+
+Acceptance criteria:
+
+- an operator can run `news.fetch` with a real zkTLS backend selected through
+  the provider backend interface
+- the returned receipt contains durable origin-proof bundle references and
+  integrity hashes
+- service/operator surfaces show whether the provider is running builtin,
+  fallback, or real zkTLS-backed evidence capture
+- a third-party product can consume the same `news.fetch` surface as the first
+  stage of a verified-news or evidence workflow without forking the provider
+  protocol
+
+### Phase 43: Stronger Proof Verifier Backend Integration
+
+Status: planned
+
+Goal:
+
+- turn `proof.verify` from a bounded hash-and-receipt checker into a stronger
+  verifier plane that can validate structured proof bundles and publish durable
+  verification receipts
+- provide the reusable verification substrate needed by third-party verified
+  news, evidence, and proof-aware market products
+
+Delivered surface:
+
+- a versioned `proofverify.verify` backend contract with explicit verifier
+  classes
+- verifier capability metadata, verifier-key references, and verification
+  receipts
+- stronger operator and requester visibility into verifier coverage and result
+  quality
+- reusable verifier plumbing that higher-level products can compose without
+  inventing a separate verification protocol
+
+Implementation tasks:
+
+- define canonical verifier backend classes for receipt verification, bundle
+  integrity verification, and cryptographic proof verification
+- add verifier-backend adapters behind the existing `proof.verify` provider
+  shell
+- persist verifier class, verifier-material reference, verdict reason, and
+  bound subject hashes in durable verification records
+- expose verifier readiness, unsupported proof classes, and degraded verifier
+  state through service status, `doctor`, and operator APIs
+- add requester-side result summaries that distinguish structural verification
+  from cryptographic verification
+- add end-to-end tests for invalid, inconclusive, and valid proof bundle paths
+
+Acceptance criteria:
+
+- an operator can run `proof.verify` with a real verifier backend selected
+  through the versioned backend interface
+- receipts clearly distinguish which verifier class was used and what was
+  actually verified
+- requester and operator surfaces can tell the difference between bounded
+  fallback verification and real proof verification
+- a third-party workflow can consume `proof.verify` as a stable verification
+  stage inside a larger evidence or verified-news product
+
+### Phase 44: Coordinator-Side M-of-N Evidence and Oracle Committees
+
+Status: planned
+
+Goal:
+
+- turn the current evidence workflow into a more realistic coordinator-side
+  `M-of-N` committee flow with bounded vote payloads, canonical tallying, and
+  deterministic payout rules
+- provide a reusable committee layer for third-party verified-news, evidence,
+  and bounded oracle products
+
+Delivered surface:
+
+- canonical committee assignment, vote, tally, and aggregate objects
+- reusable coordinator commands for bounded committee workflows
+- multi-recipient payout rules tied to tally outcomes
+- stronger owner/operator visibility into committee quorum and disagreement
+- reusable committee infrastructure for threshold-backed result publication and
+  subscription products such as `news.get`
+
+Implementation tasks:
+
+- define canonical committee member, vote, tally, and aggregate schemas for
+  evidence and oracle flows
+- add deterministic `M-of-N` coordinator logic that binds:
+  - member assignment
+  - vote payload shape
+  - quorum threshold
+  - tally result
+  - payout distribution
+- persist committee runs, member votes, quorum state, and payout allocations in
+  durable local state
+- add coordinator commands and summaries for committee list/get/tally/payout
+  inspection
+- connect committee outcomes into owner reports, operator summaries, and market
+  result surfaces
+- add end-to-end tests covering partial quorum, disagreement, failed members,
+  and bounded re-run behavior
+
+Acceptance criteria:
+
+- an operator can launch a coordinator-side `M-of-N` workflow with explicit
+  committee size and threshold
+- the system produces one canonical tally result and one deterministic payout
+  plan
+- committee outcome, disagreement, and payout state are visible through CLI and
+  operator surfaces without ad-hoc inspection
+- a third-party verified-news or evidence market can reuse the committee layer
+  without building a separate tally and payout stack
+
+### Phase 45: Public Proof and Verification Infrastructure
+
+Status: planned
+
+Goal:
+
+- complete the public-network proof plane so proof bundles, verifier material,
+  committee outputs, and verification results can be stored, searched,
+  re-checked, and consumed by external operators and builders
+- make proof and verification artifacts first-class public infrastructure for
+  downstream products such as verified-news feeds, evidence markets, and
+  committee-backed subscription surfaces
+
+Delivered surface:
+
+- public proof bundle classes and verifier-material references
+- stronger replication and retention policy for proof-oriented artifacts
+- public verification summaries and search surfaces
+- ecosystem-facing proof/verification SDK and operator packs
+- reusable publication and retrieval substrate for third-party products that
+  need durable proof-backed result feeds
+
+Implementation tasks:
+
+- define canonical public proof bundle classes for zkTLS bundles, committee
+  votes, aggregates, verifier receipts, and proof material references
+- extend storage and artifact policy packs for proof-oriented replication,
+  durability, and retention rules
+- add public search/index surfaces for proof and verification artifacts
+- add reusable `tosdk` helpers and example packs for proof retrieval and
+  verification consumption
+- add operator bundles for proof-market and verification-market public
+  deployments
+- add end-to-end packaged deployment validation for proof capture, verification,
+  storage, and retrieval on a public multi-node topology
+
+Acceptance criteria:
+
+- proof-oriented bundles can be published, retained, searched, and re-fetched
+  as first-class public artifacts
+- operators can deploy a public proof/verification lane using packaged OpenFox
+  components
+- external builders can consume the proof and verification surfaces without
+  coupling to OpenFox runtime internals
+- a third-party verified-news or evidence-feed operator can publish and serve
+  durable proof-backed results without inventing a parallel storage or
+  verification plane
