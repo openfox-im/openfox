@@ -113,6 +113,9 @@ Required fields:
 `IntentAuth` is the authorization block embedded into the solver's fill
 transaction.
 
+It does not carry a second sponsor signature block. Sponsor authorization stays
+in the native transaction envelope.
+
 Required fields:
 
 | Field | Type | Meaning |
@@ -124,8 +127,6 @@ Required fields:
 | `fill_amount` | `u256` | Requested fill amount or fraction numerator. |
 | `fill_fraction_bps` | `u32` | Used only when `fill_mode = partial_fill`. |
 | `max_solver_fee_wei` | `u256` | Solver-declared fee cap for this fill. |
-| `observed_outcome_hash` | `bytes32` | Hash of fill-relevant realized outputs. |
-| `sponsor_auth` | `bytes` | Optional sponsor authorization block. |
 
 ### 4.5 `IntentReceipt`
 
@@ -238,7 +239,8 @@ When a solver submits a fill transaction with `intent_auth`, `gtos` must verify:
 7. the fill transaction targets the `target.surface_id` contract surface
 8. the solver only changed parameters listed in `allowed_mutable_params`
 9. realized input, output, fee, and gas values remain within hard bounds
-10. sponsor usage matches `settlement.sponsor_mode`
+10. sponsor usage matches `settlement.sponsor_mode` using the transaction's
+    native sponsor authorization fields
 11. the resulting fill does not overfill the intent
 
 If any of these checks fail, the fill is rejected and the receipt reason code
@@ -417,9 +419,7 @@ Returns:
   "fill_nonce": 1,
   "fill_amount": "1000000000000000000",
   "fill_fraction_bps": 10000,
-  "max_solver_fee_wei": "2000000000000000",
-  "observed_outcome_hash": "0xbbbb...",
-  "sponsor_auth": "0x"
+  "max_solver_fee_wei": "2000000000000000"
 }
 ```
 
