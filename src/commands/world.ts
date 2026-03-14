@@ -41,6 +41,33 @@ import {
 import {
   exportMetaWorldSite,
 } from "../metaworld/site.js";
+import { startMetaWorldServer } from "../metaworld/server.js";
+import {
+  followFox,
+  unfollowFox,
+  followGroup,
+  unfollowGroup,
+  listFollowedFoxes,
+  listFollowedGroups,
+  listFoxFollowers,
+  getFollowCounts,
+} from "../metaworld/follows.js";
+import {
+  buildSearchResultSnapshot,
+} from "../metaworld/search.js";
+import {
+  buildPersonalizedFeedSnapshot,
+  buildRecommendedFoxes,
+  buildRecommendedGroups,
+} from "../metaworld/ranking.js";
+import {
+  buildFoxPublicProfile,
+  publishFoxProfile,
+  updateFoxProfileFieldForAddress,
+  buildGroupPublicProfile,
+  publishGroupProfile,
+  buildFoxReputationSummary,
+} from "../metaworld/identity.js";
 import fs from "fs/promises";
 import path from "path";
 
@@ -66,11 +93,31 @@ Usage:
   openfox world shell [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
   openfox world shell export --output <path> [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
   openfox world site export --output-dir <path> [--foxes N] [--groups N] [--json]
+  openfox world serve [--port N] [--host <addr>]
   openfox world presence publish [--group <group-id>] [--status <online|busy|away|recently_active>] [--ttl-seconds N] [--summary "<text>"] [--json]
   openfox world presence list [--group <group-id>] [--status <all|online|busy|away|recently_active|expired>] [--include-expired] [--limit N] [--json]
   openfox world notifications [--group <group-id>] [--status <all|unread>] [--include-dismissed] [--limit N] [--json]
   openfox world notification read --id <notification-id> [--json]
   openfox world notification dismiss --id <notification-id> [--json]
+  openfox world follow fox --address <addr> [--json]
+  openfox world unfollow fox --address <addr> [--json]
+  openfox world follow group --group <id> [--json]
+  openfox world unfollow group --group <id> [--json]
+  openfox world following [--json]
+  openfox world followers [--json]
+  openfox world search <query> [--kind fox|group|board_item] [--limit N] [--json]
+  openfox world recommended foxes [--limit N] [--json]
+  openfox world recommended groups [--limit N] [--json]
+  openfox world personalized-feed [--limit N] [--json]
+  openfox world profile set --bio "text"
+  openfox world profile set --avatar-url "url"
+  openfox world profile set --website "url"
+  openfox world profile set --tags "tag1,tag2"
+  openfox world profile set --social "twitter:@handle,github:user"
+  openfox world profile publish [--json]
+  openfox world profile show [--address <addr>] [--json]
+  openfox world group profile publish --group <id> [--json]
+  openfox world reputation [--address <addr>] [--json]
 `);
     return;
   }
@@ -329,6 +376,23 @@ Usage:
 
     if (command === "group") {
       const subcommand = args[1] || "page";
+      if (subcommand === "profile") {
+        const subSubcommand = args[2] && !args[2].startsWith("--") ? args[2] : "publish";
+        if (subSubcommand === "publish") {
+          const groupId = readOption(args, "--group");
+          if (!groupId) {
+            throw new Error("Usage: openfox world group profile publish --group <group-id>");
+          }
+          const result = publishGroupProfile(db, groupId);
+          if (asJson) {
+            logger.info(JSON.stringify(result, null, 2));
+            return;
+          }
+          logger.info(`Group profile published: ${result.cid}`);
+          return;
+        }
+        throw new Error(`Unknown world group profile command: ${subSubcommand}`);
+      }
       if (subcommand !== "page") {
         throw new Error(`Unknown world group command: ${subcommand}`);
       }
@@ -490,6 +554,22 @@ Usage:
       return;
     }
 
+    if (command === "serve") {
+      const port = readNumberOption(args, "--port", 3000);
+      const host = readOption(args, "--host") || "127.0.0.1";
+      const server = await startMetaWorldServer({ db, config, port, host });
+      logger.info(`metaWorld server running at ${server.url}`);
+      logger.info("Press Ctrl+C to stop.");
+      await new Promise<void>((resolve) => {
+        const shutdown = () => {
+          server.close().then(() => resolve()).catch(() => resolve());
+        };
+        process.on("SIGINT", shutdown);
+        process.on("SIGTERM", shutdown);
+      });
+      return;
+    }
+
     if (command === "presence") {
       const subcommand = args[1] || "list";
       if (subcommand === "publish") {
@@ -574,6 +654,285 @@ Usage:
         return;
       }
       throw new Error(`Unknown world notification command: ${subcommand}`);
+    }
+
+    if (command === "profile") {
+      const subcommand = args[1] || "show";
+      if (subcommand === "set") {
+        const address = config.walletAddress;
+        const bio = readOption(args, "--bio");
+        const avatarUrl = readOption(args, "--avatar-url");
+        const website = readOption(args, "--website");
+        const tagsRaw = readOption(args, "--tags");
+        const socialRaw = readOption(args, "--social");
+
+        if (bio) updateFoxProfileFieldForAddress(db, address, "bio", bio);
+        if (avatarUrl) updateFoxProfileFieldForAddress(db, address, "avatar_url", avatarUrl);
+        if (website) updateFoxProfileFieldForAddress(db, address, "website_url", website);
+        if (tagsRaw) {
+          const tags = tagsRaw.split(",").map((t) => t.trim()).filter(Boolean);
+          updateFoxProfileFieldForAddress(db, address, "tags", JSON.stringify(tags));
+        }
+        if (socialRaw) {
+          const links = socialRaw.split(",").map((entry) => {
+            const [platform, ...urlParts] = entry.split(":");
+            return { platform: platform.trim(), url: urlParts.join(":").trim() };
+          }).filter((l) => l.platform && l.url);
+          updateFoxProfileFieldForAddress(db, address, "social_links", JSON.stringify(links));
+        }
+        logger.info(asJson ? JSON.stringify({ updated: true }, null, 2) : "Profile updated.");
+        return;
+      }
+      if (subcommand === "publish") {
+        const result = publishFoxProfile(db, config);
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+          return;
+        }
+        logger.info(`Profile published: ${result.cid}`);
+        return;
+      }
+      if (subcommand === "show") {
+        const targetAddress = readOption(args, "--address") ?? config.walletAddress;
+        const profile = buildFoxPublicProfile(db, { ...config, walletAddress: targetAddress as `0x${string}` });
+        if (asJson) {
+          logger.info(JSON.stringify(profile, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX PUBLIC PROFILE ===");
+        logger.info(`${profile.displayName}  ${profile.address}`);
+        if (profile.bio) logger.info(`Bio: ${profile.bio}`);
+        if (profile.avatarUrl) logger.info(`Avatar: ${profile.avatarUrl}`);
+        if (profile.websiteUrl) logger.info(`Website: ${profile.websiteUrl}`);
+        if (profile.tags.length) logger.info(`Tags: ${profile.tags.join(", ")}`);
+        if (profile.socialLinks.length) {
+          logger.info(`Social: ${profile.socialLinks.map((l) => `${l.platform}:${l.url}`).join(", ")}`);
+        }
+        logger.info(`Groups: ${profile.groupCount}`);
+        logger.info(`Capabilities: ${profile.capabilities.join(", ") || "none"}`);
+        logger.info(`Roles: ${profile.roles.join(", ") || "none"}`);
+        if (profile.publishedAt) logger.info(`Published: ${profile.publishedAt}`);
+        return;
+      }
+      throw new Error(`Unknown world profile command: ${subcommand}`);
+    }
+
+    if (command === "reputation") {
+      const address = readOption(args, "--address") ?? config.walletAddress;
+      const summary = buildFoxReputationSummary(db, address);
+      if (asJson) {
+        logger.info(JSON.stringify(summary, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX REPUTATION SUMMARY ===");
+      logger.info(`Address: ${address}`);
+      logger.info(`Jobs completed: ${summary.jobsCompleted}`);
+      logger.info(`Bounties won: ${summary.bountiesWon}`);
+      logger.info(`Reports filed: ${summary.reportsFiled}`);
+      logger.info(`Warnings received: ${summary.warningsReceived}`);
+      logger.info(`Uptime: ${summary.uptimePercentage}%`);
+      logger.info(`Payment reliability: ${summary.paymentReliabilityScore}%`);
+      return;
+    }
+
+    if (command === "follow") {
+      const subcommand = args[1];
+      if (subcommand === "fox") {
+        const address = readOption(args, "--address");
+        if (!address) {
+          throw new Error("Usage: openfox world follow fox --address <addr>");
+        }
+        const record = followFox(db, {
+          followerAddress: config.walletAddress,
+          targetAddress: address,
+        });
+        logger.info(
+          asJson
+            ? JSON.stringify(record, null, 2)
+            : `Now following fox: ${record.targetAddress}`,
+        );
+        return;
+      }
+      if (subcommand === "group") {
+        const groupId = readOption(args, "--group");
+        if (!groupId) {
+          throw new Error("Usage: openfox world follow group --group <id>");
+        }
+        const record = followGroup(db, {
+          followerAddress: config.walletAddress,
+          groupId,
+        });
+        logger.info(
+          asJson
+            ? JSON.stringify(record, null, 2)
+            : `Now following group: ${record.targetGroupId}`,
+        );
+        return;
+      }
+      throw new Error("Usage: openfox world follow <fox|group>");
+    }
+
+    if (command === "unfollow") {
+      const subcommand = args[1];
+      if (subcommand === "fox") {
+        const address = readOption(args, "--address");
+        if (!address) {
+          throw new Error("Usage: openfox world unfollow fox --address <addr>");
+        }
+        const removed = unfollowFox(db, {
+          followerAddress: config.walletAddress,
+          targetAddress: address,
+        });
+        logger.info(
+          asJson
+            ? JSON.stringify({ removed, address }, null, 2)
+            : removed
+              ? `Unfollowed fox: ${address}`
+              : `Was not following fox: ${address}`,
+        );
+        return;
+      }
+      if (subcommand === "group") {
+        const groupId = readOption(args, "--group");
+        if (!groupId) {
+          throw new Error("Usage: openfox world unfollow group --group <id>");
+        }
+        const removed = unfollowGroup(db, {
+          followerAddress: config.walletAddress,
+          groupId,
+        });
+        logger.info(
+          asJson
+            ? JSON.stringify({ removed, groupId }, null, 2)
+            : removed
+              ? `Unfollowed group: ${groupId}`
+              : `Was not following group: ${groupId}`,
+        );
+        return;
+      }
+      throw new Error("Usage: openfox world unfollow <fox|group>");
+    }
+
+    if (command === "following") {
+      const foxes = listFollowedFoxes(db, config.walletAddress);
+      const groups = listFollowedGroups(db, config.walletAddress);
+      const counts = getFollowCounts(db, config.walletAddress);
+      if (asJson) {
+        logger.info(JSON.stringify({ counts, foxes, groups }, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX FOLLOWING ===");
+      logger.info(
+        `Following ${counts.followingFoxes} fox(es), ${counts.followingGroups} group(s). ${counts.followers} follower(s).`,
+      );
+      for (const fox of foxes) {
+        logger.info(`  fox: ${fox.targetAddress}  (since ${fox.createdAt})`);
+      }
+      for (const group of groups) {
+        logger.info(`  group: ${group.targetGroupId}  (since ${group.createdAt})`);
+      }
+      return;
+    }
+
+    if (command === "followers") {
+      const followers = listFoxFollowers(db, config.walletAddress);
+      if (asJson) {
+        logger.info(JSON.stringify({ followers }, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX FOLLOWERS ===");
+      logger.info(`${followers.length} follower(s).`);
+      for (const follower of followers) {
+        logger.info(`  ${follower.followerAddress}  (since ${follower.createdAt})`);
+      }
+      return;
+    }
+
+    if (command === "search") {
+      const query = args[1];
+      if (!query || query.startsWith("--")) {
+        throw new Error("Usage: openfox world search <query> [--kind fox|group|board_item] [--limit N]");
+      }
+      const kindRaw = readOption(args, "--kind");
+      const kinds = kindRaw
+        ? [kindRaw as "fox" | "group" | "board_item"]
+        : undefined;
+      const snapshot = buildSearchResultSnapshot(db, config, query, {
+        kinds,
+        limit: readNumberOption(args, "--limit", 20),
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX WORLD SEARCH ===");
+      logger.info(snapshot.summary);
+      for (const result of snapshot.results) {
+        logger.info(`  [${result.kind}] ${result.title}  (score=${result.relevanceScore}, matched=${result.matchedOn})`);
+        logger.info(`    ${result.summary}`);
+      }
+      return;
+    }
+
+    if (command === "recommended") {
+      const subcommand = args[1];
+      if (subcommand === "foxes") {
+        const snapshot = buildRecommendedFoxes(db, config, {
+          limit: readNumberOption(args, "--limit", 10),
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(snapshot, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX RECOMMENDED FOXES ===");
+        logger.info(snapshot.summary);
+        for (const fox of snapshot.items) {
+          logger.info(`  ${fox.displayName}  (score=${fox.score})`);
+          logger.info(`    ${fox.reason}`);
+        }
+        return;
+      }
+      if (subcommand === "groups") {
+        const snapshot = buildRecommendedGroups(db, config, {
+          limit: readNumberOption(args, "--limit", 10),
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(snapshot, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX RECOMMENDED GROUPS ===");
+        logger.info(snapshot.summary);
+        for (const group of snapshot.items) {
+          logger.info(`  ${group.name}  (score=${group.score})`);
+          logger.info(`    ${group.reason}`);
+        }
+        return;
+      }
+      throw new Error("Usage: openfox world recommended <foxes|groups>");
+    }
+
+    if (command === "personalized-feed") {
+      const snapshot = buildPersonalizedFeedSnapshot(db, config, {
+        limit: readNumberOption(args, "--limit", 25),
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX PERSONALIZED FEED ===");
+      logger.info(snapshot.summary);
+      for (const item of snapshot.items) {
+        const boostLabel = item.boostReasons.length
+          ? ` [${item.boostReasons.join(", ")}]`
+          : "";
+        const groupLabel = item.groupName ? ` [${item.groupName}]` : "";
+        logger.info(
+          `${item.occurredAt}  ${item.kind}${groupLabel}  boost=${item.boostScore.toFixed(1)}${boostLabel}`,
+        );
+        logger.info(`  ${item.title}`);
+        logger.info(`  ${item.summary}`);
+      }
+      return;
     }
 
     throw new Error(`Unknown world command: ${command}`);

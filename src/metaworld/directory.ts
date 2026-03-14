@@ -11,6 +11,9 @@ export interface WorldFoxDirectoryEntry {
   presenceStatus: WorldPresenceEffectiveStatus | null;
   lastSeenAt: string | null;
   capabilityNames: string[];
+  bio: string | null;
+  avatarUrl: string | null;
+  tags: string[];
 }
 
 export interface WorldFoxDirectorySnapshot {
@@ -134,6 +137,29 @@ function resolveFoxDirectoryEntry(
       ? new Date(presenceIdentity.expires_at).getTime() <= Date.now()
       : false;
 
+  // Load published profile metadata if available
+  let bio: string | null = null;
+  let avatarUrl: string | null = null;
+  let tags: string[] = [];
+  try {
+    const profileRow = db.raw
+      .prepare(
+        `SELECT bio, avatar_url, tags FROM fox_profiles WHERE address = ?`,
+      )
+      .get(normalizedAddress) as {
+      bio: string | null;
+      avatar_url: string | null;
+      tags: string;
+    } | undefined;
+    if (profileRow) {
+      bio = profileRow.bio;
+      avatarUrl = profileRow.avatar_url;
+      tags = parseJsonSafe<string[]>(profileRow.tags, []);
+    }
+  } catch {
+    // fox_profiles table may not exist yet
+  }
+
   return {
     address: normalizedAddress,
     agentId:
@@ -159,6 +185,9 @@ function resolveFoxDirectoryEntry(
       : null,
     lastSeenAt: presenceIdentity?.updated_at ?? null,
     capabilityNames,
+    bio,
+    avatarUrl,
+    tags,
   };
 }
 

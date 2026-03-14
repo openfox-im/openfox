@@ -40,6 +40,16 @@ import {
   unmuteGroupMember,
   withdrawGroupJoinRequest,
 } from "../group/store.js";
+import {
+  issueGroupWarning,
+  listGroupWarnings,
+  reportGroupMessage as reportGroupMessageMod,
+  listGroupReports,
+  resolveGroupReport,
+  appealGroupAction,
+  listGroupAppeals,
+  resolveGroupAppeal,
+} from "../group/moderation.js";
 
 const logger = createLogger("main");
 
@@ -79,6 +89,14 @@ Usage:
   openfox group moderation unmute --group <group-id> --address <addr> [--json]
   openfox group moderation ban --group <group-id> --address <addr> [--reason "<text>"] [--json]
   openfox group moderation unban --group <group-id> --address <addr> [--json]
+  openfox group warn --group <group-id> --target <address> --reason "<text>" [--severity mild|moderate|severe] [--json]
+  openfox group warnings --group <group-id> [--target <address>] [--limit N] [--json]
+  openfox group report --group <group-id> --message <id> --reason "<text>" --category <spam|harassment|off_topic|illegal|other> [--json]
+  openfox group reports --group <group-id> [--status open|resolved|dismissed] [--limit N] [--json]
+  openfox group resolve-report --id <report-id> --resolution <warn|mute|ban|dismiss> [--note "<text>"] [--json]
+  openfox group appeal --group <group-id> --action <mute|ban|warning> --reason "<text>" [--json]
+  openfox group appeals --group <group-id> [--status pending|approved|rejected] [--limit N] [--json]
+  openfox group resolve-appeal --id <appeal-id> --decision <approved|rejected> [--note "<text>"] [--json]
 `);
     return;
   }
@@ -680,6 +698,236 @@ Usage:
         return;
       }
       throw new Error(`Unknown group moderation command: ${subcommand}`);
+    }
+
+    if (command === "warn") {
+      const groupId = readGroupIdArg(args);
+      const targetAddress = readOption(args, "--target");
+      const reason = readOption(args, "--reason");
+      if (!groupId || !targetAddress || !reason) {
+        throw new Error(
+          "Usage: openfox group warn --group <group-id> --target <address> --reason \"<text>\"",
+        );
+      }
+      const account = loadWalletAccount();
+      if (!account) {
+        throw new Error("OpenFox wallet not found. Run openfox --init first.");
+      }
+      const severity = (readOption(args, "--severity") || "mild") as
+        | "mild"
+        | "moderate"
+        | "severe";
+      const result = await issueGroupWarning(
+        db,
+        {
+          groupId,
+          targetAddress,
+          issuerAddress: config.walletAddress,
+          reason,
+          severity,
+        },
+        account,
+      );
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "warnings") {
+      const groupId = readGroupIdArg(args);
+      if (!groupId) {
+        throw new Error("Usage: openfox group warnings --group <group-id>");
+      }
+      const items = listGroupWarnings(db, groupId, {
+        targetAddress: readOption(args, "--target"),
+        limit: readNumberOption(args, "--limit", 25),
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(items, null, 2));
+        return;
+      }
+      logger.info(`=== GROUP WARNINGS ${groupId} ===`);
+      if (!items.length) {
+        logger.info("No warnings.");
+        return;
+      }
+      for (const item of items) {
+        logger.info(
+          `${item.createdAt}  ${item.severity}  target=${item.targetAddress}  ${item.reason}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "report") {
+      const groupId = readGroupIdArg(args);
+      const messageId = readOption(args, "--message");
+      const reason = readOption(args, "--reason");
+      const category = readOption(args, "--category") as
+        | "spam"
+        | "harassment"
+        | "off_topic"
+        | "illegal"
+        | "other"
+        | undefined;
+      if (!groupId || !messageId || !reason || !category) {
+        throw new Error(
+          "Usage: openfox group report --group <group-id> --message <id> --reason \"<text>\" --category <cat>",
+        );
+      }
+      const result = reportGroupMessageMod(db, {
+        groupId,
+        messageId,
+        reporterAddress: config.walletAddress,
+        reason,
+        category,
+      });
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "reports") {
+      const groupId = readGroupIdArg(args);
+      if (!groupId) {
+        throw new Error("Usage: openfox group reports --group <group-id>");
+      }
+      const status = readOption(args, "--status") as
+        | "open"
+        | "resolved"
+        | "dismissed"
+        | undefined;
+      const items = listGroupReports(db, groupId, {
+        status,
+        limit: readNumberOption(args, "--limit", 25),
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(items, null, 2));
+        return;
+      }
+      logger.info(`=== GROUP REPORTS ${groupId} ===`);
+      if (!items.length) {
+        logger.info("No reports.");
+        return;
+      }
+      for (const item of items) {
+        logger.info(
+          `${item.createdAt}  ${item.status}  ${item.category}  ${item.reason}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "resolve-report") {
+      const reportId = readOption(args, "--id");
+      const resolution = readOption(args, "--resolution") as
+        | "warn"
+        | "mute"
+        | "ban"
+        | "dismiss"
+        | undefined;
+      if (!reportId || !resolution) {
+        throw new Error(
+          "Usage: openfox group resolve-report --id <report-id> --resolution <warn|mute|ban|dismiss>",
+        );
+      }
+      const account = loadWalletAccount();
+      if (!account) {
+        throw new Error("OpenFox wallet not found. Run openfox --init first.");
+      }
+      const result = await resolveGroupReport(
+        db,
+        reportId,
+        {
+          resolverAddress: config.walletAddress,
+          resolution,
+          note: readOption(args, "--note"),
+        },
+        account,
+      );
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "appeal") {
+      const groupId = readGroupIdArg(args);
+      const actionKind = readOption(args, "--action") as
+        | "mute"
+        | "ban"
+        | "warning"
+        | undefined;
+      const reason = readOption(args, "--reason");
+      if (!groupId || !actionKind || !reason) {
+        throw new Error(
+          "Usage: openfox group appeal --group <group-id> --action <mute|ban|warning> --reason \"<text>\"",
+        );
+      }
+      const result = appealGroupAction(db, {
+        groupId,
+        appealerAddress: config.walletAddress,
+        actionKind,
+        reason,
+      });
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "appeals") {
+      const groupId = readGroupIdArg(args);
+      if (!groupId) {
+        throw new Error("Usage: openfox group appeals --group <group-id>");
+      }
+      const status = readOption(args, "--status") as
+        | "pending"
+        | "approved"
+        | "rejected"
+        | undefined;
+      const items = listGroupAppeals(db, groupId, {
+        status,
+        limit: readNumberOption(args, "--limit", 25),
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(items, null, 2));
+        return;
+      }
+      logger.info(`=== GROUP APPEALS ${groupId} ===`);
+      if (!items.length) {
+        logger.info("No appeals.");
+        return;
+      }
+      for (const item of items) {
+        logger.info(
+          `${item.createdAt}  ${item.status}  ${item.actionKind}  ${item.reason}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "resolve-appeal") {
+      const appealId = readOption(args, "--id");
+      const decision = readOption(args, "--decision") as
+        | "approved"
+        | "rejected"
+        | undefined;
+      if (!appealId || !decision) {
+        throw new Error(
+          "Usage: openfox group resolve-appeal --id <appeal-id> --decision <approved|rejected>",
+        );
+      }
+      const account = loadWalletAccount();
+      if (!account) {
+        throw new Error("OpenFox wallet not found. Run openfox --init first.");
+      }
+      const result = await resolveGroupAppeal(
+        db,
+        appealId,
+        {
+          resolverAddress: config.walletAddress,
+          decision,
+          note: readOption(args, "--note"),
+        },
+        account,
+      );
+      logger.info(JSON.stringify(result, null, 2));
+      return;
     }
 
     throw new Error(`Unknown group command: ${command}`);

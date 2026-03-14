@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 40;
+export const SCHEMA_VERSION = 44;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -1516,6 +1516,21 @@ export const CREATE_TABLES = `
   CREATE INDEX IF NOT EXISTS idx_group_epoch_keys_pending
     ON group_epoch_keys(group_id, epoch, delivered_at);
 
+  CREATE TABLE IF NOT EXISTS group_sync_peers (
+    group_id TEXT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+    peer_address TEXT NOT NULL,
+    peer_endpoint TEXT NOT NULL,
+    last_sync_at TEXT,
+    last_cursor TEXT,
+    sync_kind TEXT NOT NULL CHECK(
+      sync_kind IN ('peer','gateway','relay','storage')
+    ),
+    PRIMARY KEY (group_id, peer_address, sync_kind)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_sync_peers_group
+    ON group_sync_peers(group_id, last_sync_at DESC);
+
   CREATE TABLE IF NOT EXISTS world_notification_state (
     notification_id TEXT PRIMARY KEY,
     read_at TEXT,
@@ -1543,4 +1558,139 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_world_presence_scope
     ON world_presence(scope_kind, scope_ref, expires_at DESC, updated_at DESC);
+
+  -- Group moderation: warnings
+  CREATE TABLE IF NOT EXISTS group_warnings (
+    warning_id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+    target_address TEXT NOT NULL,
+    issuer_address TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK(severity IN ('mild','moderate','severe')) DEFAULT 'mild',
+    reason TEXT NOT NULL,
+    escalation_action TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_warnings_target
+    ON group_warnings(group_id, target_address, created_at DESC);
+
+  -- Group moderation: reports
+  CREATE TABLE IF NOT EXISTS group_reports (
+    report_id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+    reporter_address TEXT NOT NULL,
+    target_address TEXT,
+    message_id TEXT,
+    category TEXT NOT NULL CHECK(category IN ('spam','harassment','off_topic','illegal','other')),
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open','resolved','dismissed')) DEFAULT 'open',
+    resolver_address TEXT,
+    resolution TEXT,
+    resolution_note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_reports_status
+    ON group_reports(group_id, status, created_at DESC);
+
+  -- Group moderation: appeals
+  CREATE TABLE IF NOT EXISTS group_appeals (
+    appeal_id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+    appealer_address TEXT NOT NULL,
+    action_kind TEXT NOT NULL CHECK(action_kind IN ('mute','ban','warning')),
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected')) DEFAULT 'pending',
+    resolver_address TEXT,
+    decision TEXT,
+    resolution_note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_group_appeals_status
+    ON group_appeals(group_id, status, created_at DESC);
+
+  -- Group moderation: rate limit configuration
+  CREATE TABLE IF NOT EXISTS group_rate_limits (
+    group_id TEXT PRIMARY KEY REFERENCES groups(group_id) ON DELETE CASCADE,
+    max_per_minute INTEGER NOT NULL DEFAULT 10,
+    max_per_hour INTEGER NOT NULL DEFAULT 100
+  );
+
+  -- World follows: follow foxes and groups
+  CREATE TABLE IF NOT EXISTS world_follows (
+    follower_address TEXT NOT NULL,
+    target_address TEXT DEFAULT '',
+    target_group_id TEXT DEFAULT '',
+    follow_kind TEXT NOT NULL CHECK(follow_kind IN ('fox','group')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (follower_address, follow_kind, target_address, target_group_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_world_follows_follower
+    ON world_follows(follower_address, follow_kind, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_world_follows_target_fox
+    ON world_follows(target_address, follow_kind, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_world_follows_target_group
+    ON world_follows(target_group_id, follow_kind, created_at DESC);
+
+  -- World subscriptions: notification preferences per feed
+  CREATE TABLE IF NOT EXISTS world_subscriptions (
+    subscription_id TEXT PRIMARY KEY,
+    subscriber_address TEXT NOT NULL,
+    feed_kind TEXT NOT NULL CHECK(feed_kind IN ('fox','group','board')),
+    target_id TEXT NOT NULL,
+    notify_on TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_world_subscriptions_subscriber
+    ON world_subscriptions(subscriber_address, feed_kind, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_world_subscriptions_target
+    ON world_subscriptions(feed_kind, target_id, created_at DESC);
+
+  -- World search index: denormalized searchable text
+  CREATE TABLE IF NOT EXISTS world_search_index (
+    entry_id TEXT PRIMARY KEY,
+    entry_kind TEXT NOT NULL CHECK(entry_kind IN ('fox','group','board_item')),
+    searchable_text TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_world_search_index_kind
+    ON world_search_index(entry_kind, updated_at DESC);
+
+  -- Fox public profiles: publishable identity metadata
+  CREATE TABLE IF NOT EXISTS fox_profiles (
+    address TEXT PRIMARY KEY,
+    display_name TEXT,
+    bio TEXT,
+    avatar_url TEXT,
+    avatar_cid TEXT,
+    website_url TEXT,
+    tns_name TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    social_links TEXT NOT NULL DEFAULT '[]',
+    published_cid TEXT,
+    published_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Group public profiles: publishable group identity metadata
+  CREATE TABLE IF NOT EXISTS group_profiles (
+    group_id TEXT PRIMARY KEY,
+    avatar_url TEXT,
+    avatar_cid TEXT,
+    rules_url TEXT,
+    published_cid TEXT,
+    published_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (group_id) REFERENCES groups(group_id)
+  );
 `;

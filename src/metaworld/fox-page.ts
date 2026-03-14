@@ -22,6 +22,10 @@ import type {
   WorldPresenceSourceKind,
   WorldPresenceStatus,
 } from "./presence.js";
+import {
+  buildFoxReputationSummary,
+  type FoxReputationSummary,
+} from "./identity.js";
 
 export interface FoxPageAnnouncementRecord extends GroupAnnouncementRecord {
   groupName: string;
@@ -42,6 +46,7 @@ export interface FoxPageSnapshot {
   recentAnnouncements: FoxPageAnnouncementRecord[];
   recentMessages: FoxPageMessageRecord[];
   roleSummary: Record<string, number>;
+  reputationSummary: FoxReputationSummary | null;
   stats: {
     groupCount: number;
     activeGroupCount: number;
@@ -291,6 +296,13 @@ export function buildFoxPageSnapshot(params: {
     }
   }
 
+  let reputationSummary: FoxReputationSummary | null = null;
+  try {
+    reputationSummary = buildFoxReputationSummary(params.db, address);
+  } catch {
+    // reputation tables may not be available
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     fox,
@@ -300,6 +312,7 @@ export function buildFoxPageSnapshot(params: {
     recentAnnouncements,
     recentMessages,
     roleSummary,
+    reputationSummary,
     stats: {
       groupCount: fox.stats.groupCount,
       activeGroupCount: fox.stats.activeGroupCount,

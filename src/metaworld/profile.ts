@@ -2,6 +2,7 @@ import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 import type { AgentDiscoveryCard } from "../agent-discovery/types.js";
 import { listWorldFeedItems, type WorldFeedItem } from "./feed.js";
 import { buildWorldNotificationsSnapshot } from "./notifications.js";
+import { getFoxProfileRow } from "./identity.js";
 
 export interface FoxProfileGroupMembership {
   groupId: string;
@@ -35,6 +36,13 @@ export interface FoxProfile {
     recentActivityCount: number;
   };
   recentActivity: WorldFeedItem[];
+  publishedProfile: {
+    bio: string | null;
+    avatarUrl: string | null;
+    tags: string[];
+    publishedCid: string | null;
+    publishedAt: string | null;
+  } | null;
 }
 
 function normalizeAddressLike(value: string): string {
@@ -180,6 +188,14 @@ export function buildFoxProfile(params: {
       })
     : { unreadCount: 0 };
 
+  // Load published profile data if available
+  let publishedProfile: FoxProfile["publishedProfile"] = null;
+  try {
+    publishedProfile = getFoxProfileRow(params.db, address);
+  } catch {
+    // fox_profiles table may not exist yet in older schemas
+  }
+
   return {
     address,
     agentId:
@@ -214,5 +230,6 @@ export function buildFoxProfile(params: {
       recentActivityCount: recentActivity.length,
     },
     recentActivity,
+    publishedProfile,
   };
 }
