@@ -868,42 +868,19 @@ Delivered surface:
 - live metaWorld web routes and JSON APIs for following/followers,
   personalized feed, search, recommendations, and subscriptions
 
-#### Phase 14f: Packaged Multi-Node MetaWorld Demos (Task 106)
+#### Phase 14f: Packaged Multi-Node MetaWorld Demos (Task 106) ✅
 
-Status: proposed
+Delivered surface:
 
-Goal:
-
-- let operators launch and validate a real local multi-node Fox world without
-  hand assembly
-
-The next work should not reopen the completed core phases. It should focus on:
-
-1. completing Task 106 with packaged multi-node metaWorld demo environments
-2. broader public-network deployment hardening for storage, artifact, signer, and paymaster fleets
-3. richer operator dashboards, wallet visibility, and finance reporting on top of the now-stable runtime, marketplace, settlement, and artifact layers
-4. bounded fleet-control and autopilot surfaces for low-risk remote maintenance
-5. new work surfaces and product loops built on the completed foundations rather than more runtime rewrites
-
-The latest completed slice under this next stage is:
-
-- `openfox templates export public-fleet-operator --output ...`
-- `openfox dashboard show --manifest ...`
-- `openfox dashboard export --manifest ... --format json|html`
-- reusable fleet dashboard snapshots and HTML exports for public operator fleets
-- reusable `tosdk` signer-provider and paymaster-provider requester clients for
-  third-party builders
-- `openfox wallet report` and `openfox finance report`
-- `openfox fleet wallet --manifest ...` and `openfox fleet finance --manifest ...`
-- wallet and finance sections in operator dashboards and fleet exports
-
-The next operator-focused design target is documented in:
-
-- `docs/OpenFox-Operator-Box-Design.md`
-
-The next owner-focused design target is documented in:
-
-- `docs/OpenFox-Strategy-Opportunity-Reporting-Design.md`
+- `src/metaworld/demo.ts` packaged demo bundle export and validation helpers
+- `openfox world demo export --output-dir ...`
+- `openfox world demo validate --bundle ...`
+- seeded three-node local Fox world bundle with configs, wallets, SQLite state,
+  helper scripts, and per-node static site exports
+- end-to-end validation that starts temporary local `metaWorld` servers and
+  proves Group pages and feeds are backed by synchronized multi-node state
+- operator guide:
+  `docs/OpenFox-Local-MetaWorld-Demo-Guide.md`
 
 ### Phase 14: Operator Wallet and Finance Snapshots
 

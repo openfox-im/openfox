@@ -536,10 +536,23 @@ building OpenFox into a TOS-native agent platform.
       personalized feed, search, recommendations, and subscriptions
     - 22 targeted tests covering follows, subscriptions, search, ranking,
       recommendations, and subscription-aware feed/notification filtering
-- [ ] Task 106: Add packaged multi-node metaWorld demos and validation
-  - Status: Proposed
+- [x] Task 106: Add packaged multi-node metaWorld demos and validation
+  - Status: Complete
   - Goal: Let operators launch and validate a real local multi-node Fox world
     without hand assembly.
+  - Delivered:
+    - `src/metaworld/demo.ts` — packaged `metaWorld` demo bundle export and
+      end-to-end validation over seeded multi-node state
+    - `openfox world demo export --output-dir ...` — writes a three-node local
+      Fox world bundle with seeded SQLite state, configs, wallets, helper
+      scripts, and per-node static site exports
+    - `openfox world demo validate --bundle ...` — starts temporary local
+      `metaWorld` servers and proves replicated Group pages and feeds match the
+      seeded expectations across nodes
+    - `docs/OpenFox-Local-MetaWorld-Demo-Guide.md` — operator guide for bundle
+      export, serving, and validation
+    - targeted `world-demo` tests covering bundle export and end-to-end
+      validation
 
 ## Task 53 Breakdown
 
@@ -1608,8 +1621,8 @@ building OpenFox into a TOS-native agent platform.
 
 ## Task 106 Breakdown
 
-- [ ] Add packaged local multi-node `metaWorld` demo/dev templates.
-- [ ] Add deployable example manifests for a replicated Fox world.
-- [ ] Add end-to-end validation that proves world pages and feeds are backed by
+- [x] Add packaged local multi-node `metaWorld` demo/dev bundle export.
+- [x] Add deployable example manifests for a replicated Fox world.
+- [x] Add end-to-end validation that proves world pages and feeds are backed by
   synchronized multi-node state.
-- [ ] Add operator docs for launching and validating a local Fox world bundle.
+- [x] Add operator docs for launching and validating a local Fox world bundle.

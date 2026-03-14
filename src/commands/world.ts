@@ -43,6 +43,10 @@ import {
 } from "../metaworld/site.js";
 import { startMetaWorldServer } from "../metaworld/server.js";
 import {
+  exportMetaWorldDemoBundle,
+  validateMetaWorldDemoBundle,
+} from "../metaworld/demo.js";
+import {
   followFox,
   unfollowFox,
   followGroup,
@@ -138,6 +142,8 @@ Usage:
   openfox world shell [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
   openfox world shell export --output <path> [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
   openfox world site export --output-dir <path> [--foxes N] [--groups N] [--json]
+  openfox world demo export --output-dir <path> [--force] [--json]
+  openfox world demo validate --bundle <path> [--json]
   openfox world serve [--port N] [--host <addr>]
   openfox world presence publish [--group <group-id>] [--status <online|busy|away|recently_active>] [--ttl-seconds N] [--summary "<text>"] [--json]
   openfox world presence list [--group <group-id>] [--status <all|online|busy|away|recently_active|expired>] [--include-expired] [--limit N] [--json]
@@ -605,6 +611,54 @@ Usage:
       logger.info(`  groups: ${result.groupPages.length}`);
       logger.info(`  manifest: ${result.manifestPath}`);
       return;
+    }
+
+    if (command === "demo") {
+      const subcommand = args[1] || "export";
+      if (subcommand === "export") {
+        const outputDir = readOption(args, "--output-dir");
+        if (!outputDir) {
+          throw new Error(
+            "Usage: openfox world demo export --output-dir <path> [--force]",
+          );
+        }
+        const result = await exportMetaWorldDemoBundle({
+          outputDir: resolvePath(outputDir),
+          force: args.includes("--force"),
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+          return;
+        }
+        logger.info(`metaWorld demo bundle exported: ${result.outputDir}`);
+        logger.info(`  manifest: ${result.manifestPath}`);
+        logger.info(`  replicated group: ${result.manifest.replicatedGroup.groupId}`);
+        logger.info(`  nodes: ${result.manifest.nodes.length}`);
+        return;
+      }
+      if (subcommand === "validate") {
+        const bundleDir = readOption(args, "--bundle");
+        if (!bundleDir) {
+          throw new Error(
+            "Usage: openfox world demo validate --bundle <path>",
+          );
+        }
+        const result = await validateMetaWorldDemoBundle({
+          bundleDir: resolvePath(bundleDir),
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+          return;
+        }
+        logger.info(`metaWorld demo validation: ${result.ok ? "ok" : "failed"}`);
+        logger.info(`  bundle: ${result.bundleDir}`);
+        logger.info(`  checks: ${result.checks.filter((check) => check.ok).length}/${result.checks.length}`);
+        for (const check of result.checks) {
+          logger.info(`  [${check.ok ? "ok" : "fail"}] ${check.name} — ${check.detail}`);
+        }
+        return;
+      }
+      throw new Error(`Unknown world demo command: ${subcommand}`);
     }
 
     if (command === "serve") {
