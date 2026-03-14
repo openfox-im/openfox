@@ -341,6 +341,90 @@ export interface UnmuteGroupMemberResult {
   events: GroupEventRecord[];
 }
 
+export interface GroupJoinRequestRecord {
+  requestId: string;
+  groupId: string;
+  applicantAddress: string;
+  applicantAgentId: string | null;
+  applicantTnsName: string | null;
+  requestedRoles: string[];
+  requestMessage: string;
+  openedEventId: string;
+  approvalCount: number;
+  requiredApprovals: number;
+  status: "open" | "withdrawn" | "rejected" | "expired" | "committed";
+  committedEventId: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequestToJoinGroupInput {
+  groupId: string;
+  requestedRoles?: string[];
+  message?: string;
+  expiresAt?: string;
+  actorAddress?: string;
+  actorAgentId?: string;
+  actorTnsName?: string;
+}
+
+export interface RequestToJoinGroupResult {
+  request: GroupJoinRequestRecord;
+  event: GroupEventRecord;
+}
+
+export interface ApproveGroupJoinRequestInput {
+  groupId: string;
+  requestId: string;
+  actorAddress?: string;
+  actorAgentId?: string;
+  displayName?: string;
+}
+
+export interface ApproveGroupJoinRequestResult {
+  request: GroupJoinRequestRecord;
+  member: GroupMemberRecord;
+  events: GroupEventRecord[];
+}
+
+export interface WithdrawGroupJoinRequestInput {
+  groupId: string;
+  requestId: string;
+  actorAddress?: string;
+  actorAgentId?: string;
+}
+
+export interface WithdrawGroupJoinRequestResult {
+  request: GroupJoinRequestRecord;
+  event: GroupEventRecord;
+}
+
+export interface BanGroupMemberInput {
+  groupId: string;
+  targetAddress: string;
+  reason?: string;
+  actorAddress?: string;
+  actorAgentId?: string;
+}
+
+export interface BanGroupMemberResult {
+  member: GroupMemberRecord;
+  events: GroupEventRecord[];
+}
+
+export interface UnbanGroupMemberInput {
+  groupId: string;
+  targetAddress: string;
+  actorAddress?: string;
+  actorAgentId?: string;
+}
+
+export interface UnbanGroupMemberResult {
+  member: GroupMemberRecord;
+  events: GroupEventRecord[];
+}
+
 const textEncoder = new TextEncoder();
 const DEFAULT_GROUP_MAX_MEMBERS = 256;
 const DEFAULT_CHANNELS = [
@@ -666,6 +750,26 @@ function mapMessageRow(row: any): GroupMessageRecord {
   };
 }
 
+function mapJoinRequestRow(row: any): GroupJoinRequestRecord {
+  return {
+    requestId: row.request_id,
+    groupId: row.group_id,
+    applicantAddress: row.applicant_address,
+    applicantAgentId: row.applicant_agent_id ?? null,
+    applicantTnsName: row.applicant_tns_name ?? null,
+    requestedRoles: parseJsonSafe<string[]>(row.requested_roles_json, []),
+    requestMessage: row.request_message,
+    openedEventId: row.opened_event_id,
+    approvalCount: row.approval_count,
+    requiredApprovals: row.required_approvals,
+    status: row.status,
+    committedEventId: row.committed_event_id ?? null,
+    expiresAt: row.expires_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapEventRow(row: any): GroupEventRecord {
   return {
     eventId: row.event_id,
@@ -724,6 +828,23 @@ function requireProposal(
   return mapProposalRow(row);
 }
 
+function requireJoinRequest(
+  db: OpenFoxDatabase,
+  groupId: string,
+  requestId: string,
+): GroupJoinRequestRecord {
+  const row = db.raw
+    .prepare(
+      `SELECT * FROM group_join_requests
+       WHERE group_id = ? AND request_id = ?`,
+    )
+    .get(groupId, requestId) as any | undefined;
+  if (!row) {
+    throw new Error(`Join request not found: ${requestId}`);
+  }
+  return mapJoinRequestRow(row);
+}
+
 function ensureGroupWritable(group: GroupRecord): void {
   if (group.status !== "active") {
     throw new Error(`Group is not active: ${group.groupId}`);
@@ -774,6 +895,23 @@ function requirePostableMembership(
     );
   }
   return member;
+}
+
+function getStoredMembershipState(
+  db: OpenFoxDatabase,
+  groupId: string,
+  memberAddress: string,
+): GroupMembershipState | null {
+  const row = db.raw
+    .prepare(
+      `SELECT membership_state
+       FROM group_members
+       WHERE group_id = ? AND member_address = ?`,
+    )
+    .get(groupId, normalizeAddressLike(memberAddress)) as
+    | { membership_state: GroupMembershipState }
+    | undefined;
+  return row?.membership_state ?? null;
 }
 
 function ensureGroupHasRole(
@@ -930,6 +1068,49 @@ function refreshMessageReactionSummary(
     )
     .run(JSON.stringify(summary), nowIso(), groupId, messageId);
   return summary;
+}
+
+function upsertJoinRequestProjection(params: {
+  db: OpenFoxDatabase;
+  request: GroupJoinRequestRecord;
+}): void {
+  params.db.raw
+    .prepare(
+      `INSERT OR REPLACE INTO group_join_requests (
+        request_id,
+        group_id,
+        applicant_address,
+        applicant_agent_id,
+        applicant_tns_name,
+        requested_roles_json,
+        request_message,
+        opened_event_id,
+        approval_count,
+        required_approvals,
+        status,
+        committed_event_id,
+        expires_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      params.request.requestId,
+      params.request.groupId,
+      params.request.applicantAddress,
+      params.request.applicantAgentId,
+      params.request.applicantTnsName,
+      JSON.stringify(params.request.requestedRoles),
+      params.request.requestMessage,
+      params.request.openedEventId,
+      params.request.approvalCount,
+      params.request.requiredApprovals,
+      params.request.status,
+      params.request.committedEventId,
+      params.request.expiresAt,
+      params.request.createdAt,
+      params.request.updatedAt,
+    );
 }
 
 function upsertProposalProjection(params: {
@@ -1434,6 +1615,32 @@ export function listGroupProposals(
   return rows.map(mapProposalRow);
 }
 
+export function listGroupJoinRequests(
+  db: OpenFoxDatabase,
+  groupId: string,
+  filters?: {
+    status?: GroupJoinRequestRecord["status"];
+    limit?: number;
+  },
+): GroupJoinRequestRecord[] {
+  const conditions = ["group_id = ?"];
+  const values: unknown[] = [groupId];
+  if (filters?.status) {
+    conditions.push("status = ?");
+    values.push(filters.status);
+  }
+  values.push(Math.max(1, filters?.limit ?? 50));
+  const rows = db.raw
+    .prepare(
+      `SELECT * FROM group_join_requests
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .all(...values) as any[];
+  return rows.map(mapJoinRequestRow);
+}
+
 export function listGroupMembers(
   db: OpenFoxDatabase,
   groupId: string,
@@ -1751,6 +1958,9 @@ export async function sendGroupInvite(params: {
   if (existingMember?.membership_state === "active") {
     throw new Error(`target is already an active member of ${group.groupId}`);
   }
+  if (existingMember?.membership_state === "banned") {
+    throw new Error(`target is banned from ${group.groupId}`);
+  }
 
   const proposalId = `gpr_${ulid()}`;
   const createdAt = nowIso();
@@ -1862,6 +2072,9 @@ export async function acceptGroupInvite(params: {
     | undefined;
   if (existingMember?.membership_state === "active") {
     throw new Error(`target is already an active member of ${group.groupId}`);
+  }
+  if (existingMember?.membership_state === "banned") {
+    throw new Error(`target is banned from ${group.groupId}`);
   }
   if (countActiveMembers(params.db, group.groupId) >= group.maxMembers) {
     throw new Error(`group is at capacity (${group.maxMembers})`);
@@ -2220,6 +2433,473 @@ export async function removeGroupMember(params: {
   return {
     member,
     events: [proposedEvent, approvedEvent, committedEvent, noticeEvent, epochEvent],
+  };
+}
+
+export async function requestToJoinGroup(params: {
+  db: OpenFoxDatabase;
+  account: PrivateKeyAccount;
+  input: RequestToJoinGroupInput;
+}): Promise<RequestToJoinGroupResult> {
+  const group = requireGroup(params.db, params.input.groupId);
+  ensureGroupWritable(group);
+  if (group.joinMode !== "request_approval") {
+    throw new Error(`group does not allow join requests: ${group.groupId}`);
+  }
+  const actorAddress = normalizeAddressLike(
+    params.input.actorAddress ?? params.account.address,
+  );
+  const existingState = getStoredMembershipState(params.db, group.groupId, actorAddress);
+  if (existingState === "active") {
+    throw new Error(`actor is already a member of ${group.groupId}`);
+  }
+  if (existingState === "banned") {
+    throw new Error(`actor is banned from ${group.groupId}`);
+  }
+
+  const requestId = `gjr_${ulid()}`;
+  const createdAt = nowIso();
+  const requestedRoles = normalizeGroupRoles(params.input.requestedRoles);
+  const expiresAt =
+    normalizeOptionalText(params.input.expiresAt) ??
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const event = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "join.requested",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    payload: {
+      request_id: requestId,
+      applicant_address: actorAddress,
+      applicant_agent_id: normalizeOptionalText(params.input.actorAgentId),
+      applicant_tns_name: normalizeOptionalText(params.input.actorTnsName),
+      requested_roles: requestedRoles,
+      message: normalizeOptionalText(params.input.message) ?? "",
+      request_expires_at: expiresAt,
+    },
+  });
+
+  const request: GroupJoinRequestRecord = {
+    requestId,
+    groupId: group.groupId,
+    applicantAddress: actorAddress,
+    applicantAgentId: normalizeOptionalText(params.input.actorAgentId),
+    applicantTnsName: normalizeOptionalText(params.input.actorTnsName),
+    requestedRoles,
+    requestMessage: normalizeOptionalText(params.input.message) ?? "",
+    openedEventId: event.eventId,
+    approvalCount: 0,
+    requiredApprovals: 1,
+    status: "open",
+    committedEventId: null,
+    expiresAt,
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  params.db.runTransaction(() => {
+    upsertJoinRequestProjection({
+      db: params.db,
+      request,
+    });
+    params.db.raw
+      .prepare("UPDATE groups SET updated_at = ? WHERE group_id = ?")
+      .run(createdAt, group.groupId);
+    insertGroupEvent(params.db, event);
+  });
+
+  return { request, event };
+}
+
+export async function approveGroupJoinRequest(params: {
+  db: OpenFoxDatabase;
+  account: PrivateKeyAccount;
+  input: ApproveGroupJoinRequestInput;
+}): Promise<ApproveGroupJoinRequestResult> {
+  const group = requireGroup(params.db, params.input.groupId);
+  ensureGroupWritable(group);
+  const actorAddress = normalizeAddressLike(
+    params.input.actorAddress ?? params.account.address,
+  );
+  ensureGroupHasRole(params.db, group.groupId, actorAddress, ["owner", "admin"]);
+  const request = requireJoinRequest(params.db, group.groupId, params.input.requestId);
+  if (request.status !== "open") {
+    throw new Error(`join request is not open: ${request.requestId}`);
+  }
+  if (request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now()) {
+    throw new Error(`join request has expired: ${request.requestId}`);
+  }
+  const existingState = getStoredMembershipState(
+    params.db,
+    group.groupId,
+    request.applicantAddress,
+  );
+  if (existingState === "active") {
+    throw new Error(`applicant is already an active member of ${group.groupId}`);
+  }
+  if (existingState === "banned") {
+    throw new Error(`applicant is banned from ${group.groupId}`);
+  }
+  if (countActiveMembers(params.db, group.groupId) >= group.maxMembers) {
+    throw new Error(`group is at capacity (${group.maxMembers})`);
+  }
+
+  const createdAt = nowIso();
+  const approvedEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "join.approved",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [request.openedEventId],
+    payload: {
+      request_id: request.requestId,
+      approval_count: 1,
+      required_approvals: 1,
+    },
+  });
+  const committedEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "membership.add.committed",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [approvedEvent.eventId],
+    payload: {
+      request_id: request.requestId,
+      member_address: request.applicantAddress,
+      roles: request.requestedRoles,
+      joined_via: "join_request",
+    },
+  });
+  const nextEpoch = group.currentEpoch + 1;
+  const noticeEvent = await buildMembershipSystemNoticeEvent({
+    account: params.account,
+    group,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [committedEvent.eventId],
+    noticeType: "member_joined",
+    memberAddress: request.applicantAddress,
+    memberRoles: request.requestedRoles,
+  });
+  const epochEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "epoch.rotated",
+    epoch: nextEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [committedEvent.eventId],
+    payload: {
+      previous_epoch: group.currentEpoch,
+      next_epoch: nextEpoch,
+      reason: "membership_add",
+      member_address: request.applicantAddress,
+    },
+  });
+
+  const updatedRequest: GroupJoinRequestRecord = {
+    ...request,
+    approvalCount: 1,
+    status: "committed",
+    committedEventId: committedEvent.eventId,
+    updatedAt: createdAt,
+  };
+
+  params.db.runTransaction(() => {
+    insertMemberProjection({
+      db: params.db,
+      groupId: group.groupId,
+      memberAddress: request.applicantAddress,
+      memberAgentId: request.applicantAgentId,
+      displayName: params.input.displayName,
+      joinedVia: "join_request",
+      joinedAt: createdAt,
+      lastEventId: committedEvent.eventId,
+    });
+    for (const role of request.requestedRoles) {
+      insertRoleProjection({
+        db: params.db,
+        groupId: group.groupId,
+        memberAddress: request.applicantAddress,
+        role,
+        grantedByAddress: actorAddress,
+        grantedAt: createdAt,
+        lastEventId: committedEvent.eventId,
+      });
+    }
+    const membersRoot = recomputeMembersRoot(params.db, group.groupId);
+    params.db.raw
+      .prepare(
+        `UPDATE groups
+         SET current_epoch = ?, current_members_root = ?, updated_at = ?
+         WHERE group_id = ?`,
+      )
+      .run(nextEpoch, membersRoot, createdAt, group.groupId);
+    upsertJoinRequestProjection({
+      db: params.db,
+      request: updatedRequest,
+    });
+    insertGroupEvent(params.db, approvedEvent);
+    insertGroupEvent(params.db, committedEvent);
+    insertGroupEvent(params.db, noticeEvent);
+    insertGroupEvent(params.db, epochEvent);
+  });
+
+  return {
+    request: updatedRequest,
+    member: requireActiveMembership(params.db, group.groupId, request.applicantAddress),
+    events: [approvedEvent, committedEvent, noticeEvent, epochEvent],
+  };
+}
+
+export async function withdrawGroupJoinRequest(params: {
+  db: OpenFoxDatabase;
+  account: PrivateKeyAccount;
+  input: WithdrawGroupJoinRequestInput;
+}): Promise<WithdrawGroupJoinRequestResult> {
+  const group = requireGroup(params.db, params.input.groupId);
+  ensureGroupWritable(group);
+  const actorAddress = normalizeAddressLike(
+    params.input.actorAddress ?? params.account.address,
+  );
+  const request = requireJoinRequest(params.db, group.groupId, params.input.requestId);
+  if (request.status !== "open") {
+    throw new Error(`join request is not open: ${request.requestId}`);
+  }
+  if (request.applicantAddress !== actorAddress) {
+    throw new Error(`only the applicant can withdraw join request ${request.requestId}`);
+  }
+  const createdAt = nowIso();
+  const event = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "join.withdrawn",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [request.openedEventId],
+    payload: {
+      request_id: request.requestId,
+    },
+  });
+  const updatedRequest: GroupJoinRequestRecord = {
+    ...request,
+    status: "withdrawn",
+    updatedAt: createdAt,
+  };
+
+  params.db.runTransaction(() => {
+    upsertJoinRequestProjection({
+      db: params.db,
+      request: updatedRequest,
+    });
+    params.db.raw
+      .prepare("UPDATE groups SET updated_at = ? WHERE group_id = ?")
+      .run(createdAt, group.groupId);
+    insertGroupEvent(params.db, event);
+  });
+
+  return {
+    request: updatedRequest,
+    event,
+  };
+}
+
+export async function banGroupMember(params: {
+  db: OpenFoxDatabase;
+  account: PrivateKeyAccount;
+  input: BanGroupMemberInput;
+}): Promise<BanGroupMemberResult> {
+  const group = requireGroup(params.db, params.input.groupId);
+  ensureGroupWritable(group);
+  const actorAddress = normalizeAddressLike(
+    params.input.actorAddress ?? params.account.address,
+  );
+  ensureGroupHasRole(params.db, group.groupId, actorAddress, [
+    "owner",
+    "admin",
+    "moderator",
+  ]);
+  const targetAddress = normalizeAddressLike(params.input.targetAddress);
+  if (targetAddress === actorAddress) {
+    throw new Error("self-ban is not supported");
+  }
+  if (targetAddress === group.creatorAddress) {
+    throw new Error("refusing to ban the group creator in the initial implementation");
+  }
+  requireActiveMembership(params.db, group.groupId, targetAddress);
+
+  const createdAt = nowIso();
+  const bannedEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "moderation.member.banned",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    payload: {
+      target_address: targetAddress,
+      reason: normalizeOptionalText(params.input.reason),
+    },
+  });
+  const noticeEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "system.notice.posted",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [bannedEvent.eventId],
+    payload: {
+      notice_type: "member_banned",
+      member_address: targetAddress,
+      reason: normalizeOptionalText(params.input.reason),
+    },
+  });
+  const nextEpoch = group.currentEpoch + 1;
+  const epochEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "epoch.rotated",
+    epoch: nextEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [bannedEvent.eventId],
+    payload: {
+      previous_epoch: group.currentEpoch,
+      next_epoch: nextEpoch,
+      reason: "member_banned",
+      member_address: targetAddress,
+    },
+  });
+
+  params.db.runTransaction(() => {
+    params.db.raw
+      .prepare(
+        `UPDATE group_members
+         SET membership_state = 'banned', left_at = ?, mute_until = NULL, last_event_id = ?
+         WHERE group_id = ? AND member_address = ?`,
+      )
+      .run(createdAt, bannedEvent.eventId, group.groupId, targetAddress);
+    deactivateMemberRoles({
+      db: params.db,
+      groupId: group.groupId,
+      memberAddress: targetAddress,
+      revokedAt: createdAt,
+      lastEventId: bannedEvent.eventId,
+    });
+    const membersRoot = recomputeMembersRoot(params.db, group.groupId);
+    params.db.raw
+      .prepare(
+        `UPDATE groups
+         SET current_epoch = ?, current_members_root = ?, updated_at = ?
+         WHERE group_id = ?`,
+      )
+      .run(nextEpoch, membersRoot, createdAt, group.groupId);
+    insertGroupEvent(params.db, bannedEvent);
+    insertGroupEvent(params.db, noticeEvent);
+    insertGroupEvent(params.db, epochEvent);
+  });
+
+  const member = listGroupMembers(params.db, group.groupId).find(
+    (entry) => entry.memberAddress === targetAddress,
+  );
+  if (!member) {
+    throw new Error(`failed to reload member after ban: ${targetAddress}`);
+  }
+  return {
+    member,
+    events: [bannedEvent, noticeEvent, epochEvent],
+  };
+}
+
+export async function unbanGroupMember(params: {
+  db: OpenFoxDatabase;
+  account: PrivateKeyAccount;
+  input: UnbanGroupMemberInput;
+}): Promise<UnbanGroupMemberResult> {
+  const group = requireGroup(params.db, params.input.groupId);
+  ensureGroupWritable(group);
+  const actorAddress = normalizeAddressLike(
+    params.input.actorAddress ?? params.account.address,
+  );
+  ensureGroupHasRole(params.db, group.groupId, actorAddress, [
+    "owner",
+    "admin",
+    "moderator",
+  ]);
+  const targetAddress = normalizeAddressLike(params.input.targetAddress);
+  const state = getStoredMembershipState(params.db, group.groupId, targetAddress);
+  if (state !== "banned") {
+    throw new Error(`member is not banned in ${group.groupId}: ${targetAddress}`);
+  }
+  const createdAt = nowIso();
+  const unbannedEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "moderation.member.unbanned",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    payload: {
+      target_address: targetAddress,
+    },
+  });
+  const noticeEvent = await buildSignedGroupEvent({
+    account: params.account,
+    groupId: group.groupId,
+    kind: "system.notice.posted",
+    epoch: group.currentEpoch,
+    actorAddress,
+    actorAgentId: params.input.actorAgentId,
+    createdAt,
+    parentEventIds: [unbannedEvent.eventId],
+    payload: {
+      notice_type: "member_unbanned",
+      member_address: targetAddress,
+    },
+  });
+
+  params.db.runTransaction(() => {
+    params.db.raw
+      .prepare(
+        `UPDATE group_members
+         SET membership_state = 'removed', mute_until = NULL, last_event_id = ?
+         WHERE group_id = ? AND member_address = ?`,
+      )
+      .run(unbannedEvent.eventId, group.groupId, targetAddress);
+    params.db.raw
+      .prepare("UPDATE groups SET updated_at = ? WHERE group_id = ?")
+      .run(createdAt, group.groupId);
+    insertGroupEvent(params.db, unbannedEvent);
+    insertGroupEvent(params.db, noticeEvent);
+  });
+
+  const member = listGroupMembers(params.db, group.groupId).find(
+    (entry) => entry.memberAddress === targetAddress,
+  );
+  if (!member) {
+    throw new Error(`failed to reload member after unban: ${targetAddress}`);
+  }
+  return {
+    member,
+    events: [unbannedEvent, noticeEvent],
   };
 }
 

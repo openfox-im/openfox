@@ -6,14 +6,17 @@ import { privateKeyToAccount } from "tosdk/accounts";
 import { createDatabase } from "../state/database.js";
 import {
   acceptGroupInvite,
+  approveGroupJoinRequest,
   createGroup,
   createGroupChannel,
+  banGroupMember,
   editGroupMessage,
   getGroupDetail,
   leaveGroup,
   listGroupAnnouncements,
   listGroupChannels,
   listGroupEvents,
+  listGroupJoinRequests,
   listGroupMessages,
   listGroupMembers,
   listGroups,
@@ -24,8 +27,11 @@ import {
   reactGroupMessage,
   redactGroupMessage,
   removeGroupMember,
+  requestToJoinGroup,
   sendGroupInvite,
+  unbanGroupMember,
   unmuteGroupMember,
+  withdrawGroupJoinRequest,
 } from "../group/store.js";
 import type { OpenFoxDatabase } from "../types.js";
 
@@ -452,5 +458,161 @@ describe("Group Store", () => {
       },
     });
     expect(posted.message.senderAddress).toBe(memberAccount.address.toLowerCase());
+  });
+
+  it("supports join request withdraw and admin approval flows", async () => {
+    const admin = privateKeyToAccount(TEST_PRIVATE_KEY);
+    const applicant = privateKeyToAccount(SECOND_PRIVATE_KEY);
+    const created = await createGroup({
+      db,
+      account: admin,
+      input: {
+        name: "Fox Join Board",
+        actorAddress: admin.address,
+      },
+    });
+
+    const requested = await requestToJoinGroup({
+      db,
+      account: applicant,
+      input: {
+        groupId: created.group.groupId,
+        requestedRoles: ["member", "observer"],
+        message: "I want to help with oracle verification.",
+        actorAddress: applicant.address,
+      },
+    });
+    expect(requested.request.status).toBe("open");
+    expect(listGroupJoinRequests(db, created.group.groupId)).toHaveLength(1);
+
+    const withdrawn = await withdrawGroupJoinRequest({
+      db,
+      account: applicant,
+      input: {
+        groupId: created.group.groupId,
+        requestId: requested.request.requestId,
+        actorAddress: applicant.address,
+      },
+    });
+    expect(withdrawn.request.status).toBe("withdrawn");
+
+    const secondRequest = await requestToJoinGroup({
+      db,
+      account: applicant,
+      input: {
+        groupId: created.group.groupId,
+        requestedRoles: ["member"],
+        message: "Second attempt",
+        actorAddress: applicant.address,
+      },
+    });
+    const approved = await approveGroupJoinRequest({
+      db,
+      account: admin,
+      input: {
+        groupId: created.group.groupId,
+        requestId: secondRequest.request.requestId,
+        actorAddress: admin.address,
+        displayName: "Applicant",
+      },
+    });
+
+    expect(approved.request.status).toBe("committed");
+    expect(approved.member.membershipState).toBe("active");
+    expect(approved.member.roles).toEqual(["member"]);
+    expect(getGroupDetail(db, created.group.groupId)?.group.currentEpoch).toBe(2);
+  });
+
+  it("supports ban and unban, and blocks banned members from rejoining", async () => {
+    const admin = privateKeyToAccount(TEST_PRIVATE_KEY);
+    const memberAccount = privateKeyToAccount(SECOND_PRIVATE_KEY);
+    const created = await createGroup({
+      db,
+      account: admin,
+      input: {
+        name: "Fox Enforcement",
+        actorAddress: admin.address,
+      },
+    });
+
+    const invite = await sendGroupInvite({
+      db,
+      account: admin,
+      input: {
+        groupId: created.group.groupId,
+        targetAddress: memberAccount.address,
+        targetRoles: ["member"],
+        actorAddress: admin.address,
+      },
+    });
+    await acceptGroupInvite({
+      db,
+      account: memberAccount,
+      input: {
+        groupId: created.group.groupId,
+        proposalId: invite.proposal.proposalId,
+        actorAddress: memberAccount.address,
+      },
+    });
+
+    const banned = await banGroupMember({
+      db,
+      account: admin,
+      input: {
+        groupId: created.group.groupId,
+        targetAddress: memberAccount.address,
+        reason: "malicious behavior",
+        actorAddress: admin.address,
+      },
+    });
+    expect(banned.member.membershipState).toBe("banned");
+    expect(getGroupDetail(db, created.group.groupId)?.group.currentEpoch).toBe(3);
+
+    await expect(
+      requestToJoinGroup({
+        db,
+        account: memberAccount,
+        input: {
+          groupId: created.group.groupId,
+          requestedRoles: ["member"],
+          actorAddress: memberAccount.address,
+        },
+      }),
+    ).rejects.toThrow(/banned/i);
+
+    await expect(
+      sendGroupInvite({
+        db,
+        account: admin,
+        input: {
+          groupId: created.group.groupId,
+          targetAddress: memberAccount.address,
+          targetRoles: ["member"],
+          actorAddress: admin.address,
+        },
+      }),
+    ).rejects.toThrow(/banned/i);
+
+    const unbanned = await unbanGroupMember({
+      db,
+      account: admin,
+      input: {
+        groupId: created.group.groupId,
+        targetAddress: memberAccount.address,
+        actorAddress: admin.address,
+      },
+    });
+    expect(unbanned.member.membershipState).toBe("removed");
+
+    const requestAfterUnban = await requestToJoinGroup({
+      db,
+      account: memberAccount,
+      input: {
+        groupId: created.group.groupId,
+        requestedRoles: ["member"],
+        actorAddress: memberAccount.address,
+      },
+    });
+    expect(requestAfterUnban.request.status).toBe("open");
   });
 });

@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 40;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -1515,5 +1515,32 @@ export const CREATE_TABLES = `
 
   CREATE INDEX IF NOT EXISTS idx_group_epoch_keys_pending
     ON group_epoch_keys(group_id, epoch, delivered_at);
-`;
 
+  CREATE TABLE IF NOT EXISTS world_notification_state (
+    notification_id TEXT PRIMARY KEY,
+    read_at TEXT,
+    dismissed_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_world_notification_state_unread
+    ON world_notification_state(read_at, dismissed_at, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS world_presence (
+    actor_address TEXT NOT NULL,
+    scope_kind TEXT NOT NULL CHECK(scope_kind IN ('world','group')),
+    scope_ref TEXT NOT NULL DEFAULT '',
+    agent_id TEXT,
+    display_name TEXT,
+    status TEXT NOT NULL CHECK(status IN ('online','busy','away','recently_active')),
+    summary TEXT,
+    source_kind TEXT NOT NULL CHECK(source_kind IN ('self','peer','relay','snapshot')),
+    last_seen_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (actor_address, scope_kind, scope_ref)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_world_presence_scope
+    ON world_presence(scope_kind, scope_ref, expires_at DESC, updated_at DESC);
+`;
