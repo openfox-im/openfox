@@ -2158,7 +2158,7 @@ Acceptance criteria:
 
 ### Phase 46: OpenFox metaWorld v1
 
-Status: proposed
+Status: partially delivered
 
 Goal:
 
@@ -2172,6 +2172,7 @@ Design references:
 
 - `OpenFox-MetaWorld-v1-Product-Blueprint.md`
 - `OpenFox-Group-v0-Event-Types-and-CLI.md`
+- `OpenFox-MetaWorld-Completion-Status.md`
 
 Delivered surface:
 
@@ -2182,35 +2183,79 @@ Delivered surface:
 - public/listed community directory and discovery surface
 - world feed, lightweight presence, and bounded notifications
 - shared Group boards for work, opportunities, artifacts, and settlement
-- one world-facing web shell for entering the Fox world
+- one world-facing shell plus Fox and Group pages
+- static site export with `manifest.json`, `content-index.json`, and
+  `routes.json`
 
 Implementation tasks:
 
-- implement the Group storage, reducer, and sync model defined in the Group
-  design docs
-- add Group CLI, sync, invite, join, leave, remove, role, and moderation flows
-- add Group-aware web and API surfaces instead of leaving Groups as a docs-only
-  concept
-- define a Fox profile model that unifies address, `tns_name`, `agent_id`,
-  capability summary, community memberships, and recent activity
-- add public/listed directory queries for Foxes and Groups
-- add feed generation over community, work, artifact, and settlement events
-- add lightweight presence and notification surfaces
-- project existing bounty, campaign, scout, artifact, and settlement objects
-  into Group boards
-- add end-to-end local multi-node tests that prove the world surface is backed
-  by real replicated state instead of static demo data
+- complete replicated Group sync and replay-safe multi-node lifecycle tests
+- add a live routed web shell on top of the current static page/export layer
+- add richer moderation, safety, and anti-spam workflows
+- add public profile publishing, richer profile metadata, and reputation
+  summaries
+- add follow/subscription/search/ranking over world discovery and activity
+- add packaged local multi-node demo/dev templates and deployment validation
 
 Acceptance criteria:
 
 - an operator can create a Group and see it persist with local SQLite state,
   accepted event history, and materialized member/channel projections
-- another Fox can discover a listed/public Group, request to join, and appear as
-  a committed member after one admin approval
+- another Fox can discover a listed/public Group, request to join, and appear
+  as a committed member after one admin approval
 - members can use channels, announcements, replies, reactions, and moderation
   in a real Group
 - a user can browse Fox profiles and Group profiles through one world directory
 - at least one Group can expose work, opportunity, artifact, and settlement
   boards backed by current OpenFox runtime data
+- an operator can export a navigable static site bundle containing the world
+  shell, directory pages, Fox pages, Group pages, and machine-readable site
+  indexes
+- a multi-node OpenFox deployment can replicate Group state and render the
+  world from real synchronized data instead of one local node only
 - the main OpenFox web surface feels like entering a world of Foxes and
   communities rather than opening disconnected operator tools
+
+Current assessment:
+
+- the local-first runtime, projection, page, and static export layer of
+  `metaWorld v1` is largely implemented
+- the interactive, replicated, and safety-complete product layer is still
+  outstanding
+
+### Phase 47: OpenFox metaWorld v1 Productization
+
+Status: proposed
+
+Goal:
+
+- turn the current `metaWorld v1` runtime and static-export foundation into a
+  replicated, interactive, and production-facing Fox world
+
+Implementation tasks:
+
+- add Group peer/gateway/relay/storage replication with replay-safe sync,
+  snapshots, and multi-node validation
+- add a routed interactive web shell that consumes the current page snapshots,
+  `content-index`, and `routes` outputs
+- add moderation queues, warnings, reports, appeals, and anti-spam policy
+  surfaces
+- add richer public Fox and Group profile publishing with avatar/media and
+  reputation summaries
+- add follow/subscription/search/ranking over Foxes, Groups, boards, and world
+  feed items
+- add packaged demo/dev templates and end-to-end deployment validation for a
+  local multi-node Fox world
+
+Acceptance criteria:
+
+- at least two OpenFox nodes can exchange and reconcile Group state without
+  manual database copying
+- the world shell is available as a navigable interactive web surface rather
+  than only CLI plus static export
+- moderation and safety workflows cover warnings, reports, bans, appeals, and
+  rate-limit policy
+- public world discovery supports search, follows, and subscription-aware
+  notifications
+- operators can launch a local multi-node `metaWorld` demo from packaged
+  templates and validate the resulting world end to end

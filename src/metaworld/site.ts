@@ -34,6 +34,7 @@ export interface MetaWorldSiteManifest {
   foxDirectoryPath: string;
   groupDirectoryPath: string;
   contentIndexPath: string;
+  routesPath: string;
   foxPages: MetaWorldSitePageRef[];
   groupPages: MetaWorldSitePageRef[];
 }
@@ -71,6 +72,35 @@ export interface MetaWorldSiteContentIndex {
     activeMemberCount: number;
     tags: string[];
   }>;
+}
+
+export interface MetaWorldSiteRoutesIndex {
+  generatedAt: string;
+  routes: Array<
+    | {
+        kind: "world_shell";
+        path: string;
+        title: string;
+      }
+    | {
+        kind: "directory";
+        directoryKind: "foxes" | "groups";
+        path: string;
+        title: string;
+      }
+    | {
+        kind: "fox_page";
+        address: string;
+        path: string;
+        title: string;
+      }
+    | {
+        kind: "group_page";
+        groupId: string;
+        path: string;
+        title: string;
+      }
+  >;
 }
 
 function renderDirectoryPage(params: {
@@ -335,12 +365,53 @@ export async function exportMetaWorldSite(params: {
     "utf8",
   );
 
+  const routesIndex: MetaWorldSiteRoutesIndex = {
+    generatedAt,
+    routes: [
+      {
+        kind: "world_shell",
+        path: "index.html",
+        title: "OpenFox metaWorld",
+      },
+      {
+        kind: "directory",
+        directoryKind: "foxes",
+        path: "foxes/index.html",
+        title: "Fox Directory",
+      },
+      {
+        kind: "directory",
+        directoryKind: "groups",
+        path: "groups/index.html",
+        title: "Group Directory",
+      },
+      ...foxPages.map((page) => ({
+        kind: "fox_page" as const,
+        address: page.id,
+        path: page.path,
+        title: page.title,
+      })),
+      ...groupPages.map((page) => ({
+        kind: "group_page" as const,
+        groupId: page.id,
+        path: page.path,
+        title: page.title,
+      })),
+    ],
+  };
+  await fs.writeFile(
+    path.join(outputDir, "routes.json"),
+    `${JSON.stringify(routesIndex, null, 2)}\n`,
+    "utf8",
+  );
+
   const manifest: MetaWorldSiteManifest = {
     generatedAt,
     shellPath: "index.html",
     foxDirectoryPath: "foxes/index.html",
     groupDirectoryPath: "groups/index.html",
     contentIndexPath: "content-index.json",
+    routesPath: "routes.json",
     foxPages,
     groupPages,
   };

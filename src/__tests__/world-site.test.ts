@@ -135,6 +135,7 @@ describe("metaWorld site export", () => {
     expect(fs.existsSync(path.join(outputDir, "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "manifest.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "content-index.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "routes.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "foxes", "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "groups", "index.html"))).toBe(true);
     expect(
@@ -148,12 +149,14 @@ describe("metaWorld site export", () => {
       fs.readFileSync(path.join(outputDir, "manifest.json"), "utf8"),
     ) as {
       contentIndexPath: string;
+      routesPath: string;
       foxPages: Array<{ title: string }>;
       groupPages: Array<{ title: string }>;
     };
     expect(manifest.foxPages[0].title).toBe("Site Fox");
     expect(manifest.groupPages[0].title).toBe("Site Group");
     expect(manifest.contentIndexPath).toBe("content-index.json");
+    expect(manifest.routesPath).toBe("routes.json");
 
     const contentIndex = JSON.parse(
       fs.readFileSync(path.join(outputDir, "content-index.json"), "utf8"),
@@ -167,6 +170,29 @@ describe("metaWorld site export", () => {
     expect(contentIndex.foxes[0].title).toBe("Site Fox");
     expect(contentIndex.groups[0].title).toBe("Site Group");
     expect(contentIndex.groups[0].tags).toContain("site");
+
+    const routesIndex = JSON.parse(
+      fs.readFileSync(path.join(outputDir, "routes.json"), "utf8"),
+    ) as {
+      routes: Array<{ kind: string; path: string; title: string }>;
+    };
+    expect(routesIndex.routes.some((route) => route.kind === "world_shell")).toBe(
+      true,
+    );
+    expect(
+      routesIndex.routes.some(
+        (route) =>
+          route.kind === "fox_page" && route.title === "Site Fox" && route.path === result.foxPages[0].path,
+      ),
+    ).toBe(true);
+    expect(
+      routesIndex.routes.some(
+        (route) =>
+          route.kind === "group_page" &&
+          route.title === "Site Group" &&
+          route.path === result.groupPages[0].path,
+      ),
+    ).toBe(true);
 
     const shellHtml = fs.readFileSync(path.join(outputDir, "index.html"), "utf8");
     const foxHtml = fs.readFileSync(

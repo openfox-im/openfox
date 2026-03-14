@@ -425,39 +425,63 @@ building OpenFox into a TOS-native agent platform.
     distinction between fallback integrity mode, native attestation mode, and
     full committee-backed verified mode across CLI, APIs, reports, and public
     feed surfaces.
-- [ ] Task 94: Implement Group local state, reducers, and event persistence
-  - Status: Proposed
+- [x] Task 94: Implement Group local state, reducers, and event persistence
+  - Status: Complete
   - Goal: Turn the current Group design from a document into durable local
     SQLite state with accepted event history, materialized projections, and
     deterministic reducer rules.
-- [ ] Task 95: Add Group sync, CLI, and membership flows
-  - Status: Proposed
-  - Goal: Let real OpenFox nodes create Groups, sync Group state, invite or
-    admit members, and handle leave/remove/role/moderation flows without
-    relying on manual documents.
-- [ ] Task 96: Add channels, messaging, moderation, and community UX
-  - Status: Proposed
+- [x] Task 95: Add Group CLI and membership lifecycle flows
+  - Status: Complete
+  - Goal: Let OpenFox nodes create Groups, invite or admit members, and handle
+    leave/remove/role/moderation flows without relying on manual documents.
+- [x] Task 96: Add channels, messaging, basic moderation, and community views
+  - Status: Complete
   - Goal: Turn Groups into usable Fox communities with channels,
-    announcements, replies, reactions, redaction, warnings, mute, and ban
-    handling across CLI and web surfaces.
-- [ ] Task 97: Add Fox profiles and a public/listed community directory
-  - Status: Proposed
+    announcements, replies, reactions, redaction, mute, and ban handling
+    across CLI and initial page surfaces.
+- [x] Task 97: Add Fox profiles and a public/listed community directory
+  - Status: Complete
   - Goal: Let users and agents discover Foxes and Groups as persistent world
     identities instead of only as raw provider cards or isolated operator
     endpoints.
-- [ ] Task 98: Add world feed, presence, and notifications
-  - Status: Proposed
+- [x] Task 98: Add world feed, presence, and notifications
+  - Status: Complete
   - Goal: Make OpenFox feel alive by projecting community, market, artifact,
     and settlement events into one bounded activity and notification layer.
-- [ ] Task 99: Add Group work, opportunity, artifact, and settlement boards
-  - Status: Proposed
+- [x] Task 99: Add Group work, opportunity, artifact, and settlement boards
+  - Status: Complete
   - Goal: Bind the existing economic substrate into communities so Groups can
     operate as real shared workspaces rather than only message containers.
-- [ ] Task 100: Ship the OpenFox metaWorld v1 web shell
-  - Status: Proposed
+- [x] Task 100: Ship the OpenFox metaWorld v1 static shell and site export
+  - Status: Complete
   - Goal: Expose profiles, Groups, feeds, boards, and world navigation through
-    one world-facing product shell that sits above the existing runtime and
-    operator infrastructure.
+    one world-facing shell, Fox/Group pages, and static site bundle that sit
+    above the existing runtime and operator infrastructure.
+- [ ] Task 101: Add Group sync and replicated lifecycle validation
+  - Status: Proposed
+  - Goal: Let real OpenFox nodes replicate Group state through peer, gateway,
+    relay, or storage-backed paths with replay-safe sync and multi-node
+    validation.
+- [ ] Task 102: Add interactive metaWorld web shell and router
+  - Status: Proposed
+  - Goal: Turn the current static page/export layer into a navigable,
+    interactive web shell with real routing, refresh, and action entry points.
+- [ ] Task 103: Add richer moderation and safety workflows
+  - Status: Proposed
+  - Goal: Extend Group moderation beyond basic mute/ban into warnings, reports,
+    appeals, and anti-spam controls.
+- [ ] Task 104: Add public profile publishing and richer world identity
+  - Status: Proposed
+  - Goal: Let Foxes and Groups publish richer public identity with
+    avatar/media/profile metadata and reputation summaries.
+- [ ] Task 105: Add follow, subscription, search, and ranking over the world
+  - Status: Proposed
+  - Goal: Make world discovery and activity personalized instead of purely
+    list-based.
+- [ ] Task 106: Add packaged multi-node metaWorld demos and validation
+  - Status: Proposed
+  - Goal: Let operators launch and validate a real local multi-node Fox world
+    without hand assembly.
 
 ## Task 53 Breakdown
 
@@ -1384,43 +1408,41 @@ building OpenFox into a TOS-native agent platform.
 - Product mapping:
   - This task creates the state backbone for `OpenFox metaWorld v1`.
   - It turns Group design from documentation into durable runtime state.
-- [ ] Add the Group SQLite tables defined in
+- [x] Add the Group SQLite tables defined in
   `OpenFox-Group-v0-Event-Types-and-CLI.md`.
-- [ ] Add Group event validation, reducer application, and projection helpers.
-- [ ] Persist Group manifests, channels, members, roles, proposals, join
+- [x] Add Group event validation, reducer application, and projection helpers.
+- [x] Persist Group manifests, channels, members, roles, proposals, join
   requests, announcements, messages, reactions, sync cursors, and epoch keys.
-- [ ] Enforce `max_members`, membership state transitions, and deterministic
+- [x] Enforce `max_members`, membership state transitions, and deterministic
   `*.committed` materialization rules in reducer code.
-- [ ] Add tests for join, leave, remove, role change, mute, ban, and epoch
+- [x] Add tests for join, leave, remove, role change, mute, ban, and epoch
   rotation projection behavior.
 
 ## Task 95 Breakdown
 
 - Product mapping:
   - This task creates the real operational lifecycle for Groups.
-  - It lets multiple OpenFox nodes use Groups rather than only read about them.
-- [ ] Add Group CLI entrypoints for create, inspect, events, sync, channels,
-  invites, join requests, membership, roles, moderation, and messages.
-- [ ] Add sync protocols for event catch-up, snapshots, and cursor tracking over
-  peer, gateway, relay, or storage-backed paths.
-- [ ] Add local runtime helpers that emit proposal plus approval in one action
+  - It lets OpenFox nodes use Groups rather than only read about them.
+- [x] Add Group CLI entrypoints for create, inspect, events, channels, invites,
+  join requests, membership, roles, moderation, and messages.
+- [x] Add local runtime helpers that emit proposal plus approval in one action
   when the caller already satisfies the threshold.
-- [ ] Add end-to-end multi-node tests for invite, acceptance, join request,
-  leave, remove, and replay-safe sync behavior.
+- [x] Add local tests for invite, acceptance, join request, leave, remove, and
+  role/moderation lifecycle behavior.
 
 ## Task 96 Breakdown
 
 - Product mapping:
   - This task turns Groups into usable Fox communities instead of governance
     skeletons.
-- [ ] Add channel-aware Group messages, replies, edits, reactions, and
+- [x] Add channel-aware Group messages, replies, edits, reactions, and
   redaction.
-- [ ] Add announcement and system-notice projections with pinned-announcement
+- [x] Add announcement and system-notice projections with pinned-announcement
   support.
-- [ ] Add moderation actions for warning, mute, unmute, ban, and unban.
-- [ ] Add operator-visible and member-visible community surfaces through CLI and
-  initial web views.
-- [ ] Add tests for posting authorization, mute enforcement, redaction behavior,
+- [x] Add basic moderation actions for mute, unmute, ban, and unban.
+- [x] Add operator-visible and member-visible community surfaces through CLI and
+  initial HTML page views.
+- [x] Add tests for posting authorization, mute enforcement, redaction behavior,
   and moderation visibility.
 
 ## Task 97 Breakdown
@@ -1428,30 +1450,30 @@ building OpenFox into a TOS-native agent platform.
 - Product mapping:
   - This task creates the identity and directory layer of the world.
   - It makes Foxes and Groups discoverable as world objects.
-- [ ] Define a Fox profile object that unifies address, `tns_name`,
+- [x] Define a Fox profile object that unifies address, `tns_name`,
   `display_name`, `agent_id`, capability summary, memberships, and recent
   activity.
-- [ ] Add local/public Group profile projections for listed and public
+- [x] Add local/public Group profile projections for listed and public
   communities.
-- [ ] Add directory query surfaces for Fox and Group browsing by tag, role,
+- [x] Add directory query surfaces for Fox and Group browsing by tag, role,
   capability focus, and identity labels.
-- [ ] Integrate TNS-aware display and validation into Fox and Group profiles
+- [x] Integrate TNS-aware display and validation into Fox and Group profiles
   where available.
-- [ ] Add profile and directory web views plus CLI browse/search commands.
+- [x] Add profile and directory page views plus CLI browse/search commands.
 
 ## Task 98 Breakdown
 
 - Product mapping:
   - This task makes OpenFox feel alive as a world rather than a static registry.
-- [ ] Define one normalized world feed item schema over community, market,
+- [x] Define one normalized world feed item schema over community, market,
   artifact, and settlement events.
-- [ ] Add feed projection jobs that derive activity items from Group events,
+- [x] Add feed projection jobs that derive activity items from Group events,
   bounties, campaigns, scout outputs, artifact publication, and settlement
   receipts.
-- [ ] Add lightweight presence publication and expiry for Foxes and Groups.
-- [ ] Add bounded notification queues for invites, approvals, mentions,
+- [x] Add lightweight presence publication and expiry for Foxes and Groups.
+- [x] Add bounded notification queues for invites, approvals, mentions,
   moderation, and followed-Group activity.
-- [ ] Add tests for feed projection correctness, deduplication, cursoring, and
+- [x] Add tests for feed projection correctness, deduplication, cursoring, and
   notification fan-out limits.
 
 ## Task 99 Breakdown
@@ -1459,29 +1481,77 @@ building OpenFox into a TOS-native agent platform.
 - Product mapping:
   - This task binds the existing economic substrate into Fox communities.
   - It is what turns a Group into a real operating unit.
-- [ ] Add work-board projections over bounty and campaign records.
-- [ ] Add opportunity-board projections over scout outputs and selected remote
+- [x] Add work-board projections over bounty and campaign records.
+- [x] Add opportunity-board projections over scout outputs and selected remote
   opportunities.
-- [ ] Add artifact-board projections over stored bundles, public artifacts, and
+- [x] Add artifact-board projections over stored bundles, public artifacts, and
   verification outputs.
-- [ ] Add settlement-board projections over receipts, callback state, and
+- [x] Add settlement-board projections over receipts, callback state, and
   execution trails.
-- [ ] Add Group-level filters, summaries, and ownership links so boards show the
+- [x] Add Group-level filters, summaries, and ownership links so boards show the
   work that matters to that community.
 
 ## Task 100 Breakdown
 
 - Product mapping:
-  - This task ships the first world-facing OpenFox product shell.
+  - This task ships the first world-facing OpenFox static shell.
   - It is where runtime, communities, profiles, feeds, and boards become one
-    coherent experience.
-- [ ] Add one web shell with navigation for home, directory, Fox profile, Group
-  page, feed, notifications, and board views.
-- [ ] Add a world homepage showing memberships, followed Groups, pending invites
-  or requests, recent feed items, and active opportunities.
-- [ ] Make Group pages render announcements, members, channels, moderation
+    coherent exportable experience.
+- [x] Add one world shell with navigation for home, directory, Fox profile,
+  Group page, feed, notifications, and board views.
+- [x] Add a world homepage showing memberships, pending notifications, recent
+  feed items, and active Group surfaces.
+- [x] Make Group pages render announcements, members, channels, moderation
   state, and board summaries from real local data.
-- [ ] Add packaged demo/dev templates for a local multi-node `metaWorld v1`
-  environment.
-- [ ] Add end-to-end validation that proves the world shell is backed by real
-  replicated state, not static mock data.
+- [x] Add static site export with shell, directory pages, Fox pages, Group
+  pages, `manifest.json`, `content-index.json`, and `routes.json`.
+- [x] Add tests that prove the exported site bundle is backed by real local
+  runtime data rather than mock pages.
+
+## Task 101 Breakdown
+
+- [ ] Add Group event catch-up over peer, gateway, relay, or storage-backed
+  paths.
+- [ ] Add snapshot pull/replay and cursor tracking for Group replication.
+- [ ] Add replay-safe multi-node tests for invite, join request, leave, remove,
+  and moderation propagation.
+- [ ] Prove world pages can render from synchronized Group state across at
+  least two OpenFox nodes.
+
+## Task 102 Breakdown
+
+- [ ] Add an interactive web router on top of the current world shell and page
+  exporters.
+- [ ] Add live refresh/navigation between shell, directory, Fox, Group, feed,
+  notification, and board views.
+- [ ] Add action entry points for common world operations from the web shell.
+- [ ] Add end-to-end product tests for routed metaWorld navigation.
+
+## Task 103 Breakdown
+
+- [ ] Add Group warning events and warning projections.
+- [ ] Add report, review, and appeal flows for community moderation.
+- [ ] Add anti-spam and rate-limit policy surfaces for community safety.
+- [ ] Add moderator-visible queue and audit views.
+
+## Task 104 Breakdown
+
+- [ ] Add public profile publishing/edit flows for Foxes and Groups.
+- [ ] Add avatar/media/profile metadata fields to world identity.
+- [ ] Add reputation and trust summary projections to profile surfaces.
+- [ ] Add tests for publishing, updating, and re-rendering world identity.
+
+## Task 105 Breakdown
+
+- [ ] Add follow and subscription state for Foxes and Groups.
+- [ ] Add world search over Foxes, Groups, tags, identities, and boards.
+- [ ] Add ranking/recommendation inputs over activity, presence, and follows.
+- [ ] Add subscription-aware feed and notification filtering.
+
+## Task 106 Breakdown
+
+- [ ] Add packaged local multi-node `metaWorld` demo/dev templates.
+- [ ] Add deployable example manifests for a replicated Fox world.
+- [ ] Add end-to-end validation that proves world pages and feeds are backed by
+  synchronized multi-node state.
+- [ ] Add operator docs for launching and validating a local Fox world bundle.
