@@ -350,6 +350,9 @@ import {
   buildMetaWorldShellSnapshot,
 } from "./metaworld/shell.js";
 import {
+  exportMetaWorldSite,
+} from "./metaworld/site.js";
+import {
   acceptGroupInvite,
   approveGroupJoinRequest,
   banGroupMember,
@@ -5662,6 +5665,7 @@ Usage:
   openfox world group page export --group <group-id> --output <path> [--messages N] [--announcements N] [--events N] [--presence N] [--json]
   openfox world shell [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
   openfox world shell export --output <path> [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
+  openfox world site export --output-dir <path> [--foxes N] [--groups N] [--json]
   openfox world presence publish [--group <group-id>] [--status <online|busy|away|recently_active>] [--ttl-seconds N] [--summary "<text>"] [--json]
   openfox world presence list [--group <group-id>] [--status <all|online|busy|away|recently_active|expired>] [--include-expired] [--limit N] [--json]
   openfox world notifications [--group <group-id>] [--status <all|unread>] [--include-dismissed] [--limit N] [--json]
@@ -6054,6 +6058,36 @@ Usage:
       }
 
       throw new Error(`Unknown world shell command: ${subcommand}`);
+    }
+
+    if (command === "site") {
+      const subcommand = args[1] || "export";
+      if (subcommand !== "export") {
+        throw new Error(`Unknown world site command: ${subcommand}`);
+      }
+      const outputDir = readOption(args, "--output-dir");
+      if (!outputDir) {
+        throw new Error(
+          "Usage: openfox world site export --output-dir <path>",
+        );
+      }
+      const result = await exportMetaWorldSite({
+        db,
+        config,
+        outputDir: resolvePath(outputDir),
+        foxLimit: readNumberOption(args, "--foxes", 50),
+        groupLimit: readNumberOption(args, "--groups", 50),
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+      logger.info(`metaWorld site exported: ${result.outputDir}`);
+      logger.info(`  shell: ${result.shellPath}`);
+      logger.info(`  foxes: ${result.foxPages.length}`);
+      logger.info(`  groups: ${result.groupPages.length}`);
+      logger.info(`  manifest: ${result.manifestPath}`);
+      return;
     }
 
     if (command === "presence") {
