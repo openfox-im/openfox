@@ -33,6 +33,7 @@ export interface MetaWorldSiteManifest {
   shellPath: string;
   foxDirectoryPath: string;
   groupDirectoryPath: string;
+  searchPath: string;
   contentIndexPath: string;
   routesPath: string;
   searchIndexPath: string;
@@ -86,6 +87,11 @@ export interface MetaWorldSiteRoutesIndex {
     | {
         kind: "directory";
         directoryKind: "foxes" | "groups";
+        path: string;
+        title: string;
+      }
+    | {
+        kind: "search_page";
         path: string;
         title: string;
       }
@@ -164,6 +170,144 @@ function renderDirectoryPage(params: {
   });
 }
 
+function buildStaticSearchPage(params: {
+  generatedAt: string;
+  searchIndexPath: string;
+  navLinks: Array<{ label: string; href: string }>;
+}): string {
+  const baseHtml = renderMetaWorldPageFrame({
+    title: "Search · OpenFox metaWorld",
+    eyebrow: "OpenFox Search",
+    heading: "Search the Fox World",
+    lede: "Filter exported Fox and Group pages locally from the generated site bundle.",
+    generatedAt: params.generatedAt,
+    metrics: [
+      { label: "Scope", value: "Foxes + Groups" },
+      { label: "Mode", value: "static" },
+    ],
+    navLinks: params.navLinks,
+    sections: [
+      `<section class="panel">
+        <div class="section-head">
+          <h3>Search Index</h3>
+          <span>client-side</span>
+        </div>
+        <form id="mw-search-form" class="search-form">
+          <input id="mw-search-input" name="q" type="search" placeholder="Search foxes, groups, tags, roles, capabilities..." />
+          <button type="submit">Search</button>
+        </form>
+        <p id="mw-search-summary" class="empty">Loading search index...</p>
+      </section>`,
+      `<section class="grid">
+        <section class="panel">
+          <div class="section-head">
+            <h3>Fox Results</h3>
+            <span id="mw-search-fox-count">0</span>
+          </div>
+          <ul id="mw-search-fox-results" class="directory-list"><li class="empty">No results yet.</li></ul>
+        </section>
+        <section class="panel">
+          <div class="section-head">
+            <h3>Group Results</h3>
+            <span id="mw-search-group-count">0</span>
+          </div>
+          <ul id="mw-search-group-results" class="directory-list"><li class="empty">No results yet.</li></ul>
+        </section>
+      </section>`,
+    ],
+  });
+
+  const script = `<script>
+(function() {
+  var indexPath = ${JSON.stringify(params.searchIndexPath)};
+  var form = document.getElementById("mw-search-form");
+  var input = document.getElementById("mw-search-input");
+  var summary = document.getElementById("mw-search-summary");
+  var foxList = document.getElementById("mw-search-fox-results");
+  var groupList = document.getElementById("mw-search-group-results");
+  var foxCount = document.getElementById("mw-search-fox-count");
+  var groupCount = document.getElementById("mw-search-group-count");
+  var searchIndex = null;
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function tokenMatch(values, query) {
+    if (!query) return true;
+    var normalized = query.toLowerCase();
+    for (var i = 0; i < values.length; i += 1) {
+      var value = String(values[i] || "").toLowerCase();
+      if (value.indexOf(normalized) >= 0) return true;
+    }
+    return false;
+  }
+
+  function renderFoxItem(item) {
+    return '<li><strong><a href="../' + encodeURI(item.path) + '">' + escapeHtml(item.title) + '</a></strong><span>' +
+      escapeHtml((item.presenceStatus || 'offline') + ' · groups=' + item.activeGroupCount) +
+      '</span></li>';
+  }
+
+  function renderGroupItem(item) {
+    return '<li><strong><a href="../' + encodeURI(item.path) + '">' + escapeHtml(item.title) + '</a></strong><span>' +
+      escapeHtml(item.visibility + ' · members=' + item.activeMemberCount) +
+      '</span></li>';
+  }
+
+  function applyQuery(rawQuery) {
+    if (!searchIndex) return;
+    var query = String(rawQuery || '').trim();
+    var foxes = searchIndex.foxes.filter(function(item) {
+      return tokenMatch(item.searchableText || [], query);
+    });
+    var groups = searchIndex.groups.filter(function(item) {
+      return tokenMatch(item.searchableText || [], query);
+    });
+
+    foxCount.textContent = String(foxes.length);
+    groupCount.textContent = String(groups.length);
+    summary.textContent = query
+      ? ('Query "' + query + '" matched ' + foxes.length + ' fox(es) and ' + groups.length + ' group(s).')
+      : ('Loaded ' + foxes.length + ' fox(es) and ' + groups.length + ' group(s).');
+    foxList.innerHTML = foxes.length ? foxes.map(renderFoxItem).join('') : '<li class="empty">No fox results.</li>';
+    groupList.innerHTML = groups.length ? groups.map(renderGroupItem).join('') : '<li class="empty">No group results.</li>';
+
+    var url = new URL(window.location.href);
+    if (query) {
+      url.searchParams.set('q', query);
+    } else {
+      url.searchParams.delete('q');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  fetch(indexPath)
+    .then(function(response) { return response.json(); })
+    .then(function(payload) {
+      searchIndex = payload;
+      var initialQuery = new URL(window.location.href).searchParams.get('q') || '';
+      input.value = initialQuery;
+      applyQuery(initialQuery);
+    })
+    .catch(function(error) {
+      summary.textContent = 'Failed to load search index: ' + (error && error.message ? error.message : String(error));
+    });
+
+  form.addEventListener('submit', function(event) {
+    event.preventDefault();
+    applyQuery(input.value || '');
+  });
+})();
+</script>`;
+
+  return baseHtml.replace("</body>\n</html>", `${script}\n</body>\n</html>`);
+}
+
 export async function exportMetaWorldSite(params: {
   db: OpenFoxDatabase;
   config: OpenFoxConfig;
@@ -222,14 +366,17 @@ export async function exportMetaWorldSite(params: {
 
   const foxDir = path.join(outputDir, "foxes");
   const groupDir = path.join(outputDir, "groups");
+  const searchDir = path.join(outputDir, "search");
   await fs.mkdir(foxDir, { recursive: true });
   await fs.mkdir(groupDir, { recursive: true });
+  await fs.mkdir(searchDir, { recursive: true });
 
   await fs.writeFile(
     path.join(outputDir, "index.html"),
     buildMetaWorldShellHtml(shellSnapshot, {
       foxDirectoryHref: "./foxes/index.html",
       groupDirectoryHref: "./groups/index.html",
+      searchHref: "./search/index.html",
       foxHrefsByAddress: shellFoxLinks,
       groupHrefsById: shellGroupLinks,
     }),
@@ -254,6 +401,7 @@ export async function exportMetaWorldSite(params: {
         homeHref: "../index.html",
         foxDirectoryHref: "./index.html",
         groupDirectoryHref: "../groups/index.html",
+        searchHref: "../search/index.html",
         groupHrefsById: Object.fromEntries(
           Object.entries(shellGroupLinks).map(([groupId, href]) => [
             groupId,
@@ -287,6 +435,7 @@ export async function exportMetaWorldSite(params: {
         homeHref: "../index.html",
         foxDirectoryHref: "../foxes/index.html",
         groupDirectoryHref: "./index.html",
+        searchHref: "../search/index.html",
         foxHrefsByAddress: Object.fromEntries(
           Object.entries(shellFoxLinks).map(([address, href]) => [
             address,
@@ -319,6 +468,7 @@ export async function exportMetaWorldSite(params: {
         { label: "World Shell", href: "../index.html" },
         { label: "Fox Directory", href: "./index.html" },
         { label: "Group Directory", href: "../groups/index.html" },
+        { label: "Search", href: "../search/index.html" },
       ],
       entries: foxDirectory.items.map((item) => ({
         title: item.displayName,
@@ -345,6 +495,7 @@ export async function exportMetaWorldSite(params: {
         { label: "World Shell", href: "../index.html" },
         { label: "Fox Directory", href: "../foxes/index.html" },
         { label: "Group Directory", href: "./index.html" },
+        { label: "Search", href: "../search/index.html" },
       ],
       entries: groupDirectory.items.map((item) => ({
         title: item.name,
@@ -410,6 +561,11 @@ export async function exportMetaWorldSite(params: {
         path: "groups/index.html",
         title: "Group Directory",
       },
+      {
+        kind: "search_page",
+        path: "search/index.html",
+        title: "Search",
+      },
       ...foxPages.map((page) => ({
         kind: "fox_page" as const,
         address: page.id,
@@ -474,11 +630,27 @@ export async function exportMetaWorldSite(params: {
     "utf8",
   );
 
+  await fs.writeFile(
+    path.join(searchDir, "index.html"),
+    buildStaticSearchPage({
+      generatedAt,
+      searchIndexPath: "../search-index.json",
+      navLinks: [
+        { label: "World Shell", href: "../index.html" },
+        { label: "Fox Directory", href: "../foxes/index.html" },
+        { label: "Group Directory", href: "../groups/index.html" },
+        { label: "Search", href: "./index.html" },
+      ],
+    }),
+    "utf8",
+  );
+
   const manifest: MetaWorldSiteManifest = {
     generatedAt,
     shellPath: "index.html",
     foxDirectoryPath: "foxes/index.html",
     groupDirectoryPath: "groups/index.html",
+    searchPath: "search/index.html",
     contentIndexPath: "content-index.json",
     routesPath: "routes.json",
     searchIndexPath: "search-index.json",

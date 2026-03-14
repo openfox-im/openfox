@@ -31,7 +31,7 @@ pnpm openfox templates export local-marketplace --output ./examples/local-market
 
 - `third-party-quickstart`
 - `local-marketplace`
-- `metaworld-local-demo`
+- `metaworld-local-demo` (`generated` via `openfox world demo export`)
 - `public-provider`
 - `public-fleet-operator`
 - `task-sponsor`

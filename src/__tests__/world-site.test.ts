@@ -137,6 +137,7 @@ describe("metaWorld site export", () => {
     expect(fs.existsSync(path.join(outputDir, "content-index.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "routes.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "search-index.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "search", "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "foxes", "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "groups", "index.html"))).toBe(true);
     expect(
@@ -149,6 +150,7 @@ describe("metaWorld site export", () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(outputDir, "manifest.json"), "utf8"),
     ) as {
+      searchPath: string;
       contentIndexPath: string;
       routesPath: string;
       searchIndexPath: string;
@@ -157,6 +159,7 @@ describe("metaWorld site export", () => {
     };
     expect(manifest.foxPages[0].title).toBe("Site Fox");
     expect(manifest.groupPages[0].title).toBe("Site Group");
+    expect(manifest.searchPath).toBe("search/index.html");
     expect(manifest.contentIndexPath).toBe("content-index.json");
     expect(manifest.routesPath).toBe("routes.json");
     expect(manifest.searchIndexPath).toBe("search-index.json");
@@ -182,6 +185,14 @@ describe("metaWorld site export", () => {
     expect(routesIndex.routes.some((route) => route.kind === "world_shell")).toBe(
       true,
     );
+    expect(
+      routesIndex.routes.some(
+        (route) =>
+          route.kind === "search_page" &&
+          route.title === "Search" &&
+          route.path === "search/index.html",
+      ),
+    ).toBe(true);
     expect(
       routesIndex.routes.some(
         (route) =>
@@ -218,16 +229,25 @@ describe("metaWorld site export", () => {
       path.join(outputDir, result.groupPages[0].path),
       "utf8",
     );
+    const searchHtml = fs.readFileSync(
+      path.join(outputDir, "search", "index.html"),
+      "utf8",
+    );
     expect(shellHtml).toContain("OpenFox metaWorld");
     expect(shellHtml).toContain('href="./foxes/index.html"');
     expect(shellHtml).toContain('href="./groups/index.html"');
+    expect(shellHtml).toContain('href="./search/index.html"');
     expect(foxHtml).toContain("Site Fox");
     expect(foxHtml).toContain('href="../index.html"');
     expect(foxHtml).toContain('href="../groups/index.html"');
+    expect(foxHtml).toContain('href="../search/index.html"');
     expect(foxHtml).toContain(`href="../groups/${created.group.groupId}.html"`);
     expect(groupHtml).toContain("Site Group");
     expect(groupHtml).toContain("Site Announcement");
     expect(groupHtml).toContain('href="../foxes/index.html"');
+    expect(groupHtml).toContain('href="../search/index.html"');
     expect(groupHtml).toContain(`href="../foxes/${admin.address.toLowerCase()}.html"`);
+    expect(searchHtml).toContain("../search-index.json");
+    expect(searchHtml).toContain("Search the Fox World");
   });
 });

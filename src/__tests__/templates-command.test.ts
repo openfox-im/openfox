@@ -29,6 +29,11 @@ describe("bundled templates", () => {
     expect(items.some((item) => item.name === "oracle-market-flow")).toBe(true);
     expect(items.some((item) => item.name === "proof-market-flow")).toBe(true);
     expect(items.some((item) => item.name === "verification-market-flow")).toBe(true);
+    const metaworldTemplate = items.find(
+      (item) => item.name === "metaworld-local-demo",
+    );
+    expect(metaworldTemplate?.exportMode).toBe("generated");
+    expect(metaworldTemplate?.generatedBy).toBe("openfox world demo export");
   });
 
   it("reads bundled template readmes", () => {
@@ -45,6 +50,7 @@ describe("bundled templates", () => {
     });
 
     expect(result.outputPath).toBe(outputPath);
+    expect(result.exportMode).toBe("copy");
     expect(fs.existsSync(path.join(outputPath, "host.openfox.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputPath, "solver.openfox.json"))).toBe(true);
   });
@@ -101,12 +107,14 @@ describe("bundled templates", () => {
   it("exports the generated metaWorld local demo bundle", async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-template-"));
     const outputPath = path.join(tempDir, "metaworld-local-demo");
-    await exportBundledTemplate({
+    const result = await exportBundledTemplate({
       name: "metaworld-local-demo",
       outputPath,
       force: true,
     });
 
+    expect(result.exportMode).toBe("generated");
+    expect(result.generatedBy).toBe("openfox world demo export");
     expect(fs.existsSync(path.join(outputPath, "metaworld-demo.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputPath, "scripts", "serve-node.sh"))).toBe(
       true,

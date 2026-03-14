@@ -331,6 +331,7 @@ export function buildFoxPageHtml(
     homeHref?: string;
     foxDirectoryHref?: string;
     groupDirectoryHref?: string;
+    searchHref?: string;
     groupHrefsById?: Record<string, string>;
   },
 ): string {
@@ -477,6 +478,7 @@ export function buildFoxPageHtml(
       { label: "World Shell", href: options?.homeHref ?? "../index.html" },
       { label: "Fox Directory", href: options?.foxDirectoryHref ?? "./index.html" },
       { label: "Group Directory", href: options?.groupDirectoryHref ?? "../groups/index.html" },
+      { label: "Search", href: options?.searchHref ?? "../search/index.html" },
     ],
     metrics: [
       { label: "Active groups", value: snapshot.stats.activeGroupCount },

@@ -249,13 +249,35 @@ function renderSearchHtml(
     kinds: kind ? [kind] : undefined,
     limit,
   });
+  function resultHref(item: { kind: "fox" | "group" | "board_item"; sourceId: string }): string | null {
+    if (item.kind === "fox") {
+      return `/fox/${encodeURIComponent(item.sourceId)}`;
+    }
+    if (item.kind === "group") {
+      return `/group/${encodeURIComponent(item.sourceId)}`;
+    }
+    return null;
+  }
   const items = snapshot.results
-    .map(
-      (item) =>
-        `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.kind)}</span><span>score ${escapeHtml(String(item.relevanceScore))}</span></div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.summary)}</p></div>`,
-    )
+    .map((item) => {
+      const href = resultHref(item);
+      const title = href
+        ? `<a href="${escapeHtml(href)}">${escapeHtml(item.title)}</a>`
+        : escapeHtml(item.title);
+      return `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.kind)}</span><span>score ${escapeHtml(String(item.relevanceScore))}</span></div><h4>${title}</h4><p>${escapeHtml(item.summary)}</p></div>`;
+    })
     .join("");
   const content = `<h2 class="mw-title">Search</h2>
+<form method="GET" action="/search" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+  <input name="query" type="search" value="${escapeHtml(query || "")}" placeholder="Search foxes, groups, bounties, and tags" style="flex:1 1 280px;padding:10px 12px;border-radius:12px;border:1px solid var(--text-muted);" />
+  <select name="kind" style="padding:10px 12px;border-radius:12px;border:1px solid var(--text-muted);">
+    <option value=""${!kind ? " selected" : ""}>All</option>
+    <option value="fox"${kind === "fox" ? " selected" : ""}>Foxes</option>
+    <option value="group"${kind === "group" ? " selected" : ""}>Groups</option>
+    <option value="board_item"${kind === "board_item" ? " selected" : ""}>Board items</option>
+  </select>
+  <button type="submit" style="padding:10px 14px;border-radius:12px;border:none;background:var(--accent);color:white;">Search</button>
+</form>
 <p style="color:var(--text-muted);margin-bottom:16px;">${escapeHtml(snapshot.summary)}</p>
 <div class="mw-grid">${items || '<p class="mw-empty">No results.</p>'}</div>`;
   return wrapInLayout("Search", content, "/search");

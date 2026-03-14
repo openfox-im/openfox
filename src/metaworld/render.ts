@@ -177,6 +177,32 @@ export function renderMetaWorldPageFrame(params: {
       color: var(--muted);
       line-height: 1.45;
     }
+    .search-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .search-form input,
+    .search-form button {
+      font: inherit;
+    }
+    .search-form input {
+      flex: 1 1 280px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(29,36,31,0.18);
+      background: rgba(255,255,255,0.78);
+      color: var(--ink);
+    }
+    .search-form button {
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+    }
     a {
       color: var(--accent);
     }

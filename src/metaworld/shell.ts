@@ -32,6 +32,7 @@ export interface MetaWorldShellSnapshot {
 export interface MetaWorldShellHtmlOptions {
   foxDirectoryHref?: string;
   groupDirectoryHref?: string;
+  searchHref?: string;
   foxHrefsByAddress?: Record<string, string>;
   groupHrefsById?: Record<string, string>;
 }
@@ -452,6 +453,11 @@ export function buildMetaWorldShellHtml(
       ${
         options?.groupDirectoryHref
           ? `<a href="${escapeHtml(options.groupDirectoryHref)}">Group Directory</a>`
+          : ""
+      }
+      ${
+        options?.searchHref
+          ? `<a href="${escapeHtml(options.searchHref)}">Search</a>`
           : ""
       }
     </nav>
