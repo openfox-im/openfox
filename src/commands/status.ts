@@ -34,3 +34,7 @@ export async function showStatus(options: { asJson?: boolean } = {}): Promise<vo
     db.close();
   }
 }
+
+export async function handleStatusCommand(args: string[]): Promise<void> {
+  await showStatus({ asJson: args.includes("--json") });
+}
