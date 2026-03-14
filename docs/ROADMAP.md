@@ -884,7 +884,7 @@ Delivered surface:
 
 ### Phase 46: OpenFox MetaWorld v2 Organization Layer
 
-Status: in progress
+Status: completed (Tasks 107-110 done)
 
 Goal:
 
@@ -896,14 +896,6 @@ Design references:
 
 - `OpenFox-MetaWorld-Future-State.md`
 - `OpenFox-MetaWorld-Completion-Status.md`
-
-Implementation tasks:
-
-- add governance surfaces over Group proposals, join requests, and approval
-  state
-- add treasury and budget surfaces for shared Group economic context
-- add richer artifact and settlement trail pages
-- add stronger publication and federation paths for hosted world surfaces
 
 Acceptance criteria:
 
@@ -962,6 +954,129 @@ Delivered surface:
 - targeted `world-publication`, `world-site`, and `metaworld-server` tests
   proving publication and federation surfaces are rendered from real local and
   remote state
+
+### Phase 47: OpenFox MetaWorld v2 Economic Layer
+
+Status: complete
+
+Goal:
+
+- turn Groups from community containers into self-governing economic
+  organizations with treasuries, governance, intent-driven work, global
+  reputation, and on-chain anchoring
+
+Design references:
+
+- `OpenFox-MetaWorld-v2-Product-Blueprint.md`
+- `OpenFox-MetaWorld-Future-State.md`
+
+#### Phase 47a: Full Group Governance System (Task 111)
+
+Scope:
+
+- typed governance proposals (spend, policy_change, member_action, config_change,
+  treasury_config, external_action) with configurable quorum and threshold
+- governance voting with one-vote-per-member, early resolution, and expiry
+- proposal execution with side effects (moderation events, policy updates)
+- governance snapshots on Group pages and world shell
+- migration from v1 single-approval proposals to multi-approval system
+- `group_governance_proposals`, `group_governance_votes`,
+  `group_governance_policy` schema tables
+- 4 new event kinds: proposal.created, proposal.voted, proposal.resolved,
+  proposal.executed
+
+#### Phase 47b: Group Treasury and Budget System (Task 112)
+
+Scope:
+
+- deterministic treasury address derived from creator key + Group ID
+- three-permission model: propose_spend / approve_spend / execute_spend
+- spend lifecycle: propose → vote → approve → execute (real TOS transaction) → record
+- budget lines with per-period caps (daily/weekly/monthly/epoch) and auto-reset
+- treasury balance sync from on-chain via RPC
+- treasury freeze/unfreeze mechanism
+- `group_treasury`, `group_budget_lines`, `group_treasury_log` schema tables
+- 6 new event kinds: treasury.initialized, treasury.spend.executed,
+  treasury.inflow.detected, treasury.frozen, treasury.unfrozen,
+  treasury.budget.updated
+
+#### Phase 47c: Generalized Intent System (Task 113)
+
+Scope:
+
+- intent objects with kind, requirements, optional budget, and 8-state lifecycle
+- three matching modes: automatic (capability-based), manual, competitive
+- solver responses with proposals and artifact submission
+- intent completion → auto-creates treasury spend proposal for settlement
+- world-level and Group-level intent boards
+- `world_intents`, `world_intent_responses` schema tables
+
+#### Phase 47d: Global Reputation Graph (Task 114)
+
+Scope:
+
+- 5 Fox reputation dimensions (reliability, quality, collaboration, economic,
+  moderation) and 4 Group dimensions (activity, settlement_volume,
+  member_quality, governance_health)
+- exponential decay weighting (half-life ~69 days)
+- cross-Group reputation flow through settlement graph
+- signed reputation attestations for cross-node portability
+- trust path queries via BFS through shared Groups and settlements
+- reputation-weighted search ranking
+- `world_reputation_scores`, `world_reputation_events` schema tables
+
+#### Phase 47e: Real-Time Push Infrastructure (Task 115)
+
+Scope:
+
+- in-process WorldEventBus pub/sub for internal event routing
+- SSE endpoint at `/api/v1/events/stream` for real-time client delivery
+- optional WebSocket endpoint at `/api/v1/ws` for bidirectional flows
+- client-side SSE integration replacing 30-second poll in world shell
+- event emission from governance, treasury, intents, reputation, and messaging
+
+Acceptance criteria for Phase 47:
+
+- a Group can hold TOS funds and execute governance-approved spends as real
+  chain transactions
+- budget lines enforce per-period caps and reject overspend
+- Foxes can publish intents, solvers can respond, and completed intents trigger
+  treasury settlement
+- Fox reputation reflects real settlement history across multiple Groups
+- the web shell delivers real-time updates via SSE without page refresh
+- all v2 features compose with v1: a Group with treasury, governance, and
+  intent boards works end-to-end
+
+#### Phase 47f: Nested Channels and Subgroups (Task 116)
+
+Scope:
+
+- parent_channel_id column on group_channels for channel hierarchy
+- group_subgroups table for parent-child Group relationships
+- subgroup treasury modes: shared, independent, sub_budget
+- subgroup policy inheritance
+- nested channel tree rendering in world shell
+
+#### Phase 47g: On-Chain Group Anchoring (Task 117)
+
+Scope:
+
+- GTOS-side: new Group Registry system contract with GROUP_REGISTER and
+  GROUP_STATE_COMMIT system actions (~300 lines Go in ~/gtos/group/)
+- OpenFox-side: chain-anchor.ts calling sendSystemAction
+- events Merkle root construction from group_events
+- group_chain_commitments schema table
+- periodic commitment publishing via heartbeat
+
+#### Phase 47h: World Federation (Task 118)
+
+Scope:
+
+- world_federation_peers and world_federation_events schema tables
+- federated Fox directory import/export with conflict resolution
+- world-level sync transport reusing Group sync patterns
+- signed reputation attestation verification across nodes
+- heartbeat-driven federation sync
 
 ### Phase 14: Operator Wallet and Finance Snapshots
 

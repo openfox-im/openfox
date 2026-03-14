@@ -1,9 +1,17 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 import { createLogger } from "../observability/logger.js";
+import { loadWalletAccount } from "../identity/wallet.js";
 import { escapeHtml } from "./render.js";
 import { buildMetaWorldLayout } from "./layout.js";
 import { buildMetaWorldRouterScript } from "./router.js";
+import {
+  listIntents,
+  getIntent,
+  listIntentResponses,
+  type IntentKind,
+  type IntentStatus,
+} from "./intents.js";
 import {
   buildMetaWorldShellSnapshot,
   buildMetaWorldShellHtml,
@@ -46,9 +54,24 @@ import {
 import { buildFoxProfile } from "./profile.js";
 import { buildSearchResultSnapshot } from "./search.js";
 import {
+  getReputationCard,
+  getReputationLeaderboard,
+  type ReputationDimension,
+  type ReputationEntityType,
+} from "./reputation.js";
+import {
   buildGroupGovernanceHtml,
   buildGroupGovernanceSnapshot,
 } from "./governance.js";
+import {
+  buildGovernanceV2Snapshot,
+  listGovernanceProposals,
+  getGovernanceProposalWithVotes,
+  createGovernanceProposal,
+  voteOnProposal,
+  type GovernanceProposalType,
+  type GovernanceVote,
+} from "../group/governance.js";
 import {
   buildGroupTreasuryHtml,
   buildGroupTreasurySnapshot,
@@ -71,6 +94,13 @@ import {
   listFoxFollowers,
   listGroupFollowers,
 } from "./follows.js";
+import { worldEventBus, type WorldEventKind } from "./event-bus.js";
+import {
+  listFederationPeers,
+  listFederationEvents,
+  buildFederationSnapshot,
+  type FederationEventType,
+} from "./federation.js";
 
 const logger = createLogger("metaworld-server");
 
@@ -689,6 +719,92 @@ export async function startMetaWorldServer(
           return;
         }
 
+        // --- Governance v2 API routes ---
+
+        if (req.method === "GET" && /^\/api\/v1\/group\/[^/]+\/governance\/proposals$/.test(pathname)) {
+          const groupId = decodeURIComponent(pathname.split("/")[4]);
+          try {
+            const status = url.searchParams.get("status") as string | null;
+            const proposals = listGovernanceProposals(
+              db,
+              groupId,
+              (status || undefined) as any,
+            );
+            jsonResponse(res, 200, { groupId, proposals });
+          } catch (err) {
+            jsonResponse(res, 404, { error: err instanceof Error ? err.message : "not found" });
+          }
+          return;
+        }
+
+        if (req.method === "GET" && /^\/api\/v1\/group\/[^/]+\/governance\/proposals\/[^/]+$/.test(pathname)) {
+          const parts = pathname.split("/");
+          const proposalId = decodeURIComponent(parts[6]);
+          try {
+            const result = getGovernanceProposalWithVotes(db, proposalId);
+            if (!result) {
+              jsonResponse(res, 404, { error: "proposal not found" });
+              return;
+            }
+            jsonResponse(res, 200, result);
+          } catch (err) {
+            jsonResponse(res, 404, { error: err instanceof Error ? err.message : "not found" });
+          }
+          return;
+        }
+
+        if (req.method === "POST" && /^\/api\/v1\/group\/[^/]+\/governance\/proposals$/.test(pathname)) {
+          const groupId = decodeURIComponent(pathname.split("/")[4]);
+          try {
+            const walletAccount = loadWalletAccount();
+            if (!walletAccount) {
+              jsonResponse(res, 500, { error: "wallet not available" });
+              return;
+            }
+            const body = await readJsonBody(req);
+            const proposal = await createGovernanceProposal(db, {
+              account: walletAccount,
+              groupId,
+              proposalType: body.proposalType as GovernanceProposalType,
+              title: body.title as string,
+              description: typeof body.description === "string" ? body.description : undefined,
+              params: typeof body.params === "object" && body.params ? body.params as Record<string, unknown> : undefined,
+              proposerAddress: config.walletAddress,
+              proposerAgentId: config.agentId,
+              durationHours: typeof body.durationHours === "number" ? body.durationHours : undefined,
+            });
+            jsonResponse(res, 201, proposal);
+          } catch (err) {
+            jsonResponse(res, 400, { error: err instanceof Error ? err.message : "bad request" });
+          }
+          return;
+        }
+
+        if (req.method === "POST" && /^\/api\/v1\/group\/[^/]+\/governance\/proposals\/[^/]+\/vote$/.test(pathname)) {
+          const parts = pathname.split("/");
+          const proposalId = decodeURIComponent(parts[6]);
+          try {
+            const walletAccount = loadWalletAccount();
+            if (!walletAccount) {
+              jsonResponse(res, 500, { error: "wallet not available" });
+              return;
+            }
+            const body = await readJsonBody(req);
+            const result = await voteOnProposal(db, {
+              account: walletAccount,
+              proposalId,
+              voterAddress: config.walletAddress,
+              voterAgentId: config.agentId,
+              vote: body.vote as GovernanceVote,
+              reason: typeof body.reason === "string" ? body.reason : undefined,
+            });
+            jsonResponse(res, 200, result);
+          } catch (err) {
+            jsonResponse(res, 400, { error: err instanceof Error ? err.message : "bad request" });
+          }
+          return;
+        }
+
         if (req.method === "GET" && /^\/api\/v1\/group\/[^/]+\/treasury$/.test(pathname)) {
           const groupId = decodeURIComponent(pathname.split("/")[4]);
           try {
@@ -802,6 +918,57 @@ export async function startMetaWorldServer(
           return;
         }
 
+        // --- SSE event stream ---
+
+        if (req.method === "GET" && pathname === "/api/v1/events/stream") {
+          const kindsParam = url.searchParams.get("kinds");
+          const kinds = kindsParam ? kindsParam.split(",") as WorldEventKind[] : undefined;
+
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+          });
+
+          // Send initial comment to establish connection
+          res.write(": connected\n\n");
+
+          const clientId = `sse_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          worldEventBus.subscribe(clientId, kinds);
+
+          // Stream events
+          const stream = worldEventBus.getStream(clientId);
+          const streamEvents = async () => {
+            try {
+              for await (const event of stream) {
+                if (res.destroyed) break;
+                res.write(`event: ${event.kind}\ndata: ${JSON.stringify(event.payload)}\n\n`);
+              }
+            } catch {
+              // Connection closed
+            }
+          };
+          streamEvents();
+
+          // Heartbeat to keep connection alive
+          const heartbeat = setInterval(() => {
+            if (res.destroyed) {
+              clearInterval(heartbeat);
+              worldEventBus.unsubscribe(clientId);
+              return;
+            }
+            res.write(": heartbeat\n\n");
+          }, 15000);
+
+          req.on("close", () => {
+            clearInterval(heartbeat);
+            worldEventBus.unsubscribe(clientId);
+          });
+
+          return;
+        }
+
         // --- POST action endpoints ---
 
         if (req.method === "POST" && pathname === "/api/v1/presence/publish") {
@@ -840,6 +1007,27 @@ export async function startMetaWorldServer(
           try {
             const state = dismissWorldNotification(db, notificationId);
             jsonResponse(res, 200, state);
+          } catch (err) {
+            jsonResponse(res, 404, { error: err instanceof Error ? err.message : "not found" });
+          }
+          return;
+        }
+
+        // --- Reputation API routes ---
+
+        if (req.method === "GET" && /^\/api\/v1\/reputation\/leaderboard$/.test(pathname)) {
+          const entityType = (url.searchParams.get("type") || "fox") as ReputationEntityType;
+          const dimension = (url.searchParams.get("dimension") || "reliability") as ReputationDimension;
+          const limit = parseIntParam(url.searchParams.get("limit"), 10);
+          jsonResponse(res, 200, getReputationLeaderboard(db, entityType, dimension, limit));
+          return;
+        }
+
+        if (req.method === "GET" && /^\/api\/v1\/reputation\/[^/]+$/.test(pathname)) {
+          const address = decodeURIComponent(pathname.split("/")[4]);
+          try {
+            const card = getReputationCard(db, address);
+            jsonResponse(res, 200, card);
           } catch (err) {
             jsonResponse(res, 404, { error: err instanceof Error ? err.message : "not found" });
           }
@@ -995,6 +1183,48 @@ export async function startMetaWorldServer(
           return;
         }
 
+        if (req.method === "GET" && /^\/fox\/[^/]+\/reputation$/.test(pathname)) {
+          const address = decodeURIComponent(pathname.split("/")[2]);
+          try {
+            const card = getReputationCard(db, address);
+            const dimRows = card.dimensions
+              .map(
+                (d) =>
+                  `<tr><td>${escapeHtml(d.dimension)}</td><td>${d.score.toFixed(3)}</td><td>${d.eventCount}</td></tr>`,
+              )
+              .join("");
+            const content = `<h2 class="mw-title">Reputation: ${escapeHtml(address.slice(0, 14))}...</h2>
+<p>Entity type: ${escapeHtml(card.entityType)} &middot; Overall: <strong>${card.overallScore.toFixed(3)}</strong></p>
+<table class="mw-table"><thead><tr><th>Dimension</th><th>Score</th><th>Events</th></tr></thead><tbody>${dimRows || '<tr><td colspan="3">No reputation scores yet.</td></tr>'}</tbody></table>
+<p><a href="/fox/${encodeURIComponent(address)}">Back to profile</a></p>`;
+            htmlResponse(res, 200, wrapInLayout(`Reputation: ${address.slice(0, 14)}`, content));
+          } catch (err) {
+            htmlResponse(res, 404, wrapInLayout("Not Found", `<p class="mw-empty">${escapeHtml(err instanceof Error ? err.message : "Fox not found")}</p>`));
+          }
+          return;
+        }
+
+        if (req.method === "GET" && /^\/group\/[^/]+\/reputation$/.test(pathname)) {
+          const groupId = decodeURIComponent(pathname.split("/")[2]);
+          try {
+            const card = getReputationCard(db, groupId);
+            const dimRows = card.dimensions
+              .map(
+                (d) =>
+                  `<tr><td>${escapeHtml(d.dimension)}</td><td>${d.score.toFixed(3)}</td><td>${d.eventCount}</td></tr>`,
+              )
+              .join("");
+            const content = `<h2 class="mw-title">Reputation: ${escapeHtml(groupId.slice(0, 14))}...</h2>
+<p>Entity type: ${escapeHtml(card.entityType)} &middot; Overall: <strong>${card.overallScore.toFixed(3)}</strong></p>
+<table class="mw-table"><thead><tr><th>Dimension</th><th>Score</th><th>Events</th></tr></thead><tbody>${dimRows || '<tr><td colspan="3">No reputation scores yet.</td></tr>'}</tbody></table>
+<p><a href="/group/${encodeURIComponent(groupId)}">Back to group</a></p>`;
+            htmlResponse(res, 200, wrapInLayout(`Reputation: ${groupId.slice(0, 14)}`, content));
+          } catch (err) {
+            htmlResponse(res, 404, wrapInLayout("Not Found", `<p class="mw-empty">${escapeHtml(err instanceof Error ? err.message : "Group not found")}</p>`));
+          }
+          return;
+        }
+
         if (req.method === "GET" && /^\/group\/[^/]+$/.test(pathname)) {
           const groupId = decodeURIComponent(pathname.split("/")[2]);
           try {
@@ -1142,6 +1372,128 @@ export async function startMetaWorldServer(
         if (req.method === "GET" && pathname === "/notifications") {
           const limit = parseIntParam(url.searchParams.get("limit"), 25);
           htmlResponse(res, 200, renderNotificationsHtml(db, config, limit));
+          return;
+        }
+
+        // --- Intent API routes ---
+
+        if (req.method === "GET" && pathname === "/api/v1/intents") {
+          const kindRaw = url.searchParams.get("kind");
+          const statusRaw = url.searchParams.get("status");
+          const groupId = url.searchParams.get("group") || undefined;
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          const kind = (kindRaw && ["work", "opportunity", "procurement", "collaboration", "custom"].includes(kindRaw))
+            ? kindRaw as IntentKind
+            : undefined;
+          const status = (statusRaw && ["open", "matching", "matched", "in_progress", "review", "completed", "cancelled", "expired"].includes(statusRaw))
+            ? statusRaw as IntentStatus
+            : undefined;
+          jsonResponse(res, 200, { intents: listIntents(db, { kind, status, groupId, limit }) });
+          return;
+        }
+
+        if (req.method === "GET" && /^\/api\/v1\/intents\/[^/]+$/.test(pathname)) {
+          const intentId = decodeURIComponent(pathname.split("/")[4]);
+          const intent = getIntent(db, intentId);
+          if (!intent) {
+            jsonResponse(res, 404, { error: "intent not found" });
+            return;
+          }
+          const responses = listIntentResponses(db, intentId);
+          jsonResponse(res, 200, { intent, responses });
+          return;
+        }
+
+        // --- Intent HTML routes ---
+
+        if (req.method === "GET" && pathname === "/intents") {
+          const kindRaw = url.searchParams.get("kind");
+          const statusRaw = url.searchParams.get("status");
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          const kind = (kindRaw && ["work", "opportunity", "procurement", "collaboration", "custom"].includes(kindRaw))
+            ? kindRaw as IntentKind
+            : undefined;
+          const status = (statusRaw && ["open", "matching", "matched", "in_progress", "review", "completed", "cancelled", "expired"].includes(statusRaw))
+            ? statusRaw as IntentStatus
+            : undefined;
+          const intents = listIntents(db, { kind, status, limit });
+          const items = intents
+            .map(
+              (item) =>
+                `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.kind)}</span><span>${escapeHtml(item.status)}</span></div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.description || `Published by ${item.publisherAddress.slice(0, 10)}...`)}</p><p style="color:var(--text-muted);font-size:0.85rem;">Expires: ${escapeHtml(item.expiresAt)}</p></div>`,
+            )
+            .join("");
+          const content = `<h2 class="mw-title">Intent Board</h2>
+<p style="color:var(--text-muted);margin-bottom:16px;">${intents.length} intent(s) found.</p>
+<div class="mw-grid">${items || '<p class="mw-empty">No intents yet.</p>'}</div>`;
+          htmlResponse(res, 200, wrapInLayout("Intent Board", content, "/intents"));
+          return;
+        }
+
+        if (req.method === "GET" && /^\/group\/[^/]+\/intents$/.test(pathname)) {
+          const groupId = decodeURIComponent(pathname.split("/")[2]);
+          const kindRaw = url.searchParams.get("kind");
+          const statusRaw = url.searchParams.get("status");
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          const kind = (kindRaw && ["work", "opportunity", "procurement", "collaboration", "custom"].includes(kindRaw))
+            ? kindRaw as IntentKind
+            : undefined;
+          const status = (statusRaw && ["open", "matching", "matched", "in_progress", "review", "completed", "cancelled", "expired"].includes(statusRaw))
+            ? statusRaw as IntentStatus
+            : undefined;
+          const intents = listIntents(db, { groupId, kind, status, limit });
+          const groupName = getGroupDisplayName(db, groupId);
+          const items = intents
+            .map(
+              (item) =>
+                `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.kind)}</span><span>${escapeHtml(item.status)}</span></div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.description || `Published by ${item.publisherAddress.slice(0, 10)}...`)}</p><p style="color:var(--text-muted);font-size:0.85rem;">Expires: ${escapeHtml(item.expiresAt)}</p></div>`,
+            )
+            .join("");
+          const content = `<h2 class="mw-title">${escapeHtml(groupName)} — Intents</h2>
+<p style="margin-bottom:12px;"><a href="/group/${encodeURIComponent(groupId)}">Back to group</a></p>
+<p style="color:var(--text-muted);margin-bottom:16px;">${intents.length} intent(s) found.</p>
+<div class="mw-grid">${items || '<p class="mw-empty">No intents for this group.</p>'}</div>`;
+          htmlResponse(res, 200, wrapInLayout(`${groupName} Intents`, content, `/group/${encodeURIComponent(groupId)}/intents`));
+          return;
+        }
+
+        // --- Federation API routes ---
+
+        if (req.method === "GET" && pathname === "/api/v1/federation/peers") {
+          const peers = listFederationPeers(db);
+          jsonResponse(res, 200, { peers });
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/federation/events") {
+          const eventType = url.searchParams.get("type") as FederationEventType | null;
+          const limit = parseIntParam(url.searchParams.get("limit"), 50);
+          const events = listFederationEvents(db, eventType || undefined, limit);
+          jsonResponse(res, 200, { events, nextCursor: events.length > 0 ? events[events.length - 1].eventId : "" });
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/federation") {
+          const snapshot = buildFederationSnapshot(db);
+          const peerRows = snapshot.peers
+            .map(
+              (p) =>
+                `<tr><td>${escapeHtml(p.peerUrl)}</td><td>${escapeHtml(p.status)}</td><td>${escapeHtml(p.lastSyncAt || "never")}</td><td>${p.failureCount}</td></tr>`,
+            )
+            .join("");
+          const eventRows = snapshot.recentEvents
+            .map(
+              (e) =>
+                `<tr><td>${escapeHtml(e.eventType)}</td><td>${escapeHtml(e.peerId.slice(0, 10))}...</td><td>${escapeHtml(e.receivedAt)}</td></tr>`,
+            )
+            .join("");
+          const content = `<h2 class="mw-title">World Federation</h2>
+<p style="color:var(--text-muted);margin-bottom:16px;">${escapeHtml(snapshot.summary)}</p>
+<h3>Peers</h3>
+<table class="mw-table"><thead><tr><th>URL</th><th>Status</th><th>Last Sync</th><th>Failures</th></tr></thead><tbody>${peerRows || '<tr><td colspan="4">No peers</td></tr>'}</tbody></table>
+<h3>Recent Events</h3>
+<table class="mw-table"><thead><tr><th>Type</th><th>Peer</th><th>Received</th></tr></thead><tbody>${eventRows || '<tr><td colspan="3">No events</td></tr>'}</tbody></table>`;
+          htmlResponse(res, 200, wrapInLayout("Federation", content, "/federation"));
           return;
         }
 

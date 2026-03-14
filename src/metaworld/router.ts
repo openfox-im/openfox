@@ -363,6 +363,10 @@ export function buildMetaWorldRouterScript(): string {
     });
   }
 
+  window.__refreshContent = function() {
+    if (!document.hidden) navigate(currentPath, false);
+  };
+
   function resetAutoRefresh() {
     if (refreshTimer) clearInterval(refreshTimer);
     if (currentPath === "/" || currentPath === "/feed") {
@@ -383,7 +387,34 @@ export function buildMetaWorldRouterScript(): string {
     navigate(location.pathname, false);
   });
 
-  resetAutoRefresh();
+  // Use SSE for real-time push when available, fall back to polling
+  if (typeof EventSource !== "undefined") {
+    var evtSource = new EventSource("/api/v1/events/stream?kinds=feed.item,notification.new,presence.update,proposal.update,intent.update,treasury.update");
+
+    evtSource.addEventListener("feed.item", function() {
+      if (currentPath === "/" || currentPath === "/feed") {
+        window.__refreshContent && window.__refreshContent();
+      }
+    });
+
+    evtSource.addEventListener("notification.new", function() {
+      window.__refreshContent && window.__refreshContent();
+    });
+
+    ["proposal.update", "intent.update", "treasury.update", "presence.update"].forEach(function(kind) {
+      evtSource.addEventListener(kind, function() {
+        window.__refreshContent && window.__refreshContent();
+      });
+    });
+
+    evtSource.onerror = function() {
+      // On error, close SSE and fall back to polling
+      evtSource.close();
+      resetAutoRefresh();
+    };
+  } else {
+    resetAutoRefresh();
+  }
 })();
 </script>`;
 }

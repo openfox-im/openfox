@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 44;
+export const SCHEMA_VERSION = 46;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -1284,6 +1284,7 @@ export const CREATE_TABLES = `
     group_id TEXT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    parent_channel_id TEXT,
     visibility TEXT NOT NULL DEFAULT 'group',
     status TEXT NOT NULL CHECK(status IN ('active','archived')) DEFAULT 'active',
     created_by_address TEXT NOT NULL,
@@ -1693,4 +1694,217 @@ export const CREATE_TABLES = `
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (group_id) REFERENCES groups(group_id)
   );
+
+  -- Group treasury: operational treasury accounts for groups
+  CREATE TABLE IF NOT EXISTS group_treasury (
+    group_id TEXT PRIMARY KEY,
+    treasury_address TEXT NOT NULL,
+    balance_wei TEXT NOT NULL DEFAULT '0',
+    last_synced_at TEXT,
+    spend_policy_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','frozen','closed')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  -- Group budget lines: per-group spending categories with caps
+  CREATE TABLE IF NOT EXISTS group_budget_lines (
+    group_id TEXT NOT NULL,
+    line_name TEXT NOT NULL,
+    cap_wei TEXT NOT NULL,
+    period TEXT NOT NULL DEFAULT 'monthly' CHECK (period IN ('daily','weekly','monthly','epoch')),
+    spent_wei TEXT NOT NULL DEFAULT '0',
+    period_start TEXT NOT NULL,
+    requires_supermajority INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (group_id, line_name)
+  );
+
+  -- Group treasury log: inflow/outflow transaction history
+  CREATE TABLE IF NOT EXISTS group_treasury_log (
+    log_id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('inflow','outflow')),
+    amount_wei TEXT NOT NULL,
+    counterparty TEXT,
+    budget_line TEXT,
+    proposal_id TEXT,
+    tx_hash TEXT,
+    memo TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_treasury_log_group ON group_treasury_log(group_id, created_at);
+
+  -- Generalized intents: work requests, opportunities, procurements, collaborations
+  CREATE TABLE IF NOT EXISTS world_intents (
+    intent_id TEXT PRIMARY KEY,
+    publisher_address TEXT NOT NULL,
+    group_id TEXT,
+    kind TEXT NOT NULL CHECK (kind IN ('work','opportunity','procurement','collaboration','custom')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    requirements_json TEXT NOT NULL DEFAULT '[]',
+    budget_wei TEXT,
+    budget_line TEXT,
+    budget_token TEXT DEFAULT 'TOS',
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','matching','matched','in_progress','review','completed','cancelled','expired')),
+    matched_solver_address TEXT,
+    matched_at TEXT,
+    completed_at TEXT,
+    settlement_proposal_id TEXT,
+    settlement_tx_hash TEXT,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_intents_status ON world_intents(status, kind);
+  CREATE INDEX IF NOT EXISTS idx_intents_group ON world_intents(group_id, status);
+  CREATE INDEX IF NOT EXISTS idx_intents_publisher ON world_intents(publisher_address);
+
+  -- Intent responses: solver proposals for intents
+  CREATE TABLE IF NOT EXISTS world_intent_responses (
+    response_id TEXT PRIMARY KEY,
+    intent_id TEXT NOT NULL,
+    solver_address TEXT NOT NULL,
+    proposal_text TEXT NOT NULL DEFAULT '',
+    proposed_amount_wei TEXT,
+    capability_refs_json TEXT DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','withdrawn')),
+    artifact_ids_json TEXT DEFAULT '[]',
+    review_status TEXT CHECK (review_status IN ('pending','approved','revision_requested','rejected')),
+    review_note TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(intent_id, solver_address)
+  );
+  CREATE INDEX IF NOT EXISTS idx_intent_responses_intent ON world_intent_responses(intent_id, status);
+
+  -- Group governance v2: proposals with quorum + threshold voting
+  CREATE TABLE IF NOT EXISTS group_governance_proposals (
+    proposal_id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    proposal_type TEXT NOT NULL CHECK (proposal_type IN ('spend','policy_change','member_action','config_change','treasury_config','external_action')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    params_json TEXT NOT NULL DEFAULT '{}',
+    proposer_address TEXT NOT NULL,
+    opened_event_id TEXT NOT NULL,
+    quorum INTEGER NOT NULL DEFAULT 1,
+    threshold_numerator INTEGER NOT NULL DEFAULT 2,
+    threshold_denominator INTEGER NOT NULL DEFAULT 3,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','approved','rejected','expired','executed')),
+    votes_approve INTEGER NOT NULL DEFAULT 0,
+    votes_reject INTEGER NOT NULL DEFAULT 0,
+    votes_total INTEGER NOT NULL DEFAULT 0,
+    resolved_event_id TEXT,
+    executed_event_id TEXT,
+    execution_result_json TEXT,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_gov_proposals_group ON group_governance_proposals(group_id, status);
+
+  CREATE TABLE IF NOT EXISTS group_governance_votes (
+    vote_id TEXT PRIMARY KEY,
+    proposal_id TEXT NOT NULL,
+    group_id TEXT NOT NULL,
+    voter_address TEXT NOT NULL,
+    vote TEXT NOT NULL CHECK (vote IN ('approve','reject')),
+    reason TEXT,
+    event_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(proposal_id, voter_address)
+  );
+  CREATE INDEX IF NOT EXISTS idx_gov_votes_proposal ON group_governance_votes(proposal_id);
+
+  CREATE TABLE IF NOT EXISTS group_governance_policy (
+    group_id TEXT NOT NULL,
+    proposal_type TEXT NOT NULL,
+    quorum INTEGER NOT NULL DEFAULT 1,
+    threshold_numerator INTEGER NOT NULL DEFAULT 2,
+    threshold_denominator INTEGER NOT NULL DEFAULT 3,
+    allowed_proposer_roles TEXT NOT NULL DEFAULT '["owner","admin"]',
+    allowed_voter_roles TEXT NOT NULL DEFAULT '["owner","admin"]',
+    default_duration_hours INTEGER NOT NULL DEFAULT 168,
+    PRIMARY KEY (group_id, proposal_type)
+  );
+
+  CREATE TABLE IF NOT EXISTS group_subgroups (
+    parent_group_id TEXT NOT NULL,
+    child_group_id TEXT NOT NULL,
+    relationship TEXT NOT NULL DEFAULT 'child' CHECK (relationship IN ('child','affiliate')),
+    treasury_mode TEXT NOT NULL DEFAULT 'independent' CHECK (treasury_mode IN ('shared','independent','sub_budget')),
+    sub_budget_line TEXT,
+    policy_mode TEXT NOT NULL DEFAULT 'inherit' CHECK (policy_mode IN ('inherit','override')),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (parent_group_id, child_group_id)
+  );
+
+  -- Global reputation graph: multi-dimensional scoring
+  CREATE TABLE IF NOT EXISTS world_reputation_scores (
+    address TEXT NOT NULL,
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('fox','group')),
+    dimension TEXT NOT NULL,
+    score REAL NOT NULL DEFAULT 0.0,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    last_updated TEXT NOT NULL,
+    PRIMARY KEY (address, dimension)
+  );
+  CREATE INDEX IF NOT EXISTS idx_reputation_entity ON world_reputation_scores(entity_type, dimension, score DESC);
+
+  CREATE TABLE IF NOT EXISTS world_reputation_events (
+    event_id TEXT PRIMARY KEY,
+    target_address TEXT NOT NULL,
+    target_type TEXT NOT NULL CHECK (target_type IN ('fox','group')),
+    dimension TEXT NOT NULL,
+    delta REAL NOT NULL,
+    source_type TEXT NOT NULL CHECK (source_type IN ('intent_completion','settlement','moderation','peer_endorsement','governance_participation')),
+    source_ref TEXT,
+    issuer_group_id TEXT,
+    issuer_address TEXT NOT NULL,
+    signature TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_rep_events_target ON world_reputation_events(target_address, dimension);
+  CREATE INDEX IF NOT EXISTS idx_rep_events_source ON world_reputation_events(source_type, source_ref);
+
+  -- Group chain commitments: on-chain anchoring records
+  CREATE TABLE IF NOT EXISTS group_chain_commitments (
+    commitment_id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    action_type TEXT NOT NULL CHECK (action_type IN ('register','state_commit')),
+    epoch INTEGER NOT NULL,
+    members_root TEXT NOT NULL,
+    events_merkle_root TEXT,
+    treasury_balance_wei TEXT,
+    tx_hash TEXT NOT NULL,
+    block_number INTEGER,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_chain_commits_group ON group_chain_commitments(group_id, epoch);
+
+  -- World federation peers: remote MetaWorld nodes
+  CREATE TABLE IF NOT EXISTS world_federation_peers (
+    peer_id TEXT PRIMARY KEY,
+    peer_url TEXT NOT NULL UNIQUE,
+    peer_address TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','unreachable','banned')),
+    last_sync_at TEXT,
+    last_cursor TEXT,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  -- World federation events: cross-node event log
+  CREATE TABLE IF NOT EXISTS world_federation_events (
+    event_id TEXT PRIMARY KEY,
+    peer_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (event_type IN ('group_registered','fox_profile_updated','intent_published','settlement_completed','reputation_attestation')),
+    payload_json TEXT NOT NULL,
+    received_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_fed_events_type ON world_federation_events(event_type, received_at);
 `;

@@ -50,6 +50,42 @@ import {
   listGroupAppeals,
   resolveGroupAppeal,
 } from "../group/moderation.js";
+import {
+  initializeGroupTreasury,
+  getGroupTreasury,
+  listBudgetLines,
+  setBudgetLine,
+  getTreasuryLog,
+  recordTreasuryInflow,
+  freezeGroupTreasury,
+  unfreezeGroupTreasury,
+  buildTreasurySnapshot,
+} from "../group/treasury.js";
+import type { HexString } from "../chain/address.js";
+import {
+  createGovernanceProposal,
+  voteOnProposal,
+  listGovernanceProposals,
+  getGovernanceProposalWithVotes,
+  getGovernancePolicy,
+  setGovernancePolicy,
+  executeApprovedProposal,
+  type GovernanceProposalType,
+  type GovernanceVote,
+} from "../group/governance.js";
+import {
+  registerGroupOnChain,
+  publishGroupStateCommitment,
+  listChainCommitments,
+  getLatestChainCommitment,
+} from "../group/chain-anchor.js";
+import {
+  listChannelTree,
+  createSubgroup,
+  listSubgroups,
+  removeSubgroup,
+  type ChannelTreeNode,
+} from "../group/hierarchy.js";
 
 const logger = createLogger("main");
 
@@ -97,6 +133,25 @@ Usage:
   openfox group appeal --group <group-id> --action <mute|ban|warning> --reason "<text>" [--json]
   openfox group appeals --group <group-id> [--status pending|approved|rejected] [--limit N] [--json]
   openfox group resolve-appeal --id <appeal-id> --decision <approved|rejected> [--note "<text>"] [--json]
+  openfox group treasury init --group <group-id> --private-key <hex> [--json]
+  openfox group treasury show --group <group-id> [--json]
+  openfox group treasury budget list --group <group-id> [--json]
+  openfox group treasury budget set --group <group-id> --name <line> --cap <wei> [--period <period>] [--supermajority] [--json]
+  openfox group treasury log --group <group-id> [--limit N] [--json]
+  openfox group treasury freeze --group <group-id> [--json]
+  openfox group treasury deposit --group <group-id> --amount <wei> [--from <addr>] [--memo "<text>"] [--json]
+  openfox group propose --group <group-id> --type <spend|policy_change|member_action|config_change|treasury_config|external_action> --title "<text>" [--description "<text>"] [--params '{}'] [--duration-hours N] [--json]
+  openfox group vote --proposal <proposal-id> --vote <approve|reject> [--reason "<text>"] [--json]
+  openfox group proposals --group <group-id> [--status active|approved|rejected|expired|executed] [--json]
+  openfox group governance-policy --group <group-id> --type <proposal-type> [--quorum N] [--threshold-num N] [--threshold-den N] [--proposer-roles owner,admin] [--voter-roles owner,admin] [--duration-hours N] [--json]
+  openfox group chain register <group-id> --private-key <hex> --rpc-url <url> [--json]
+  openfox group chain commit <group-id> --private-key <hex> --rpc-url <url> [--json]
+  openfox group chain status <group-id> [--json]
+  openfox group chain history <group-id> [--limit N] [--json]
+  openfox group channels tree --group <group-id> [--json]
+  openfox group subgroup create --group <parent-id> --name "<name>" [--relationship <child|affiliate>] [--treasury-mode <shared|independent|sub_budget>] [--policy-mode <inherit|override>] [--json]
+  openfox group subgroup list --group <parent-id> [--json]
+  openfox group subgroup remove --group <parent-id> --child <child-id> [--json]
 `);
     return;
   }
@@ -928,6 +983,461 @@ Usage:
       );
       logger.info(JSON.stringify(result, null, 2));
       return;
+    }
+
+    if (command === "treasury") {
+      const subcommand = args[1] || "help";
+
+      if (subcommand === "init") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group treasury init --group <group-id>");
+        }
+        const account = loadWalletAccount();
+        if (!account) {
+          throw new Error("OpenFox wallet not found. Run openfox --init first.");
+        }
+        const privateKey = readOption(args, "--private-key") as HexString | undefined;
+        if (!privateKey) {
+          throw new Error("Usage: openfox group treasury init --group <group-id> --private-key <hex>");
+        }
+        const result = initializeGroupTreasury(db, groupId, privateKey);
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      if (subcommand === "show") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group treasury show --group <group-id>");
+        }
+        const treasury = getGroupTreasury(db, groupId);
+        if (!treasury) {
+          throw new Error(`No treasury found for group: ${groupId}`);
+        }
+        if (asJson) {
+          logger.info(JSON.stringify(buildTreasurySnapshot(db, groupId), null, 2));
+        } else {
+          logger.info(`=== TREASURY: ${groupId} ===`);
+          logger.info(`  Address:  ${treasury.treasuryAddress}`);
+          logger.info(`  Balance:  ${treasury.balanceWei} wei`);
+          logger.info(`  Status:   ${treasury.status}`);
+          logger.info(`  Updated:  ${treasury.updatedAt}`);
+        }
+        return;
+      }
+
+      if (subcommand === "budget") {
+        const budgetCmd = args[2] || "list";
+
+        if (budgetCmd === "list") {
+          const groupId = readGroupIdArg(args, 3);
+          if (!groupId) {
+            throw new Error("Usage: openfox group treasury budget list --group <group-id>");
+          }
+          const lines = listBudgetLines(db, groupId);
+          if (asJson) {
+            logger.info(JSON.stringify(lines, null, 2));
+          } else {
+            logger.info(`=== BUDGET LINES: ${groupId} ===`);
+            if (!lines.length) {
+              logger.info("No budget lines.");
+            }
+            for (const line of lines) {
+              logger.info(`  ${line.lineName}: cap=${line.capWei} spent=${line.spentWei} period=${line.period} supermajority=${line.requiresSupermajority}`);
+            }
+          }
+          return;
+        }
+
+        if (budgetCmd === "set") {
+          const groupId = readGroupIdArg(args, 3);
+          const lineName = readOption(args, "--name");
+          const capWei = readOption(args, "--cap");
+          if (!groupId || !lineName || !capWei) {
+            throw new Error("Usage: openfox group treasury budget set --group <group-id> --name <line> --cap <wei> [--period <period>]");
+          }
+          const period = (readOption(args, "--period") || "monthly") as "daily" | "weekly" | "monthly" | "epoch";
+          const supermajority = args.includes("--supermajority");
+          const result = setBudgetLine(db, groupId, lineName, capWei, period, supermajority);
+          logger.info(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        throw new Error(`Unknown treasury budget command: ${budgetCmd}`);
+      }
+
+      if (subcommand === "log") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group treasury log --group <group-id> [--limit N]");
+        }
+        const log = getTreasuryLog(db, groupId, readNumberOption(args, "--limit", 50));
+        if (asJson) {
+          logger.info(JSON.stringify(log, null, 2));
+        } else {
+          logger.info(`=== TREASURY LOG: ${groupId} ===`);
+          if (!log.length) {
+            logger.info("No log entries.");
+          }
+          for (const entry of log) {
+            logger.info(`  ${entry.createdAt}  ${entry.direction}  ${entry.amountWei} wei  ${entry.counterparty ?? ""}`);
+          }
+        }
+        return;
+      }
+
+      if (subcommand === "freeze") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group treasury freeze --group <group-id>");
+        }
+        const result = freezeGroupTreasury(db, groupId);
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      if (subcommand === "deposit") {
+        const groupId = readGroupIdArg(args, 2);
+        const amount = readOption(args, "--amount");
+        if (!groupId || !amount) {
+          throw new Error("Usage: openfox group treasury deposit --group <group-id> --amount <wei> [--from <addr>] [--memo <text>]");
+        }
+        const result = recordTreasuryInflow(
+          db,
+          groupId,
+          amount,
+          readOption(args, "--from") ?? undefined,
+          readOption(args, "--tx-hash") ?? undefined,
+          readOption(args, "--memo") ?? undefined,
+        );
+        logger.info(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      throw new Error(`Unknown treasury command: ${subcommand}`);
+    }
+
+    if (command === "propose") {
+      const groupId = readGroupIdArg(args);
+      const proposalType = readOption(args, "--type") as GovernanceProposalType | undefined;
+      const title = readOption(args, "--title");
+      if (!groupId || !proposalType || !title) {
+        throw new Error(
+          "Usage: openfox group propose --group <group-id> --type <type> --title \"<text>\"",
+        );
+      }
+      const account = loadWalletAccount();
+      if (!account) {
+        throw new Error("OpenFox wallet not found. Run openfox --init first.");
+      }
+      let paramsObj: Record<string, unknown> = {};
+      const paramsRaw = readOption(args, "--params");
+      if (paramsRaw) {
+        try {
+          paramsObj = JSON.parse(paramsRaw);
+        } catch {
+          throw new Error("--params must be valid JSON");
+        }
+      }
+      const result = await createGovernanceProposal(db, {
+        account,
+        groupId,
+        proposalType,
+        title,
+        description: readOption(args, "--description"),
+        params: paramsObj,
+        proposerAddress: config.walletAddress,
+        proposerAgentId: config.agentId,
+        durationHours: readNumberOption(args, "--duration-hours", 0) || undefined,
+      });
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "vote") {
+      const proposalId = readOption(args, "--proposal");
+      const voteValue = readOption(args, "--vote") as GovernanceVote | undefined;
+      if (!proposalId || !voteValue) {
+        throw new Error(
+          "Usage: openfox group vote --proposal <proposal-id> --vote <approve|reject>",
+        );
+      }
+      const account = loadWalletAccount();
+      if (!account) {
+        throw new Error("OpenFox wallet not found. Run openfox --init first.");
+      }
+      const result = await voteOnProposal(db, {
+        account,
+        proposalId,
+        voterAddress: config.walletAddress,
+        voterAgentId: config.agentId,
+        vote: voteValue,
+        reason: readOption(args, "--reason") ?? undefined,
+      });
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (command === "proposals") {
+      const groupId = readGroupIdArg(args);
+      if (!groupId) {
+        throw new Error("Usage: openfox group proposals --group <group-id>");
+      }
+      const status = readOption(args, "--status") as
+        | "active"
+        | "approved"
+        | "rejected"
+        | "expired"
+        | "executed"
+        | undefined;
+      const items = listGovernanceProposals(db, groupId, status || undefined);
+      if (asJson) {
+        logger.info(JSON.stringify(items, null, 2));
+        return;
+      }
+      logger.info(`=== GOVERNANCE PROPOSALS ${groupId} ===`);
+      if (!items.length) {
+        logger.info("No governance proposals.");
+        return;
+      }
+      for (const item of items) {
+        logger.info(
+          `${item.createdAt}  ${item.status}  ${item.proposalType}  ${item.title}  approve=${item.votesApprove} reject=${item.votesReject}`,
+        );
+      }
+      return;
+    }
+
+    if (command === "governance-policy") {
+      const groupId = readGroupIdArg(args);
+      const proposalType = readOption(args, "--type") as GovernanceProposalType | undefined;
+      if (!groupId || !proposalType) {
+        throw new Error(
+          "Usage: openfox group governance-policy --group <group-id> --type <proposal-type>",
+        );
+      }
+      // If any update flags provided, update the policy
+      const quorum = readNumberOption(args, "--quorum", 0) || undefined;
+      const thresholdNum = readNumberOption(args, "--threshold-num", 0) || undefined;
+      const thresholdDen = readNumberOption(args, "--threshold-den", 0) || undefined;
+      const proposerRolesRaw = readOption(args, "--proposer-roles");
+      const voterRolesRaw = readOption(args, "--voter-roles");
+      const durationHours = readNumberOption(args, "--duration-hours", 0) || undefined;
+
+      const hasUpdates = quorum || thresholdNum || thresholdDen || proposerRolesRaw || voterRolesRaw || durationHours;
+      if (hasUpdates) {
+        const result = setGovernancePolicy(db, groupId, proposalType, {
+          quorum,
+          thresholdNumerator: thresholdNum,
+          thresholdDenominator: thresholdDen,
+          allowedProposerRoles: proposerRolesRaw ? proposerRolesRaw.split(",") : undefined,
+          allowedVoterRoles: voterRolesRaw ? voterRolesRaw.split(",") : undefined,
+          defaultDurationHours: durationHours,
+        });
+        logger.info(JSON.stringify(result, null, 2));
+      } else {
+        const policy = getGovernancePolicy(db, groupId, proposalType);
+        logger.info(JSON.stringify(policy, null, 2));
+      }
+      return;
+    }
+
+    if (command === "chain") {
+      const chainSub = args[1] || "help";
+
+      if (chainSub === "register") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group chain register <group-id> --private-key <hex> --rpc-url <url>");
+        }
+        const privateKey = readOption(args, "--private-key") as HexString | undefined;
+        const rpcUrl = readOption(args, "--rpc-url");
+        if (!privateKey || !rpcUrl) {
+          throw new Error("Usage: openfox group chain register <group-id> --private-key <hex> --rpc-url <url>");
+        }
+        const result = await registerGroupOnChain({ db, groupId, privateKey, rpcUrl });
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+        } else {
+          logger.info(`Group ${groupId} registered on-chain.`);
+          logger.info(`  TX Hash:       ${result.txHash}`);
+          logger.info(`  Commitment ID: ${result.commitmentId}`);
+        }
+        return;
+      }
+
+      if (chainSub === "commit") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group chain commit <group-id> --private-key <hex> --rpc-url <url>");
+        }
+        const privateKey = readOption(args, "--private-key") as HexString | undefined;
+        const rpcUrl = readOption(args, "--rpc-url");
+        if (!privateKey || !rpcUrl) {
+          throw new Error("Usage: openfox group chain commit <group-id> --private-key <hex> --rpc-url <url>");
+        }
+        const result = await publishGroupStateCommitment({ db, groupId, privateKey, rpcUrl });
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+        } else {
+          logger.info(`State commitment published for group ${groupId}.`);
+          logger.info(`  TX Hash:       ${result.txHash}`);
+          logger.info(`  Commitment ID: ${result.commitmentId}`);
+        }
+        return;
+      }
+
+      if (chainSub === "status") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group chain status <group-id>");
+        }
+        const latest = getLatestChainCommitment(db, groupId);
+        if (!latest) {
+          logger.info(`No chain commitments found for group: ${groupId}`);
+          return;
+        }
+        if (asJson) {
+          logger.info(JSON.stringify(latest, null, 2));
+        } else {
+          logger.info(`=== CHAIN STATUS: ${groupId} ===`);
+          logger.info(`  Type:        ${latest.actionType}`);
+          logger.info(`  Epoch:       ${latest.epoch}`);
+          logger.info(`  TX Hash:     ${latest.txHash}`);
+          logger.info(`  Members Root: ${latest.membersRoot}`);
+          if (latest.eventsMerkleRoot) {
+            logger.info(`  Events Root: ${latest.eventsMerkleRoot}`);
+          }
+          if (latest.treasuryBalanceWei) {
+            logger.info(`  Treasury:    ${latest.treasuryBalanceWei} wei`);
+          }
+          logger.info(`  Created:     ${latest.createdAt}`);
+        }
+        return;
+      }
+
+      if (chainSub === "history") {
+        const groupId = readGroupIdArg(args, 2);
+        if (!groupId) {
+          throw new Error("Usage: openfox group chain history <group-id>");
+        }
+        const limit = readNumberOption(args, "--limit", 20);
+        const commitments = listChainCommitments(db, groupId, limit);
+        if (asJson) {
+          logger.info(JSON.stringify(commitments, null, 2));
+          return;
+        }
+        logger.info(`=== CHAIN HISTORY: ${groupId} ===`);
+        if (!commitments.length) {
+          logger.info("No chain commitments.");
+          return;
+        }
+        for (const c of commitments) {
+          logger.info(
+            `${c.createdAt}  epoch=${c.epoch}  ${c.actionType}  tx=${c.txHash.slice(0, 18)}...`,
+          );
+        }
+        return;
+      }
+
+      throw new Error(`Unknown chain subcommand: ${chainSub}`);
+    }
+
+    if (command === "channels" && args[1] === "tree") {
+      const groupId = readGroupIdArg(args, 2) || readOption(args, "--group");
+      if (!groupId) {
+        throw new Error("Usage: openfox group channels tree --group <group-id>");
+      }
+      const tree = listChannelTree(db, groupId);
+      if (asJson) {
+        logger.info(JSON.stringify(tree, null, 2));
+        return;
+      }
+      function printTree(nodes: ChannelTreeNode[], indent = ""): void {
+        for (const node of nodes) {
+          logger.info(`${indent}#${node.name}${node.description ? ` — ${node.description}` : ""}`);
+          printTree(node.children, indent + "  ");
+        }
+      }
+      printTree(tree);
+      return;
+    }
+
+    if (command === "subgroup") {
+      const sub = args[1] || "help";
+      const account = loadWalletAccount();
+      if (!account) {
+        throw new Error("No wallet found. Run 'openfox wallet init' first.");
+      }
+
+      if (sub === "create") {
+        const groupId = readGroupIdArg(args, 2) || readOption(args, "--group");
+        const name = readOption(args, "--name");
+        if (!groupId || !name) {
+          throw new Error(
+            "Usage: openfox group subgroup create --group <parent-id> --name \"<name>\"",
+          );
+        }
+        const relationship = (readOption(args, "--relationship") || "child") as "child" | "affiliate";
+        const treasuryMode = (readOption(args, "--treasury-mode") || "independent") as "shared" | "independent" | "sub_budget";
+        const policyMode = (readOption(args, "--policy-mode") || "inherit") as "inherit" | "override";
+        const result = await createSubgroup(db, {
+          account,
+          parentGroupId: groupId,
+          childName: name,
+          relationship,
+          treasuryMode,
+          policyMode,
+          creatorAddress: account.address,
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+        } else {
+          logger.info(`Created subgroup: ${result.childGroup.group.groupId}`);
+          logger.info(`  Relationship: ${result.subgroupRecord.relationship}`);
+          logger.info(`  Treasury: ${result.subgroupRecord.treasuryMode}`);
+          logger.info(`  Policy: ${result.subgroupRecord.policyMode}`);
+        }
+        return;
+      }
+
+      if (sub === "list") {
+        const groupId = readGroupIdArg(args, 2) || readOption(args, "--group");
+        if (!groupId) {
+          throw new Error("Usage: openfox group subgroup list --group <parent-id>");
+        }
+        const subs = listSubgroups(db, groupId);
+        if (asJson) {
+          logger.info(JSON.stringify(subs, null, 2));
+        } else {
+          if (!subs.length) {
+            logger.info("No subgroups.");
+            return;
+          }
+          for (const s of subs) {
+            logger.info(
+              `${s.childGroupId}  ${s.relationship}  treasury=${s.treasuryMode}  policy=${s.policyMode}`,
+            );
+          }
+        }
+        return;
+      }
+
+      if (sub === "remove") {
+        const groupId = readGroupIdArg(args, 2) || readOption(args, "--group");
+        const childId = readOption(args, "--child");
+        if (!groupId || !childId) {
+          throw new Error(
+            "Usage: openfox group subgroup remove --group <parent-id> --child <child-id>",
+          );
+        }
+        removeSubgroup(db, groupId, childId, account.address);
+        logger.info(`Removed subgroup relationship: ${groupId} -> ${childId}`);
+        return;
+      }
+
+      throw new Error(`Unknown subgroup subcommand: ${sub}`);
     }
 
     throw new Error(`Unknown group command: ${command}`);

@@ -104,6 +104,31 @@ import {
   publishGroupProfile,
   buildFoxReputationSummary,
 } from "../metaworld/identity.js";
+import {
+  getReputationCard,
+  getReputationLeaderboard,
+  findTrustPath,
+  type ReputationDimension,
+  type ReputationEntityType,
+} from "../metaworld/reputation.js";
+import {
+  createIntent,
+  getIntent,
+  listIntents,
+  respondToIntent,
+  listIntentResponses,
+  acceptIntentResponse,
+  approveIntentCompletion,
+  cancelIntent,
+  type IntentKind,
+  type IntentStatus,
+} from "../metaworld/intents.js";
+import {
+  addFederationPeer,
+  removeFederationPeer,
+  listFederationPeers as listFedPeers,
+  buildFederationSnapshot,
+} from "../metaworld/federation.js";
 import fs from "fs/promises";
 import path from "path";
 
@@ -212,6 +237,17 @@ Usage:
   openfox world treasury [--group <group-id>] [--campaigns N] [--bounties N] [--settlements N] [--json]
   openfox world treasury export --group <group-id> --output <path> [--campaigns N] [--bounties N] [--settlements N] [--json]
   openfox world reputation [--address <addr>] [--json]
+  openfox world intent create --title <t> --kind <k> [--group <g>] [--budget <b>] [--expires <h>] [--json]
+  openfox world intent list [--kind <k>] [--status <s>] [--group <g>] [--json]
+  openfox world intent show <id> [--json]
+  openfox world intent respond <id> [--proposal <text>] [--json]
+  openfox world intent accept <id> --solver <addr> [--json]
+  openfox world intent approve <id> [--json]
+  openfox world intent cancel <id> [--json]
+  openfox world federation peers [--json]
+  openfox world federation add-peer <url> [--address <addr>] [--json]
+  openfox world federation remove-peer <peer-id> [--json]
+  openfox world federation status [--json]
 `);
     return;
   }
@@ -1207,21 +1243,85 @@ Usage:
     }
 
     if (command === "reputation") {
-      const address = readOption(args, "--address") ?? config.walletAddress;
-      const summary = buildFoxReputationSummary(db, address);
-      if (asJson) {
-        logger.info(JSON.stringify(summary, null, 2));
+      const subcommand = args[1] || "show";
+
+      if (subcommand === "show") {
+        const address = readOption(args, "--address") ?? args[2] ?? config.walletAddress;
+        const card = getReputationCard(db, address);
+        if (asJson) {
+          logger.info(JSON.stringify(card, null, 2));
+          return;
+        }
+        logger.info("=== REPUTATION CARD ===");
+        logger.info(`Address: ${card.address}`);
+        logger.info(`Entity type: ${card.entityType}`);
+        logger.info(`Overall score: ${card.overallScore.toFixed(3)}`);
+        if (card.dimensions.length === 0) {
+          logger.info("No reputation scores yet.");
+        }
+        for (const dim of card.dimensions) {
+          logger.info(`  ${dim.dimension}: ${dim.score.toFixed(3)} (${dim.eventCount} events)`);
+        }
+        // Also show legacy summary
+        try {
+          const summary = buildFoxReputationSummary(db, address);
+          logger.info("--- Legacy summary ---");
+          logger.info(`Jobs completed: ${summary.jobsCompleted}`);
+          logger.info(`Bounties won: ${summary.bountiesWon}`);
+          logger.info(`Payment reliability: ${summary.paymentReliabilityScore}%`);
+        } catch {
+          // legacy summary may not be available
+        }
         return;
       }
-      logger.info("=== OPENFOX REPUTATION SUMMARY ===");
-      logger.info(`Address: ${address}`);
-      logger.info(`Jobs completed: ${summary.jobsCompleted}`);
-      logger.info(`Bounties won: ${summary.bountiesWon}`);
-      logger.info(`Reports filed: ${summary.reportsFiled}`);
-      logger.info(`Warnings received: ${summary.warningsReceived}`);
-      logger.info(`Uptime: ${summary.uptimePercentage}%`);
-      logger.info(`Payment reliability: ${summary.paymentReliabilityScore}%`);
-      return;
+
+      if (subcommand === "leaderboard") {
+        const entityType = (readOption(args, "--type") ?? "fox") as ReputationEntityType;
+        const dimension = (readOption(args, "--dimension") ?? "reliability") as ReputationDimension;
+        const limit = readNumberOption(args, "--limit", 10);
+        const leaderboard = getReputationLeaderboard(db, entityType, dimension, limit);
+        if (asJson) {
+          logger.info(JSON.stringify(leaderboard, null, 2));
+          return;
+        }
+        logger.info(`=== REPUTATION LEADERBOARD: ${entityType} / ${dimension} ===`);
+        if (leaderboard.length === 0) {
+          logger.info("No entries yet.");
+        }
+        for (let i = 0; i < leaderboard.length; i++) {
+          const entry = leaderboard[i];
+          logger.info(`  ${i + 1}. ${entry.address} — score: ${entry.score.toFixed(3)} (${entry.eventCount} events)`);
+        }
+        return;
+      }
+
+      if (subcommand === "trust-path") {
+        const from = args[2] ?? readOption(args, "--from");
+        const to = args[3] ?? readOption(args, "--to");
+        if (!from || !to) {
+          throw new Error("Usage: openfox world reputation trust-path <from> <to>");
+        }
+        const trustPath = findTrustPath(db, from, to);
+        if (asJson) {
+          logger.info(JSON.stringify(trustPath, null, 2));
+          return;
+        }
+        if (!trustPath) {
+          logger.info(`No trust path found between ${from} and ${to}`);
+          return;
+        }
+        logger.info(`=== TRUST PATH ===`);
+        logger.info(`From: ${trustPath.from}`);
+        logger.info(`To: ${trustPath.to}`);
+        logger.info(`Hops: ${trustPath.hops.length}`);
+        logger.info(`Strength: ${trustPath.strength.toFixed(3)}`);
+        for (const hop of trustPath.hops) {
+          logger.info(`  ${hop.type}: ${hop.ref}`);
+        }
+        return;
+      }
+
+      throw new Error(`Unknown reputation subcommand: ${subcommand}. Use show, leaderboard, or trust-path.`);
     }
 
     if (command === "follow") {
@@ -1535,6 +1635,252 @@ Usage:
         logger.info(`  ${item.summary}`);
       }
       return;
+    }
+
+    if (command === "intent") {
+      const subcommand = args[1] || "list";
+
+      if (subcommand === "create") {
+        const title = readOption(args, "--title");
+        if (!title) {
+          throw new Error("Usage: openfox world intent create --title <t> --kind <k>");
+        }
+        const kindRaw = readOption(args, "--kind") ?? "work";
+        const validKinds = ["work", "opportunity", "procurement", "collaboration", "custom"];
+        if (!validKinds.includes(kindRaw)) {
+          throw new Error(`Invalid intent kind: ${kindRaw}. Expected: ${validKinds.join(", ")}`);
+        }
+        const intent = createIntent(db, {
+          publisherAddress: config.walletAddress,
+          kind: kindRaw as IntentKind,
+          title,
+          description: readOption(args, "--description") ?? "",
+          groupId: readOption(args, "--group"),
+          budgetWei: readOption(args, "--budget"),
+          expiresInHours: readNumberOption(args, "--expires", 72),
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(intent, null, 2));
+          return;
+        }
+        logger.info(`Intent created: ${intent.intentId}`);
+        logger.info(`  kind=${intent.kind} status=${intent.status} expires=${intent.expiresAt}`);
+        return;
+      }
+
+      if (subcommand === "list") {
+        const kindRaw = readOption(args, "--kind");
+        const statusRaw = readOption(args, "--status");
+        const intents = listIntents(db, {
+          kind: kindRaw as IntentKind | undefined,
+          status: statusRaw as IntentStatus | undefined,
+          groupId: readOption(args, "--group"),
+          limit: readNumberOption(args, "--limit", 25),
+        });
+        if (asJson) {
+          logger.info(JSON.stringify({ intents }, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX INTENTS ===");
+        if (!intents.length) {
+          logger.info("No intents found.");
+          return;
+        }
+        for (const intent of intents) {
+          logger.info(
+            `${intent.intentId}  ${intent.kind}  status=${intent.status}  ${intent.title}`,
+          );
+        }
+        return;
+      }
+
+      if (subcommand === "show") {
+        const intentId = args[2];
+        if (!intentId || intentId.startsWith("--")) {
+          throw new Error("Usage: openfox world intent show <id>");
+        }
+        const intent = getIntent(db, intentId);
+        if (!intent) {
+          throw new Error(`Intent not found: ${intentId}`);
+        }
+        const responses = listIntentResponses(db, intentId);
+        if (asJson) {
+          logger.info(JSON.stringify({ intent, responses }, null, 2));
+          return;
+        }
+        logger.info("=== INTENT DETAILS ===");
+        logger.info(`ID: ${intent.intentId}`);
+        logger.info(`Kind: ${intent.kind}  Status: ${intent.status}`);
+        logger.info(`Title: ${intent.title}`);
+        logger.info(`Publisher: ${intent.publisherAddress}`);
+        if (intent.groupId) logger.info(`Group: ${intent.groupId}`);
+        if (intent.budgetWei) logger.info(`Budget: ${intent.budgetWei} wei`);
+        logger.info(`Expires: ${intent.expiresAt}`);
+        if (intent.matchedSolverAddress) {
+          logger.info(`Matched solver: ${intent.matchedSolverAddress}`);
+        }
+        if (responses.length > 0) {
+          logger.info(`Responses (${responses.length}):`);
+          for (const resp of responses) {
+            logger.info(`  ${resp.solverAddress}  status=${resp.status}  ${resp.proposalText.slice(0, 60)}`);
+          }
+        }
+        return;
+      }
+
+      if (subcommand === "respond") {
+        const intentId = args[2];
+        if (!intentId || intentId.startsWith("--")) {
+          throw new Error("Usage: openfox world intent respond <id> [--proposal <text>]");
+        }
+        const response = respondToIntent(db, {
+          intentId,
+          solverAddress: config.walletAddress,
+          proposalText: readOption(args, "--proposal") ?? "",
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(response, null, 2));
+          return;
+        }
+        logger.info(`Response submitted: ${response.responseId}`);
+        return;
+      }
+
+      if (subcommand === "accept") {
+        const intentId = args[2];
+        if (!intentId || intentId.startsWith("--")) {
+          throw new Error("Usage: openfox world intent accept <id> --solver <addr>");
+        }
+        const solverAddress = readOption(args, "--solver");
+        if (!solverAddress) {
+          throw new Error("Usage: openfox world intent accept <id> --solver <addr>");
+        }
+        const intent = acceptIntentResponse(db, {
+          intentId,
+          solverAddress,
+          actorAddress: config.walletAddress,
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(intent, null, 2));
+          return;
+        }
+        logger.info(`Intent ${intentId} matched to solver ${solverAddress}`);
+        return;
+      }
+
+      if (subcommand === "approve") {
+        const intentId = args[2];
+        if (!intentId || intentId.startsWith("--")) {
+          throw new Error("Usage: openfox world intent approve <id>");
+        }
+        const result = approveIntentCompletion(db, {
+          intentId,
+          actorAddress: config.walletAddress,
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(result, null, 2));
+          return;
+        }
+        logger.info(`Intent ${intentId} completed.`);
+        if (result.settlementProposalId) {
+          logger.info(`Settlement proposal: ${result.settlementProposalId}`);
+        }
+        return;
+      }
+
+      if (subcommand === "cancel") {
+        const intentId = args[2];
+        if (!intentId || intentId.startsWith("--")) {
+          throw new Error("Usage: openfox world intent cancel <id>");
+        }
+        const intent = cancelIntent(db, {
+          intentId,
+          actorAddress: config.walletAddress,
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(intent, null, 2));
+          return;
+        }
+        logger.info(`Intent ${intentId} cancelled.`);
+        return;
+      }
+
+      throw new Error(
+        "Usage: openfox world intent <create|list|show|respond|accept|approve|cancel>",
+      );
+    }
+
+    if (command === "federation") {
+      const subcommand = args[1] || "peers";
+
+      if (subcommand === "peers") {
+        const peers = listFedPeers(db);
+        if (asJson) {
+          logger.info(JSON.stringify({ peers }, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX FEDERATION PEERS ===");
+        if (peers.length === 0) {
+          logger.info("No federation peers configured.");
+          return;
+        }
+        for (const peer of peers) {
+          logger.info(`${peer.peerUrl}  [${peer.status}]  failures=${peer.failureCount}`);
+          logger.info(`  id=${peer.peerId}  last_sync=${peer.lastSyncAt || "never"}`);
+        }
+        return;
+      }
+
+      if (subcommand === "add-peer") {
+        const peerUrl = args[2];
+        if (!peerUrl || peerUrl.startsWith("--")) {
+          throw new Error("Usage: openfox world federation add-peer <url> [--address <addr>]");
+        }
+        const address = readOption(args, "--address");
+        const peer = addFederationPeer(db, peerUrl, address || undefined);
+        if (asJson) {
+          logger.info(JSON.stringify(peer, null, 2));
+          return;
+        }
+        logger.info(`Added federation peer: ${peer.peerUrl} (${peer.peerId})`);
+        return;
+      }
+
+      if (subcommand === "remove-peer") {
+        const peerId = args[2];
+        if (!peerId || peerId.startsWith("--")) {
+          throw new Error("Usage: openfox world federation remove-peer <peer-id>");
+        }
+        const removed = removeFederationPeer(db, peerId);
+        if (asJson) {
+          logger.info(JSON.stringify({ removed }, null, 2));
+          return;
+        }
+        logger.info(removed ? `Removed federation peer: ${peerId}` : `Peer not found: ${peerId}`);
+        return;
+      }
+
+      if (subcommand === "status") {
+        const snapshot = buildFederationSnapshot(db);
+        if (asJson) {
+          logger.info(JSON.stringify(snapshot, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX FEDERATION STATUS ===");
+        logger.info(snapshot.summary);
+        logger.info(`  active=${snapshot.activePeers}  unreachable=${snapshot.unreachablePeers}  banned=${snapshot.bannedPeers}`);
+        if (snapshot.recentEvents.length > 0) {
+          logger.info("Recent events:");
+          for (const event of snapshot.recentEvents) {
+            logger.info(`  ${event.receivedAt}  ${event.eventType}  from=${event.peerId.slice(0, 10)}...`);
+          }
+        }
+        return;
+      }
+
+      throw new Error(
+        "Usage: openfox world federation <peers|add-peer|remove-peer|status>",
+      );
     }
 
     throw new Error(`Unknown world command: ${command}`);

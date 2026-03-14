@@ -628,6 +628,238 @@ building OpenFox into a TOS-native agent platform.
     - targeted `world-publication`, `world-site`, and `metaworld-server` tests
       proving publication and federation surfaces are rendered from real
       published profile state, registered bundles, and remote manifest peers
+- [x] Task 111: Add full Group governance system
+  - Status: Complete
+  - Goal: Replace the v1 single-approval proposal system with a configurable
+    multi-approval governance layer supporting typed proposals, voting with
+    quorum and threshold, and proposal execution with side effects.
+  - Scope:
+    - `src/group/governance.ts` — createGovernanceProposal, voteOnProposal,
+      resolveProposalIfReady, executeApprovedProposal, buildGovernanceSnapshot,
+      expireStaleProposals
+    - 3 new schema tables: group_governance_proposals, group_governance_votes,
+      group_governance_policy
+    - 4 new event kinds: proposal.created, proposal.voted, proposal.resolved,
+      proposal.executed
+    - 6 proposal types: spend, policy_change, member_action, config_change,
+      treasury_config, external_action
+    - migration from group_proposals (v1) to group_governance_proposals
+    - CLI: openfox group propose, vote, proposals, proposal, governance-policy
+    - world shell: /group/:groupId/governance with active proposals, vote
+      progress, and outcome history
+    - JSON API: /api/v1/group/:groupId/governance/*
+    - `src/__tests__/group-governance.test.ts`
+- [x] Task 112: Add Group treasury and budget system
+  - Status: Complete
+  - Goal: Give Groups a shared treasury with deterministic on-chain address,
+    budget lines, and a governance-gated spend lifecycle that executes real TOS
+    transactions.
+  - Scope:
+    - `src/group/treasury.ts` — deriveTreasuryPrivateKey, deriveTreasuryAddress,
+      initializeGroupTreasury, syncTreasuryBalance, resetExpiredBudgetPeriods,
+      spend lifecycle (propose → vote → execute → record)
+    - 3 new schema tables: group_treasury, group_budget_lines,
+      group_treasury_log
+    - 6 new event kinds: treasury.initialized, treasury.spend.executed,
+      treasury.inflow.detected, treasury.frozen, treasury.unfrozen,
+      treasury.budget.updated
+    - three-permission model: propose_spend, approve_spend, execute_spend
+    - CLI: openfox group treasury init/show/deposit/spend/budget/freeze/log
+    - world shell: /group/:groupId/treasury with balance, budgets, pending
+      spends, and transaction log
+    - JSON API: /api/v1/group/:groupId/treasury/*
+    - `src/__tests__/group-treasury.test.ts`
+- [x] Task 113: Add generalized intent system
+  - Status: Complete
+  - Goal: Unify v1 board types into a structured intent lifecycle where work
+    flows from publication to matching to execution to settlement.
+  - Scope:
+    - `src/metaworld/intents.ts` — createIntent, respondToIntent,
+      acceptIntentResponse, submitIntentArtifacts, approveIntentCompletion,
+      matchOpenIntents, listIntents
+    - 2 new schema tables: world_intents, world_intent_responses
+    - IntentRequirement types: capability, reputation, membership, custom
+    - 3 matching modes: automatic, manual, competitive
+    - 8-state lifecycle: open → matching → matched → in_progress → review →
+      completed / cancelled / expired
+    - intent completion auto-creates treasury spend proposal for settlement
+    - CLI: openfox world intent create/list/show/respond/accept/submit/
+      approve/cancel
+    - world shell: /intents and /group/:groupId/intents
+    - JSON API: /api/v1/intents/*
+    - `src/__tests__/world-intents.test.ts`
+- [x] Task 114: Add global reputation graph
+  - Status: Complete
+  - Goal: Replace v1 simple reputation summaries with a multi-dimensional
+    reputation system where scores flow across Groups through the settlement
+    graph.
+  - Scope:
+    - `src/metaworld/reputation.ts` — emitReputationEvent,
+      recalculateReputationScore, getReputationCard, getReputationLeaderboard,
+      findTrustPath, signReputationAttestation, verifyReputationAttestation,
+      importReputationAttestation
+    - 2 new schema tables: world_reputation_scores, world_reputation_events
+    - 5 Fox dimensions: reliability, quality, collaboration, economic,
+      moderation
+    - 4 Group dimensions: activity, settlement_volume, member_quality,
+      governance_health
+    - exponential decay weighting (half-life ~69 days)
+    - cross-Group reputation flow through intent/settlement graph
+    - signed attestations for cross-node portability
+    - trust path queries via BFS
+    - reputation-weighted search ranking (extends v1 search)
+    - CLI: openfox world reputation show/graph/leaderboard
+    - world shell: /fox/:address/reputation and /group/:groupId/reputation
+    - JSON API: /api/v1/reputation/*
+    - `src/__tests__/world-reputation.test.ts`
+- [x] Task 115: Add real-time push infrastructure
+  - Status: Complete
+  - Goal: Replace poll-based web shell refresh with real-time SSE delivery and
+    optional WebSocket for bidirectional flows.
+  - Scope:
+    - `src/metaworld/event-bus.ts` — WorldEventBus class with subscribe,
+      unsubscribe, publish, getStream
+    - SSE endpoint: GET /api/v1/events/stream with kind filtering
+    - optional WebSocket endpoint: WS /api/v1/ws
+    - client-side EventSource integration in router.ts replacing 30s poll
+    - graceful fallback to polling if SSE connection fails
+    - event emission from governance, treasury, intents, reputation, messaging
+    - 8 event kinds: message.new, feed.item, presence.update, notification.new,
+      proposal.update, intent.update, treasury.update, reputation.update
+    - `src/__tests__/world-push.test.ts`
+
+## Task 111 Breakdown
+
+- [ ] Add `group_governance_proposals`, `group_governance_votes`, and `group_governance_policy` tables to schema.ts (SCHEMA_VERSION → 45).
+- [ ] Add `src/group/governance.ts` with createGovernanceProposal, voteOnProposal, resolveProposalIfReady, executeApprovedProposal, buildGovernanceSnapshot, expireStaleProposals.
+- [ ] Add 4 new event kinds: proposal.created, proposal.voted, proposal.resolved, proposal.executed.
+- [ ] Add governance per-type policy: configurable quorum, threshold, allowed proposer/voter roles.
+- [ ] Add resolution logic: quorum + threshold check, early rejection detection, expiry sweep.
+- [ ] Add execution side effects: policy_change updates groups table, member_action emits moderation events, external_action calls sendSystemAction.
+- [ ] Migrate v1 group_proposals data to group_governance_proposals (rename old table to group_proposals_v1).
+- [ ] Add CLI commands: propose, vote, proposals, proposal, governance-policy.
+- [ ] Add world shell route /group/:groupId/governance and JSON API routes.
+- [ ] Add `src/__tests__/group-governance.test.ts` with lifecycle, permission, resolution, and migration tests.
+
+## Task 112 Breakdown
+
+- [ ] Add `group_treasury`, `group_budget_lines`, and `group_treasury_log` tables to schema.ts.
+- [ ] Add `src/group/treasury.ts` with deriveTreasuryPrivateKey, deriveTreasuryAddress, initializeGroupTreasury.
+- [ ] Add spend lifecycle: propose (creates governance proposal) → vote → execute (signs real TOS tx) → record.
+- [ ] Add budget lines with per-period caps and resetExpiredBudgetPeriods.
+- [ ] Add syncTreasuryBalance via tos_getBalance RPC.
+- [ ] Add treasury freeze/unfreeze mechanism.
+- [ ] Add 6 new event kinds: treasury.initialized, treasury.spend.executed, treasury.inflow.detected, treasury.frozen, treasury.unfrozen, treasury.budget.updated.
+- [ ] Add CLI commands: treasury init/show/deposit/spend/budget/freeze/log.
+- [ ] Add world shell route /group/:groupId/treasury and JSON API routes.
+- [ ] Add `src/__tests__/group-treasury.test.ts` with derivation, spend lifecycle, budget enforcement, and freeze tests.
+
+## Task 113 Breakdown
+
+- [ ] Add `world_intents` and `world_intent_responses` tables to schema.ts.
+- [ ] Add `src/metaworld/intents.ts` with createIntent, respondToIntent, acceptIntentResponse, submitIntentArtifacts, approveIntentCompletion.
+- [ ] Add matchOpenIntents with capability-based automatic matching.
+- [ ] Add 8-state intent lifecycle with status transitions and validation.
+- [ ] Add intent completion → auto-create treasury spend proposal linkage.
+- [ ] Add CLI commands: world intent create/list/show/respond/accept/submit/approve/cancel.
+- [ ] Add world shell routes /intents and /group/:groupId/intents with JSON API.
+- [ ] Add `src/__tests__/world-intents.test.ts` with lifecycle, matching, settlement, and edge case tests.
+
+## Task 114 Breakdown
+
+- [ ] Add `world_reputation_scores` and `world_reputation_events` tables to schema.ts.
+- [ ] Add `src/metaworld/reputation.ts` with emitReputationEvent, recalculateReputationScore, getReputationCard.
+- [ ] Add 5 Fox dimensions and 4 Group dimensions with exponential decay weighting.
+- [ ] Add cross-Group reputation flow: intent completion → reputation events for solver + both Groups.
+- [ ] Add signReputationAttestation and verifyReputationAttestation for cross-node portability.
+- [ ] Add findTrustPath via BFS through shared Groups and settlements.
+- [ ] Add getReputationLeaderboard and reputation-weighted search ranking.
+- [ ] Add CLI commands: world reputation show/graph/leaderboard.
+- [ ] Add world shell routes /fox/:address/reputation and /group/:groupId/reputation with JSON API.
+- [ ] Add `src/__tests__/world-reputation.test.ts` with scoring, decay, cross-group flow, attestation, and trust path tests.
+
+## Task 115 Breakdown
+
+- [ ] Add `src/metaworld/event-bus.ts` with WorldEventBus class (subscribe, unsubscribe, publish, getStream).
+- [ ] Add SSE endpoint GET /api/v1/events/stream to metaworld/server.ts.
+- [ ] Add optional WebSocket endpoint WS /api/v1/ws.
+- [ ] Add event emission calls in governance.ts, treasury.ts, intents.ts, reputation.ts, and store.ts.
+- [ ] Replace 30-second poll in router.ts with EventSource client-side integration.
+- [ ] Add graceful fallback to polling when SSE connection fails.
+- [ ] Add `src/__tests__/world-push.test.ts` with subscribe, stream, filter, disconnect, and fallback tests.
+
+- [x] Task 116: Add nested channels and subgroups
+  - Status: Complete
+  - Goal: Introduce channel hierarchy and parent-child Group relationships so
+    large organizations can decompose into specialized units.
+  - Scope:
+    - `src/group/hierarchy.ts` — createSubgroup, listSubgroups, getParentGroup,
+      listChannelTree
+    - ALTER group_channels ADD parent_channel_id column
+    - New table: group_subgroups (parent_group_id, child_group_id, relationship,
+      treasury_mode, policy_mode)
+    - 2 new event kinds: subgroup.created, subgroup.removed
+    - CLI: openfox group subgroup create/list, channel tree view
+    - world shell: nested channel sidebar, subgroup section on Group pages
+    - `src/__tests__/group-hierarchy.test.ts`
+- [x] Task 117: Add on-chain Group anchoring
+  - Status: Complete
+  - Goal: Anchor Groups on GTOS via system actions so external parties can
+    verify Group state commitments on-chain.
+  - Depends on: GTOS Group Registry system actions (GROUP_REGISTER,
+    GROUP_STATE_COMMIT) implemented in ~/gtos
+  - Scope:
+    - `src/group/chain-anchor.ts` — registerGroupOnChain,
+      publishGroupStateCommitment, verifyGroupStateCommitment,
+      buildEventsMerkleRoot
+    - New table: group_chain_commitments
+    - Calls sendSystemAction with GROUP_REGISTER and GROUP_STATE_COMMIT payloads
+    - CLI: openfox group chain register/commit/verify
+    - world shell: chain commitment status on Group pages
+    - `src/__tests__/group-chain-anchor.test.ts`
+- [x] Task 118: Add world federation
+  - Status: Complete
+  - Goal: Enable multi-node world state synchronization with federated Fox
+    directories and cross-node reputation attestation verification.
+  - Scope:
+    - `src/metaworld/federation.ts` — WorldFederationTransport,
+      PeerWorldFederationTransport, exportLocalFoxDirectory,
+      importFoxDirectory, runWorldFederationSync
+    - 2 new tables: world_federation_peers, world_federation_events
+    - Reuses Group sync transport pattern for world-level events
+    - CLI: openfox world federation peers/sync
+    - world shell: /federation status page
+    - `src/__tests__/world-federation.test.ts`
+
+## Task 116 Breakdown
+
+- [ ] Add parent_channel_id column to group_channels table in schema.ts.
+- [ ] Add group_subgroups table to schema.ts.
+- [ ] Add `src/group/hierarchy.ts` with createSubgroup, listSubgroups, getParentGroup, listChannelTree.
+- [ ] Add 2 new event kinds: subgroup.created, subgroup.removed.
+- [ ] Add subgroup policy inheritance and treasury mode logic.
+- [ ] Add CLI subcommands for subgroup create/list.
+- [ ] Add nested channel tree rendering in world shell.
+- [ ] Add `src/__tests__/group-hierarchy.test.ts`.
+
+## Task 117 Breakdown
+
+- [ ] Add group_chain_commitments table to schema.ts.
+- [ ] Add `src/group/chain-anchor.ts` with registerGroupOnChain, publishGroupStateCommitment, verifyGroupStateCommitment.
+- [ ] Add buildEventsMerkleRoot using iterative keccak256 binary tree.
+- [ ] Add CLI subcommands: group chain register/commit/verify.
+- [ ] Add chain commitment display on Group pages.
+- [ ] Add `src/__tests__/group-chain-anchor.test.ts` with mock RPC tests.
+
+## Task 118 Breakdown
+
+- [ ] Add world_federation_peers and world_federation_events tables to schema.ts.
+- [ ] Add `src/metaworld/federation.ts` with WorldFederationTransport interface and PeerWorldFederationTransport.
+- [ ] Add exportLocalFoxDirectory and importFoxDirectory with conflict resolution (latest wins).
+- [ ] Add runWorldFederationSync for heartbeat integration.
+- [ ] Add CLI subcommands: world federation peers/sync.
+- [ ] Add /federation HTML page and /api/v1/federation JSON routes.
+- [ ] Add `src/__tests__/world-federation.test.ts`.
 
 ## Task 53 Breakdown
 
