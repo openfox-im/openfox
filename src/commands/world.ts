@@ -25,6 +25,14 @@ import {
   buildGroupPageHtml,
 } from "../metaworld/group-page.js";
 import {
+  buildArtifactPageSnapshot,
+  buildArtifactPageHtml,
+} from "../metaworld/artifact-page.js";
+import {
+  buildSettlementPageSnapshot,
+  buildSettlementPageHtml,
+} from "../metaworld/settlement-page.js";
+import {
   buildWorldPresenceSnapshot,
   publishWorldPresence,
   type WorldPresenceStatus,
@@ -74,6 +82,15 @@ import {
   buildGroupTreasuryHtml,
   buildGroupTreasurySnapshot,
 } from "../metaworld/treasury.js";
+import {
+  addMetaWorldFederationPeer,
+  buildMetaWorldPublicationHtml,
+  buildMetaWorldPublicationSnapshot,
+  listMetaWorldFederationPeers,
+  refreshMetaWorldFederationPeer,
+  registerMetaWorldSitePublication,
+  registerMetaWorldSitePublicationFromOutputDir,
+} from "../metaworld/publication.js";
 import {
   buildPersonalizedFeedSnapshot,
   buildRecommendedFoxes,
@@ -147,9 +164,18 @@ Usage:
   openfox world fox page export --output <path> [--address <addr>] [--activity-limit N] [--messages N] [--announcements N] [--presence N] [--json]
   openfox world group page --group <group-id> [--messages N] [--announcements N] [--events N] [--presence N] [--json]
   openfox world group page export --group <group-id> --output <path> [--messages N] [--announcements N] [--events N] [--presence N] [--json]
+  openfox world artifact page --artifact <artifact-id> [--settlements N] [--json]
+  openfox world artifact page export --artifact <artifact-id> --output <path> [--settlements N] [--json]
+  openfox world settlement page --receipt <receipt-id> [--artifacts N] [--json]
+  openfox world settlement page export --receipt <receipt-id> --output <path> [--artifacts N] [--json]
   openfox world shell [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
   openfox world shell export --output <path> [--feed N] [--notifications N] [--boards N] [--directory N] [--groups N] [--json]
-  openfox world site export --output-dir <path> [--foxes N] [--groups N] [--json]
+  openfox world site export --output-dir <path> [--foxes N] [--groups N] [--base-url <url>] [--label <text>] [--json]
+  openfox world publication [--json]
+  openfox world publication site register --output-dir <path> [--base-url <url>] [--label <text>] [--json]
+  openfox world publication peer add --manifest-url <url> [--base-url <url>] [--label <text>] [--json]
+  openfox world publication peer refresh --id <peer-id> [--json]
+  openfox world publication peers [--json]
   openfox world demo export --output-dir <path> [--force] [--json]
   openfox world demo validate --bundle <path> [--json]
   openfox world serve [--port N] [--host <addr>]
@@ -523,6 +549,94 @@ Usage:
       return;
     }
 
+    if (command === "artifact") {
+      const subcommand = args[1] || "page";
+      if (subcommand !== "page") {
+        throw new Error(`Unknown world artifact command: ${subcommand}`);
+      }
+      const artifactId = readOption(args, "--artifact");
+      if (!artifactId) {
+        throw new Error(
+          "Usage: openfox world artifact page --artifact <artifact-id> [--settlements N]",
+        );
+      }
+      const snapshot = buildArtifactPageSnapshot(db, {
+        artifactId,
+        settlementLimit: readNumberOption(args, "--settlements", 8),
+      });
+      const pageSubcommand =
+        args[2] && !args[2].startsWith("--") ? args[2] : "snapshot";
+      if (pageSubcommand === "export") {
+        const output = readOption(args, "--output");
+        if (!output) {
+          throw new Error(
+            "Usage: openfox world artifact page export --artifact <artifact-id> --output <path>",
+          );
+        }
+        const outputPath = resolvePath(output);
+        await fs.mkdir(path.dirname(outputPath), { recursive: true });
+        await fs.writeFile(outputPath, buildArtifactPageHtml(snapshot), "utf8");
+        if (asJson) {
+          logger.info(JSON.stringify({ outputPath, artifactId }, null, 2));
+          return;
+        }
+        logger.info(`artifact page exported: ${outputPath}`);
+        return;
+      }
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX ARTIFACT PAGE ===");
+      logger.info(`${snapshot.artifact.title}  ${snapshot.artifact.artifactId}`);
+      logger.info(snapshot.summary);
+      return;
+    }
+
+    if (command === "settlement") {
+      const subcommand = args[1] || "page";
+      if (subcommand !== "page") {
+        throw new Error(`Unknown world settlement command: ${subcommand}`);
+      }
+      const receiptId = readOption(args, "--receipt");
+      if (!receiptId) {
+        throw new Error(
+          "Usage: openfox world settlement page --receipt <receipt-id> [--artifacts N]",
+        );
+      }
+      const snapshot = buildSettlementPageSnapshot(db, {
+        receiptId,
+        artifactLimit: readNumberOption(args, "--artifacts", 8),
+      });
+      const pageSubcommand =
+        args[2] && !args[2].startsWith("--") ? args[2] : "snapshot";
+      if (pageSubcommand === "export") {
+        const output = readOption(args, "--output");
+        if (!output) {
+          throw new Error(
+            "Usage: openfox world settlement page export --receipt <receipt-id> --output <path>",
+          );
+        }
+        const outputPath = resolvePath(output);
+        await fs.mkdir(path.dirname(outputPath), { recursive: true });
+        await fs.writeFile(outputPath, buildSettlementPageHtml(snapshot), "utf8");
+        if (asJson) {
+          logger.info(JSON.stringify({ outputPath, receiptId }, null, 2));
+          return;
+        }
+        logger.info(`settlement page exported: ${outputPath}`);
+        return;
+      }
+      if (asJson) {
+        logger.info(JSON.stringify(snapshot, null, 2));
+        return;
+      }
+      logger.info("=== OPENFOX SETTLEMENT PAGE ===");
+      logger.info(`${snapshot.settlement.receiptId}  ${snapshot.settlement.kind}`);
+      logger.info(snapshot.summary);
+      return;
+    }
+
     if (command === "governance") {
       const groupId = readOption(args, "--group");
       if (!groupId) {
@@ -759,8 +873,14 @@ Usage:
         foxLimit: readNumberOption(args, "--foxes", 50),
         groupLimit: readNumberOption(args, "--groups", 50),
       });
+      const publication = registerMetaWorldSitePublication({
+        db,
+        result,
+        baseUrl: readOption(args, "--base-url"),
+        label: readOption(args, "--label") ?? undefined,
+      });
       if (asJson) {
-        logger.info(JSON.stringify(result, null, 2));
+        logger.info(JSON.stringify({ ...result, publication }, null, 2));
         return;
       }
       logger.info(`metaWorld site exported: ${result.outputDir}`);
@@ -768,7 +888,111 @@ Usage:
       logger.info(`  foxes: ${result.foxPages.length}`);
       logger.info(`  groups: ${result.groupPages.length}`);
       logger.info(`  manifest: ${result.manifestPath}`);
+      logger.info(`  publication: ${publication.publicationId}`);
       return;
+    }
+
+    if (command === "publication") {
+      const subcommand = args[1] && !args[1].startsWith("--") ? args[1] : "show";
+      if (subcommand === "show") {
+        const snapshot = buildMetaWorldPublicationSnapshot(db);
+        if (asJson) {
+          logger.info(JSON.stringify(snapshot, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX PUBLICATION SURFACE ===");
+        logger.info(snapshot.summary);
+        for (const item of snapshot.sitePublications.slice(0, 10)) {
+          logger.info(`  site ${item.label}  foxes=${item.foxPageCount} groups=${item.groupPageCount}`);
+        }
+        for (const item of snapshot.federationPeers.slice(0, 10)) {
+          logger.info(`  peer ${item.label}  manifest=${item.manifestUrl}`);
+        }
+        return;
+      }
+      if (subcommand === "site") {
+        const siteSubcommand = args[2] && !args[2].startsWith("--") ? args[2] : "register";
+        if (siteSubcommand !== "register") {
+          throw new Error(`Unknown world publication site command: ${siteSubcommand}`);
+        }
+        const outputDir = readOption(args, "--output-dir");
+        if (!outputDir) {
+          throw new Error(
+            "Usage: openfox world publication site register --output-dir <path> [--base-url <url>] [--label <text>]",
+          );
+        }
+        const record = await registerMetaWorldSitePublicationFromOutputDir({
+          db,
+          outputDir: resolvePath(outputDir),
+          baseUrl: readOption(args, "--base-url"),
+          label: readOption(args, "--label") ?? undefined,
+        });
+        if (asJson) {
+          logger.info(JSON.stringify(record, null, 2));
+          return;
+        }
+        logger.info(`site publication registered: ${record.publicationId}`);
+        logger.info(`  ${record.label} -> ${record.manifestPath}`);
+        return;
+      }
+      if (subcommand === "peer") {
+        const peerSubcommand = args[2] && !args[2].startsWith("--") ? args[2] : "add";
+        if (peerSubcommand === "add") {
+          const manifestUrl = readOption(args, "--manifest-url");
+          if (!manifestUrl) {
+            throw new Error(
+              "Usage: openfox world publication peer add --manifest-url <url> [--base-url <url>] [--label <text>]",
+            );
+          }
+          const record = await addMetaWorldFederationPeer({
+            db,
+            manifestUrl,
+            baseUrl: readOption(args, "--base-url"),
+            label: readOption(args, "--label") ?? undefined,
+          });
+          if (asJson) {
+            logger.info(JSON.stringify(record, null, 2));
+            return;
+          }
+          logger.info(`federation peer added: ${record.peerId}`);
+          logger.info(`  ${record.label} -> ${record.manifestUrl}`);
+          return;
+        }
+        if (peerSubcommand === "refresh") {
+          const peerId = readOption(args, "--id");
+          if (!peerId) {
+            throw new Error(
+              "Usage: openfox world publication peer refresh --id <peer-id>",
+            );
+          }
+          const record = await refreshMetaWorldFederationPeer({ db, peerId });
+          if (asJson) {
+            logger.info(JSON.stringify(record, null, 2));
+            return;
+          }
+          logger.info(`federation peer refreshed: ${record.peerId}`);
+          logger.info(`  error=${record.lastError ?? "none"}`);
+          return;
+        }
+        throw new Error(`Unknown world publication peer command: ${peerSubcommand}`);
+      }
+      if (subcommand === "peers") {
+        const records = listMetaWorldFederationPeers(db);
+        if (asJson) {
+          logger.info(JSON.stringify(records, null, 2));
+          return;
+        }
+        logger.info("=== OPENFOX FEDERATION PEERS ===");
+        for (const record of records) {
+          logger.info(`${record.peerId}  ${record.label}`);
+          logger.info(`  ${record.manifestUrl}`);
+          if (record.lastError) {
+            logger.info(`  error: ${record.lastError}`);
+          }
+        }
+        return;
+      }
+      throw new Error(`Unknown world publication command: ${subcommand}`);
     }
 
     if (command === "demo") {

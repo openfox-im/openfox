@@ -156,6 +156,7 @@ export function buildGroupPageHtml(
     homeHref?: string;
     foxDirectoryHref?: string;
     groupDirectoryHref?: string;
+    publicationHref?: string;
     searchHref?: string;
     foxHrefsByAddress?: Record<string, string>;
   },
@@ -413,6 +414,7 @@ export function buildGroupPageHtml(
       { label: "World Shell", href: options?.homeHref ?? "../index.html" },
       { label: "Fox Directory", href: options?.foxDirectoryHref ?? "../foxes/index.html" },
       { label: "Group Directory", href: options?.groupDirectoryHref ?? "./index.html" },
+      { label: "Publication", href: options?.publicationHref ?? "../publication/index.html" },
       { label: "Search", href: options?.searchHref ?? "../search/index.html" },
     ],
     metrics: [

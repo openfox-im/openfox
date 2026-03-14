@@ -19,6 +19,7 @@ export function buildMetaWorldRouterScript(): string {
     "/feed": "/api/v1/feed",
     "/personalized-feed": "/api/v1/personalized-feed",
     "/search": "/api/v1/search",
+    "/publication": "/api/v1/publication",
     "/following": "/api/v1/following",
     "/followers": "/api/v1/followers",
     "/recommended/foxes": "/api/v1/recommended/foxes",
@@ -117,6 +118,66 @@ export function buildMetaWorldRouterScript(): string {
       var summary = item.reason || item.description || "";
       h += '<div class="mw-card"><div class="mw-meta"><span>recommended</span><span>' + escapeHtml(score) + '</span></div><h4>' + escapeHtml(title) + '</h4><p>' + escapeHtml(summary) + '</p></div>';
     });
+    h += '</div>';
+    return h;
+  }
+
+  function renderPublication(data) {
+    var h = '<h2 class="mw-title">Publication & Federation</h2>';
+    h += '<p style="color:#8b949e;margin-bottom:12px;">' + escapeHtml(data.summary || "") + '</p>';
+    h += '<div class="mw-metrics">';
+    h += '<div class="mw-metric"><strong>' + escapeHtml(data.counts && data.counts.publishedFoxCount || 0) + '</strong><span>Published Foxes</span></div>';
+    h += '<div class="mw-metric"><strong>' + escapeHtml(data.counts && data.counts.publishedGroupCount || 0) + '</strong><span>Published Groups</span></div>';
+    h += '<div class="mw-metric"><strong>' + escapeHtml(data.counts && data.counts.sitePublicationCount || 0) + '</strong><span>Site Bundles</span></div>';
+    h += '<div class="mw-metric"><strong>' + escapeHtml(data.counts && data.counts.federationPeerCount || 0) + '</strong><span>Federation Peers</span></div>';
+    h += '</div>';
+    h += '<div class="mw-grid">';
+    h += '<div class="mw-panel"><h3>Published Fox Profiles</h3>';
+    if (data.publishedFoxProfiles && data.publishedFoxProfiles.length) {
+      h += '<ul class="mw-list">';
+      data.publishedFoxProfiles.slice(0, 12).forEach(function(item) {
+        h += renderListItem(item.displayName || item.address, item.publishedCid || "");
+      });
+      h += '</ul>';
+    } else {
+      h += '<p class="mw-empty">No published Fox profiles.</p>';
+    }
+    h += '</div>';
+    h += '<div class="mw-panel"><h3>Published Group Profiles</h3>';
+    if (data.publishedGroupProfiles && data.publishedGroupProfiles.length) {
+      h += '<ul class="mw-list">';
+      data.publishedGroupProfiles.slice(0, 12).forEach(function(item) {
+        h += renderListItem(item.name || item.groupId, item.publishedCid || "");
+      });
+      h += '</ul>';
+    } else {
+      h += '<p class="mw-empty">No published Group profiles.</p>';
+    }
+    h += '</div>';
+    h += '</div>';
+    h += '<div class="mw-grid">';
+    h += '<div class="mw-panel"><h3>Hosted Site Bundles</h3>';
+    if (data.sitePublications && data.sitePublications.length) {
+      h += '<ul class="mw-list">';
+      data.sitePublications.slice(0, 12).forEach(function(item) {
+        h += renderListItem(item.label || item.publicationId, (item.baseUrl || item.outputDir || "") + ' · foxes=' + String(item.foxPageCount || 0));
+      });
+      h += '</ul>';
+    } else {
+      h += '<p class="mw-empty">No hosted site bundles yet.</p>';
+    }
+    h += '</div>';
+    h += '<div class="mw-panel"><h3>Federation Peers</h3>';
+    if (data.federationPeers && data.federationPeers.length) {
+      h += '<ul class="mw-list">';
+      data.federationPeers.slice(0, 12).forEach(function(item) {
+        h += renderListItem(item.label || item.peerId, item.manifestUrl || item.baseUrl || "");
+      });
+      h += '</ul>';
+    } else {
+      h += '<p class="mw-empty">No federation peers yet.</p>';
+    }
+    h += '</div>';
     h += '</div>';
     return h;
   }
@@ -237,6 +298,7 @@ export function buildMetaWorldRouterScript(): string {
     if (path === "/feed") return renderFeed(data);
     if (path === "/personalized-feed") return renderFeed(data);
     if (path.indexOf("/search") === 0) return renderSearch(data);
+    if (path === "/publication") return renderPublication(data);
     if (path === "/following") return renderFollowing(data);
     if (path === "/followers") return renderFollowers(data);
     if (path === "/recommended/foxes") return renderRecommended(data, "Recommended Foxes");

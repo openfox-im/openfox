@@ -13,6 +13,8 @@ import {
   sendGroupInvite,
 } from "../group/store.js";
 import { followFox, followGroup } from "../metaworld/follows.js";
+import { publishFoxProfile, publishGroupProfile } from "../metaworld/identity.js";
+import { registerMetaWorldSitePublication } from "../metaworld/publication.js";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 
 const TEST_ADDRESS = "0xabcdef0123456789abcdef0123456789abcdef01";
@@ -41,6 +43,10 @@ function makeHexPair(seed: string): { hash: `0x${string}`; txHash: `0x${string}`
     hash: (`0x${seed.repeat(64)}`.slice(0, 66)) as `0x${string}`,
     txHash: (`0x${(seed + seed.toUpperCase()).repeat(32)}`.slice(0, 66)) as `0x${string}`,
   };
+}
+
+function makeHex(seed: string): `0x${string}` {
+  return (`0x${seed.repeat(64)}`.slice(0, 66)) as `0x${string}`;
 }
 
 function seedGroupEconomics(params: {
@@ -348,6 +354,71 @@ describe("metaWorld server", () => {
     expect(res.body).toContain("Search");
   });
 
+  it("serves publication routes with published profiles and site bundles", async () => {
+    const admin = privateKeyToAccount(GROUP_ADMIN_PRIVATE_KEY);
+    const created = await createGroup({
+      db,
+      account: admin,
+      input: {
+        name: "Publication Server Group",
+        description: "Published group on the server.",
+        visibility: "public",
+        actorAddress: admin.address,
+        actorAgentId: "group-admin",
+        creatorDisplayName: "Group Admin",
+        tags: ["publication"],
+      },
+    });
+
+    publishFoxProfile(db, {
+      ...makeConfig(),
+      walletAddress: admin.address,
+      agentId: "group-admin",
+      agentDiscovery: {
+        enabled: true,
+        publishCard: true,
+        displayName: "Server Publication Fox",
+        endpoints: [],
+        capabilities: [],
+        directoryNodeRecords: [],
+      },
+    });
+    publishGroupProfile(db, created.group.groupId);
+    registerMetaWorldSitePublication({
+      db,
+      result: {
+        generatedAt: "2026-03-14T12:00:00.000Z",
+        outputDir: "/tmp/openfox-published-site",
+        manifestPath: "/tmp/openfox-published-site/manifest.json",
+        shellPath: "index.html",
+        foxDirectoryPath: "foxes/index.html",
+        groupDirectoryPath: "groups/index.html",
+        publicationPath: "publication/index.html",
+        searchPath: "search/index.html",
+        contentIndexPath: "content-index.json",
+        routesPath: "routes.json",
+        searchIndexPath: "search-index.json",
+        foxPages: [{ id: admin.address.toLowerCase(), title: "Server Publication Fox", path: `foxes/${admin.address.toLowerCase()}.html` }],
+        groupPages: [{ id: created.group.groupId, title: "Publication Server Group", path: `groups/${created.group.groupId}.html` }],
+      },
+      baseUrl: "https://world.example/server",
+      label: "Server Bundle",
+    });
+
+    const htmlRes = await httpGet(server.url + "/publication");
+    expect(htmlRes.status).toBe(200);
+    expect(htmlRes.body).toContain("Publication &amp; Federation");
+    expect(htmlRes.body).toContain("Server Publication Fox");
+    expect(htmlRes.body).toContain("Server Bundle");
+
+    const jsonRes = await httpGet(server.url + "/api/v1/publication");
+    expect(jsonRes.status).toBe(200);
+    const data = JSON.parse(jsonRes.body);
+    expect(data.counts.publishedFoxCount).toBe(1);
+    expect(data.counts.publishedGroupCount).toBe(1);
+    expect(data.counts.sitePublicationCount).toBe(1);
+  });
+
   it("serves the following page", async () => {
     const res = await httpGet(server.url + "/following");
     expect(res.status).toBe(200);
@@ -492,6 +563,129 @@ describe("metaWorld server", () => {
     expect(data.counts.settlementCount).toBe(2);
     expect(data.totals.pendingPayablesWei).toBe((2n * TOS).toString());
     expect(data.totals.pendingReceivablesWei).toBe((5n * TOS).toString());
+  });
+
+  it("serves artifact and settlement HTML and JSON routes", async () => {
+    const requester = privateKeyToAccount(GROUP_ADMIN_PRIVATE_KEY);
+    const provider = privateKeyToAccount(GROUP_OUTSIDER_PRIVATE_KEY);
+    const now = "2026-03-14T14:00:00.000Z";
+    const later = "2026-03-14T14:10:00.000Z";
+
+    db.insertBounty({
+      bountyId: "bnt_route_trail",
+      hostAgentId: "route-host",
+      hostAddress: requester.address,
+      kind: "question",
+      title: "Route Trail Bounty",
+      taskPrompt: "Collect evidence.",
+      referenceOutput: "Expected",
+      rewardWei: (1n * TOS).toString(),
+      submissionDeadline: "2026-03-15T00:00:00.000Z",
+      judgeMode: "local_model",
+      status: "paid",
+      createdAt: now,
+      updatedAt: later,
+    });
+    db.upsertArtifact({
+      artifactId: "art_route_trail",
+      kind: "oracle.evidence",
+      title: "Route Trail Artifact",
+      leaseId: "lease_route_trail",
+      cid: "bafyrouterailcid",
+      bundleHash: makeHex("f"),
+      providerBaseUrl: "https://provider.example",
+      providerAddress: provider.address,
+      requesterAddress: requester.address,
+      subjectId: "bnt_route_trail",
+      summaryText: "Artifact for route tests.",
+      status: "anchored",
+      createdAt: now,
+      updatedAt: later,
+    });
+    db.upsertArtifactVerification({
+      verificationId: "verify_route_trail",
+      artifactId: "art_route_trail",
+      receipt: {} as any,
+      receiptHash: makeHex("1"),
+      createdAt: later,
+      updatedAt: later,
+    });
+    db.upsertArtifactAnchor({
+      anchorId: "anchor_route_trail",
+      artifactId: "art_route_trail",
+      summary: {} as any,
+      summaryHash: makeHex("2"),
+      anchorTxHash: makeHex("3"),
+      createdAt: later,
+      updatedAt: later,
+    });
+    db.upsertExecutionTrail({
+      trailId: "trail_route_artifact",
+      subjectKind: "artifact",
+      subjectId: "art_route_trail",
+      executionKind: "signer_execution",
+      executionRecordId: "sign_exec_route",
+      executionTxHash: makeHex("4"),
+      executionReceiptHash: makeHex("5"),
+      linkMode: "direct",
+      createdAt: later,
+      updatedAt: later,
+    });
+    db.upsertSettlementReceipt({
+      receiptId: "rcpt_route_trail",
+      kind: "bounty",
+      subjectId: "bnt_route_trail",
+      receipt: {} as any,
+      receiptHash: makeHex("6"),
+      payoutTxHash: makeHex("7"),
+      settlementTxHash: makeHex("8"),
+      createdAt: later,
+      updatedAt: later,
+    });
+    db.upsertSettlementCallback({
+      callbackId: "cb_route_trail",
+      receiptId: "rcpt_route_trail",
+      kind: "bounty",
+      subjectId: "bnt_route_trail",
+      contractAddress: requester.address,
+      payloadMode: "receipt_hash",
+      payloadHex: makeHex("9"),
+      payloadHash: makeHex("a"),
+      status: "confirmed",
+      attemptCount: 1,
+      maxAttempts: 3,
+      callbackTxHash: makeHex("b"),
+      createdAt: later,
+      updatedAt: later,
+    });
+
+    const artifactHtml = await httpGet(
+      `${server.url}/artifact/${encodeURIComponent("art_route_trail")}`,
+    );
+    expect(artifactHtml.status).toBe(200);
+    expect(artifactHtml.body).toContain("Artifact Overview");
+    expect(artifactHtml.body).toContain("Execution Trails");
+
+    const artifactJson = await httpGet(
+      `${server.url}/api/v1/artifact/${encodeURIComponent("art_route_trail")}`,
+    );
+    expect(artifactJson.status).toBe(200);
+    expect(JSON.parse(artifactJson.body).artifact.title).toBe("Route Trail Artifact");
+
+    const settlementHtml = await httpGet(
+      `${server.url}/settlement/${encodeURIComponent("rcpt_route_trail")}`,
+    );
+    expect(settlementHtml.status).toBe(200);
+    expect(settlementHtml.body).toContain("Settlement Overview");
+    expect(settlementHtml.body).toContain("Related Artifacts");
+
+    const settlementJson = await httpGet(
+      `${server.url}/api/v1/settlement/${encodeURIComponent("rcpt_route_trail")}`,
+    );
+    expect(settlementJson.status).toBe(200);
+    const data = JSON.parse(settlementJson.body);
+    expect(data.settlement.receiptId).toBe("rcpt_route_trail");
+    expect(data.relatedArtifacts).toHaveLength(1);
   });
 
   it("serves a board page", async () => {
@@ -720,6 +914,7 @@ describe("metaWorld server", () => {
     expect(res.body).toContain("Feed");
     expect(res.body).toContain("For You");
     expect(res.body).toContain("Search");
+    expect(res.body).toContain("Publication");
     expect(res.body).toContain("Directory");
     expect(res.body).toContain("Following");
     expect(res.body).toContain("Recommended");

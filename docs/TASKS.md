@@ -588,14 +588,46 @@ building OpenFox into a TOS-native agent platform.
     - targeted `world-group-page` and `metaworld-server` tests proving the
       views are rendered from real campaign, bounty, result, and settlement
       state
-- [ ] Task 109: Add artifact and settlement trail pages
-  - Status: Proposed
+- [x] Task 109: Add artifact and settlement trail pages
+  - Status: Complete
   - Goal: Make artifacts, evidence, and settlement outcomes first-class
     navigable world objects with deeper trails and references.
-- [ ] Task 110: Add hosted publication and federation surfaces
-  - Status: Proposed
+  - Delivered:
+    - `src/metaworld/artifact-page.ts` — artifact page snapshots over artifact
+      records, verification state, anchor state, execution trails, and related
+      settlements
+    - `src/metaworld/settlement-page.ts` — settlement page snapshots over
+      settlement receipts, callback state, linked bounty metadata, and related
+      artifacts
+    - `openfox world artifact page ...` and
+      `openfox world settlement page ...` — CLI inspection and HTML export
+      surfaces
+    - `src/metaworld/server.ts` — live JSON and HTML routes at
+      `/api/v1/artifact/:artifactId`, `/artifact/:artifactId`,
+      `/api/v1/settlement/:receiptId`, and `/settlement/:receiptId`
+    - targeted `world-trail-pages` and `metaworld-server` tests proving the
+      pages are rendered from real artifact, verification, anchor, trail,
+      settlement, and callback state
+- [x] Task 110: Add hosted publication and federation surfaces
+  - Status: Complete
   - Goal: Extend the local-first world into broader published and federated
     surfaces without breaking the current runtime model.
+  - Delivered:
+    - `src/metaworld/publication.ts` — publication snapshot and HTML surface
+      over published Fox profiles, published Group profiles, hosted site
+      bundles, and federation peers
+    - `openfox world publication ...` and site export auto-registration —
+      CLI inspection and management for hosted site bundle records and
+      federation peer manifests
+    - `src/metaworld/server.ts` and `src/metaworld/router.ts` — live JSON and
+      HTML routes at `/api/v1/publication` and `/publication`, plus router and
+      layout support
+    - `src/metaworld/site.ts` — static `publication/index.html` export,
+      manifest `publicationPath`, and route index integration for hosted world
+      bundles
+    - targeted `world-publication`, `world-site`, and `metaworld-server` tests
+      proving publication and federation surfaces are rendered from real
+      published profile state, registered bundles, and remote manifest peers
 
 ## Task 53 Breakdown
 
@@ -1687,3 +1719,31 @@ building OpenFox into a TOS-native agent platform.
   export.
 - [x] Add tests proving treasury views are rendered from real campaign,
   bounty, result, and settlement state.
+
+## Task 109 Breakdown
+
+- [x] Add artifact page snapshots over artifact, verification, anchor, and
+  execution trail state.
+- [x] Add settlement page snapshots over settlement receipts, callback state,
+  linked bounty metadata, and related artifacts.
+- [x] Add CLI and live server routes for artifact and settlement inspection and
+  HTML export.
+- [x] Add tests proving artifact and settlement pages are rendered from real
+  local state.
+
+## Task 110 Breakdown
+
+- [x] Add publication snapshot and HTML builders for published Fox profiles,
+  published Group profiles, hosted site bundles, and federation peers.
+- [x] Add site bundle registration helpers for direct exports and manifest
+  re-registration from disk.
+- [x] Add federation peer add and refresh flows backed by remote
+  `manifest.json` fetches and durable local records.
+- [x] Add `openfox world publication ...` CLI surfaces and auto-register site
+  export output as a hosted publication record.
+- [x] Add live `/api/v1/publication` and `/publication` routes plus client-side
+  router/layout support.
+- [x] Add static `publication/index.html` export and include `publicationPath`
+  in the site manifest and routes index.
+- [x] Add tests proving publication and federation views are rendered from real
+  published profile state, registered site bundles, and remote peers.

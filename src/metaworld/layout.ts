@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { label: "Feed", href: "/feed" },
   { label: "For You", href: "/personalized-feed" },
   { label: "Search", href: "/search" },
+  { label: "Publication", href: "/publication" },
   { label: "Directory", href: "/directory/foxes" },
   { label: "Following", href: "/following" },
   { label: "Recommended", href: "/recommended/foxes" },

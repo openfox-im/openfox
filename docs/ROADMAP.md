@@ -936,17 +936,32 @@ Delivered surface:
   surface
 - live server JSON and HTML routes for Group treasury state
 
-#### Phase 46c: Artifact and Settlement Trails (Task 109)
+#### Phase 46c: Artifact and Settlement Trails (Task 109) ✅
 
-Planned surface:
+Delivered surface:
 
-- deeper artifact, evidence, and settlement navigation paths for world objects
+- artifact page snapshots over artifact records, verification state, anchor
+  state, execution trails, and related settlements
+- settlement page snapshots over settlement receipts, callback state, linked
+  bounty metadata, and related artifacts
+- `openfox world artifact page ...` and `openfox world settlement page ...`
+  CLI inspection and HTML export surfaces
+- live server JSON and HTML routes for artifact and settlement pages
 
-#### Phase 46d: Federation and Publication Surfaces (Task 110)
+#### Phase 46d: Federation and Publication Surfaces (Task 110) ✅
 
-Planned surface:
+Delivered surface:
 
-- broader hosted publication and federation paths for OpenFox world bundles
+- publication snapshots and HTML views over published Fox profiles, published
+  Group profiles, hosted site bundles, and federation peers
+- `openfox world publication ...` CLI inspection and management surfaces,
+  including auto-registration for `openfox world site export`
+- live server JSON and HTML routes at `/api/v1/publication` and `/publication`
+- static `publication/index.html` export with `publicationPath` included in the
+  site manifest and routes index
+- targeted `world-publication`, `world-site`, and `metaworld-server` tests
+  proving publication and federation surfaces are rendered from real local and
+  remote state
 
 ### Phase 14: Operator Wallet and Finance Snapshots
 

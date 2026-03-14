@@ -18,6 +18,11 @@ import {
   escapeHtml,
 } from "./render.js";
 import {
+  buildMetaWorldPublicationHtml,
+  buildMetaWorldPublicationSnapshot,
+  type MetaWorldSitePublicationRecord,
+} from "./publication.js";
+import {
   buildMetaWorldShellHtml,
   buildMetaWorldShellSnapshot,
 } from "./shell.js";
@@ -33,6 +38,7 @@ export interface MetaWorldSiteManifest {
   shellPath: string;
   foxDirectoryPath: string;
   groupDirectoryPath: string;
+  publicationPath: string;
   searchPath: string;
   contentIndexPath: string;
   routesPath: string;
@@ -92,6 +98,11 @@ export interface MetaWorldSiteRoutesIndex {
       }
     | {
         kind: "search_page";
+        path: string;
+        title: string;
+      }
+    | {
+        kind: "publication_page";
         path: string;
         title: string;
       }
@@ -367,15 +378,18 @@ export async function exportMetaWorldSite(params: {
   const foxDir = path.join(outputDir, "foxes");
   const groupDir = path.join(outputDir, "groups");
   const searchDir = path.join(outputDir, "search");
+  const publicationDir = path.join(outputDir, "publication");
   await fs.mkdir(foxDir, { recursive: true });
   await fs.mkdir(groupDir, { recursive: true });
   await fs.mkdir(searchDir, { recursive: true });
+  await fs.mkdir(publicationDir, { recursive: true });
 
   await fs.writeFile(
     path.join(outputDir, "index.html"),
     buildMetaWorldShellHtml(shellSnapshot, {
       foxDirectoryHref: "./foxes/index.html",
       groupDirectoryHref: "./groups/index.html",
+      publicationHref: "./publication/index.html",
       searchHref: "./search/index.html",
       foxHrefsByAddress: shellFoxLinks,
       groupHrefsById: shellGroupLinks,
@@ -401,6 +415,7 @@ export async function exportMetaWorldSite(params: {
         homeHref: "../index.html",
         foxDirectoryHref: "./index.html",
         groupDirectoryHref: "../groups/index.html",
+        publicationHref: "../publication/index.html",
         searchHref: "../search/index.html",
         groupHrefsById: Object.fromEntries(
           Object.entries(shellGroupLinks).map(([groupId, href]) => [
@@ -435,6 +450,7 @@ export async function exportMetaWorldSite(params: {
         homeHref: "../index.html",
         foxDirectoryHref: "../foxes/index.html",
         groupDirectoryHref: "./index.html",
+        publicationHref: "../publication/index.html",
         searchHref: "../search/index.html",
         foxHrefsByAddress: Object.fromEntries(
           Object.entries(shellFoxLinks).map(([address, href]) => [
@@ -468,6 +484,7 @@ export async function exportMetaWorldSite(params: {
         { label: "World Shell", href: "../index.html" },
         { label: "Fox Directory", href: "./index.html" },
         { label: "Group Directory", href: "../groups/index.html" },
+        { label: "Publication", href: "../publication/index.html" },
         { label: "Search", href: "../search/index.html" },
       ],
       entries: foxDirectory.items.map((item) => ({
@@ -495,6 +512,7 @@ export async function exportMetaWorldSite(params: {
         { label: "World Shell", href: "../index.html" },
         { label: "Fox Directory", href: "../foxes/index.html" },
         { label: "Group Directory", href: "./index.html" },
+        { label: "Publication", href: "../publication/index.html" },
         { label: "Search", href: "../search/index.html" },
       ],
       entries: groupDirectory.items.map((item) => ({
@@ -565,6 +583,11 @@ export async function exportMetaWorldSite(params: {
         kind: "search_page",
         path: "search/index.html",
         title: "Search",
+      },
+      {
+        kind: "publication_page",
+        path: "publication/index.html",
+        title: "Publication",
       },
       ...foxPages.map((page) => ({
         kind: "fox_page" as const,
@@ -639,9 +662,40 @@ export async function exportMetaWorldSite(params: {
         { label: "World Shell", href: "../index.html" },
         { label: "Fox Directory", href: "../foxes/index.html" },
         { label: "Group Directory", href: "../groups/index.html" },
+        { label: "Publication", href: "../publication/index.html" },
         { label: "Search", href: "./index.html" },
       ],
     }),
+    "utf8",
+  );
+
+  const previewPublicationRecord: MetaWorldSitePublicationRecord = {
+    publicationId: "generated-site-bundle",
+    label: path.basename(outputDir) || "metaworld-site",
+    outputDir,
+    manifestPath: path.join(outputDir, "manifest.json"),
+    publicationPath: "publication/index.html",
+    baseUrl: null,
+    generatedAt,
+    registeredAt: generatedAt,
+    foxPageCount: foxPages.length,
+    groupPageCount: groupPages.length,
+    shellPath: "index.html",
+    searchPath: "search/index.html",
+  };
+  await fs.writeFile(
+    path.join(publicationDir, "index.html"),
+    buildMetaWorldPublicationHtml(
+      buildMetaWorldPublicationSnapshot(params.db, {
+        previewSitePublication: previewPublicationRecord,
+      }),
+      {
+        homeHref: "../index.html",
+        foxDirectoryHref: "../foxes/index.html",
+        groupDirectoryHref: "../groups/index.html",
+        searchHref: "../search/index.html",
+      },
+    ),
     "utf8",
   );
 
@@ -650,6 +704,7 @@ export async function exportMetaWorldSite(params: {
     shellPath: "index.html",
     foxDirectoryPath: "foxes/index.html",
     groupDirectoryPath: "groups/index.html",
+    publicationPath: "publication/index.html",
     searchPath: "search/index.html",
     contentIndexPath: "content-index.json",
     routesPath: "routes.json",

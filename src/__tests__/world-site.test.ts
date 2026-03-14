@@ -10,6 +10,10 @@ import {
   postGroupAnnouncement,
   postGroupMessage,
 } from "../group/store.js";
+import {
+  publishFoxProfile,
+  publishGroupProfile,
+} from "../metaworld/identity.js";
 import { publishWorldPresence } from "../metaworld/presence.js";
 import { exportMetaWorldSite } from "../metaworld/site.js";
 
@@ -121,6 +125,8 @@ describe("metaWorld site export", () => {
       status: "online",
       ttlSeconds: 300,
     });
+    publishFoxProfile(db, config);
+    publishGroupProfile(db, created.group.groupId);
 
     const result = await exportMetaWorldSite({
       db,
@@ -137,6 +143,7 @@ describe("metaWorld site export", () => {
     expect(fs.existsSync(path.join(outputDir, "content-index.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "routes.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "search-index.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "publication", "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "search", "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "foxes", "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "groups", "index.html"))).toBe(true);
@@ -156,9 +163,11 @@ describe("metaWorld site export", () => {
       searchIndexPath: string;
       foxPages: Array<{ title: string }>;
       groupPages: Array<{ title: string }>;
+      publicationPath: string;
     };
     expect(manifest.foxPages[0].title).toBe("Site Fox");
     expect(manifest.groupPages[0].title).toBe("Site Group");
+    expect(manifest.publicationPath).toBe("publication/index.html");
     expect(manifest.searchPath).toBe("search/index.html");
     expect(manifest.contentIndexPath).toBe("content-index.json");
     expect(manifest.routesPath).toBe("routes.json");
@@ -191,6 +200,14 @@ describe("metaWorld site export", () => {
           route.kind === "search_page" &&
           route.title === "Search" &&
           route.path === "search/index.html",
+      ),
+    ).toBe(true);
+    expect(
+      routesIndex.routes.some(
+        (route) =>
+          route.kind === "publication_page" &&
+          route.title === "Publication" &&
+          route.path === "publication/index.html",
       ),
     ).toBe(true);
     expect(
@@ -233,21 +250,34 @@ describe("metaWorld site export", () => {
       path.join(outputDir, "search", "index.html"),
       "utf8",
     );
+    const publicationHtml = fs.readFileSync(
+      path.join(outputDir, "publication", "index.html"),
+      "utf8",
+    );
     expect(shellHtml).toContain("OpenFox metaWorld");
     expect(shellHtml).toContain('href="./foxes/index.html"');
     expect(shellHtml).toContain('href="./groups/index.html"');
+    expect(shellHtml).toContain('href="./publication/index.html"');
     expect(shellHtml).toContain('href="./search/index.html"');
     expect(foxHtml).toContain("Site Fox");
     expect(foxHtml).toContain('href="../index.html"');
     expect(foxHtml).toContain('href="../groups/index.html"');
+    expect(foxHtml).toContain('href="../publication/index.html"');
     expect(foxHtml).toContain('href="../search/index.html"');
     expect(foxHtml).toContain(`href="../groups/${created.group.groupId}.html"`);
     expect(groupHtml).toContain("Site Group");
     expect(groupHtml).toContain("Site Announcement");
     expect(groupHtml).toContain('href="../foxes/index.html"');
+    expect(groupHtml).toContain('href="../publication/index.html"');
     expect(groupHtml).toContain('href="../search/index.html"');
     expect(groupHtml).toContain(`href="../foxes/${admin.address.toLowerCase()}.html"`);
+    expect(searchHtml).toContain('../publication/index.html');
     expect(searchHtml).toContain("../search-index.json");
     expect(searchHtml).toContain("Search the Fox World");
+    expect(publicationHtml).toContain("Publication &amp; Federation");
+    expect(publicationHtml).toContain("Published Fox Profiles");
+    expect(publicationHtml).toContain("Site Fox");
+    expect(publicationHtml).toContain("Site Group");
+    expect(publicationHtml).toContain(path.basename(outputDir));
   });
 });

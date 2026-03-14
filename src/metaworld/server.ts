@@ -17,6 +17,14 @@ import {
   buildGroupPageHtml,
 } from "./group-page.js";
 import {
+  buildArtifactPageSnapshot,
+  buildArtifactPageHtml,
+} from "./artifact-page.js";
+import {
+  buildSettlementPageSnapshot,
+  buildSettlementPageHtml,
+} from "./settlement-page.js";
+import {
   buildWorldFoxDirectorySnapshot,
   buildWorldGroupDirectorySnapshot,
 } from "./directory.js";
@@ -45,6 +53,10 @@ import {
   buildGroupTreasuryHtml,
   buildGroupTreasurySnapshot,
 } from "./treasury.js";
+import {
+  buildMetaWorldPublicationHtml,
+  buildMetaWorldPublicationSnapshot,
+} from "./publication.js";
 import {
   buildPersonalizedFeedSnapshot,
   buildRecommendedFoxes,
@@ -634,6 +646,34 @@ export async function startMetaWorldServer(
           return;
         }
 
+        if (req.method === "GET" && /^\/api\/v1\/artifact\/[^/]+$/.test(pathname)) {
+          const artifactId = decodeURIComponent(pathname.split("/")[4]);
+          try {
+            const snapshot = buildArtifactPageSnapshot(db, {
+              artifactId,
+              settlementLimit: parseIntParam(url.searchParams.get("settlements"), 8),
+            });
+            jsonResponse(res, 200, snapshot);
+          } catch (err) {
+            jsonResponse(res, 404, { error: err instanceof Error ? err.message : "not found" });
+          }
+          return;
+        }
+
+        if (req.method === "GET" && /^\/api\/v1\/settlement\/[^/]+$/.test(pathname)) {
+          const receiptId = decodeURIComponent(pathname.split("/")[4]);
+          try {
+            const snapshot = buildSettlementPageSnapshot(db, {
+              receiptId,
+              artifactLimit: parseIntParam(url.searchParams.get("artifacts"), 8),
+            });
+            jsonResponse(res, 200, snapshot);
+          } catch (err) {
+            jsonResponse(res, 404, { error: err instanceof Error ? err.message : "not found" });
+          }
+          return;
+        }
+
         if (req.method === "GET" && /^\/api\/v1\/group\/[^/]+\/governance$/.test(pathname)) {
           const groupId = decodeURIComponent(pathname.split("/")[4]);
           try {
@@ -726,6 +766,11 @@ export async function startMetaWorldServer(
             kinds: kind ? [kind] : undefined,
             limit,
           }));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/publication") {
+          jsonResponse(res, 200, buildMetaWorldPublicationSnapshot(db));
           return;
         }
 
@@ -861,6 +906,20 @@ export async function startMetaWorldServer(
           return;
         }
 
+        if (req.method === "GET" && pathname === "/publication") {
+          htmlResponse(
+            res,
+            200,
+            buildMetaWorldPublicationHtml(buildMetaWorldPublicationSnapshot(db), {
+              homeHref: "/",
+              foxDirectoryHref: "/directory/foxes",
+              groupDirectoryHref: "/directory/groups",
+              searchHref: "/search",
+            }),
+          );
+          return;
+        }
+
         if (req.method === "GET" && pathname === "/following") {
           const limit = parseIntParam(url.searchParams.get("limit"), 50);
           htmlResponse(res, 200, renderFollowingHtml(db, config, limit));
@@ -904,6 +963,7 @@ export async function startMetaWorldServer(
               homeHref: "/",
               foxDirectoryHref: "/directory/foxes",
               groupDirectoryHref: "/directory/groups",
+              publicationHref: "/publication",
               groupHrefsById: Object.fromEntries(
                 snapshot.fox.groups.map((g) => [g.groupId, `/group/${encodeURIComponent(g.groupId)}`]),
               ),
@@ -923,6 +983,7 @@ export async function startMetaWorldServer(
               homeHref: "/",
               foxDirectoryHref: "/directory/foxes",
               groupDirectoryHref: "/directory/groups",
+              publicationHref: "/publication",
               groupHrefsById: Object.fromEntries(
                 snapshot.fox.groups.map((g) => [g.groupId, `/group/${encodeURIComponent(g.groupId)}`]),
               ),
@@ -942,6 +1003,7 @@ export async function startMetaWorldServer(
               homeHref: "/",
               foxDirectoryHref: "/directory/foxes",
               groupDirectoryHref: "/directory/groups",
+              publicationHref: "/publication",
               searchHref: "/search",
               foxHrefsByAddress: Object.fromEntries(
                 snapshot.members.map((m) => [m.memberAddress, `/fox/${encodeURIComponent(m.memberAddress)}`]),
@@ -950,6 +1012,46 @@ export async function startMetaWorldServer(
             htmlResponse(res, 200, html);
           } catch (err) {
             htmlResponse(res, 404, wrapInLayout("Not Found", `<p class="mw-empty">${escapeHtml(err instanceof Error ? err.message : "Group not found")}</p>`));
+          }
+          return;
+        }
+
+        if (req.method === "GET" && /^\/artifact\/[^/]+$/.test(pathname)) {
+          const artifactId = decodeURIComponent(pathname.split("/")[2]);
+          try {
+            const snapshot = buildArtifactPageSnapshot(db, {
+              artifactId,
+              settlementLimit: parseIntParam(url.searchParams.get("settlements"), 8),
+            });
+            const html = buildArtifactPageHtml(snapshot, {
+              homeHref: "/",
+              foxDirectoryHref: "/directory/foxes",
+              groupDirectoryHref: "/directory/groups",
+              searchHref: "/search",
+            });
+            htmlResponse(res, 200, html);
+          } catch (err) {
+            htmlResponse(res, 404, wrapInLayout("Not Found", `<p class="mw-empty">${escapeHtml(err instanceof Error ? err.message : "Artifact not found")}</p>`));
+          }
+          return;
+        }
+
+        if (req.method === "GET" && /^\/settlement\/[^/]+$/.test(pathname)) {
+          const receiptId = decodeURIComponent(pathname.split("/")[2]);
+          try {
+            const snapshot = buildSettlementPageSnapshot(db, {
+              receiptId,
+              artifactLimit: parseIntParam(url.searchParams.get("artifacts"), 8),
+            });
+            const html = buildSettlementPageHtml(snapshot, {
+              homeHref: "/",
+              foxDirectoryHref: "/directory/foxes",
+              groupDirectoryHref: "/directory/groups",
+              searchHref: "/search",
+            });
+            htmlResponse(res, 200, html);
+          } catch (err) {
+            htmlResponse(res, 404, wrapInLayout("Not Found", `<p class="mw-empty">${escapeHtml(err instanceof Error ? err.message : "Settlement not found")}</p>`));
           }
           return;
         }
