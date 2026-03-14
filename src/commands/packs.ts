@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readOption } from "../cli/parse.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("packs");
 
 export interface BundledPackInfo {
   name: string;
@@ -159,4 +163,93 @@ export function lintBundledPack(rootPath: string): BundledPackLintResult {
     if (relative.endsWith(".json")) inspectJson(relative);
   }
   return { rootPath: resolvedRoot, manifestPath, errors, warnings };
+}
+
+export async function handlePacksCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox packs
+
+Usage:
+  openfox packs list [--json]
+  openfox packs show <name>
+  openfox packs export <name> --output <path> [--force] [--json]
+  openfox packs lint --path <dir> [--json]
+`);
+    return;
+  }
+
+  if (command === "list") {
+    const items = listBundledPacks();
+    if (asJson) {
+      logger.info(JSON.stringify({ items }, null, 2));
+      return;
+    }
+    if (items.length === 0) {
+      logger.info("No bundled packs found.");
+      return;
+    }
+    logger.info("=== OPENFOX PACKS ===");
+    for (const item of items) {
+      logger.info(`${item.name}${item.version ? `  v${item.version}` : ""}`);
+      if (item.description) logger.info(`  ${item.description}`);
+    }
+    return;
+  }
+
+  if (command === "show") {
+    const name = args[1];
+    if (!name) throw new Error("Usage: openfox packs show <name>");
+    logger.info(readBundledPackReadme(name));
+    return;
+  }
+
+  if (command === "export") {
+    const name = args[1];
+    const outputPath = readOption(args, "--output");
+    if (!name || !outputPath) {
+      throw new Error("Usage: openfox packs export <name> --output <path> [--force] [--json]");
+    }
+    const result = exportBundledPack({
+      name,
+      outputPath,
+      force: args.includes("--force"),
+    });
+    if (asJson) {
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+    logger.info(
+      ["Pack exported.", `Name: ${result.name}`, `Source: ${result.sourcePath}`, `Output: ${result.outputPath}`].join("\n"),
+    );
+    return;
+  }
+
+  if (command === "lint") {
+    const packPath = readOption(args, "--path");
+    if (!packPath) {
+      throw new Error("Usage: openfox packs lint --path <dir> [--json]");
+    }
+    const result = lintBundledPack(packPath);
+    if (asJson) {
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+    logger.info(
+      [
+        "=== OPENFOX PACK LINT ===",
+        `Root: ${result.rootPath}`,
+        `Manifest: ${result.manifestPath || "(missing)"}`,
+        `Errors: ${result.errors.length}`,
+        `Warnings: ${result.warnings.length}`,
+        ...result.errors.map((value) => `ERROR: ${value}`),
+        ...result.warnings.map((value) => `WARN: ${value}`),
+      ].join("\n"),
+    );
+    return;
+  }
+
+  throw new Error(`Unknown packs command: ${command}`);
 }

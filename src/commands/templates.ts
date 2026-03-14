@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readOption } from "../cli/parse.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("templates");
 
 export interface BundledTemplateInfo {
   name: string;
@@ -82,4 +86,77 @@ export function exportBundledTemplate(params: {
     sourcePath,
     outputPath,
   };
+}
+
+export async function handleTemplatesCommand(args: string[]): Promise<void> {
+  const command = args[0] || "list";
+  const asJson = args.includes("--json");
+  if (args.includes("--help") || args.includes("-h") || command === "help") {
+    logger.info(`
+OpenFox templates
+
+Usage:
+  openfox templates list [--json]
+  openfox templates show <name>
+  openfox templates export <name> --output <path> [--force] [--json]
+`);
+    return;
+  }
+
+  if (command === "list") {
+    const items = listBundledTemplates();
+    if (asJson) {
+      logger.info(JSON.stringify({ items }, null, 2));
+      return;
+    }
+    if (items.length === 0) {
+      logger.info("No bundled templates found.");
+      return;
+    }
+    logger.info("=== OPENFOX TEMPLATES ===");
+    for (const item of items) {
+      logger.info(`${item.name}`);
+      if (item.description) {
+        logger.info(`  ${item.description}`);
+      }
+    }
+    return;
+  }
+
+  if (command === "show") {
+    const name = args[1];
+    if (!name) {
+      throw new Error("Usage: openfox templates show <name>");
+    }
+    logger.info(readBundledTemplateReadme(name));
+    return;
+  }
+
+  if (command === "export") {
+    const name = args[1];
+    const outputPath = readOption(args, "--output");
+    if (!name || !outputPath) {
+      throw new Error("Usage: openfox templates export <name> --output <path> [--force] [--json]");
+    }
+    const result = exportBundledTemplate({
+      name,
+      outputPath,
+      force: args.includes("--force"),
+    });
+    if (asJson) {
+      logger.info(JSON.stringify(result, null, 2));
+      return;
+    }
+    logger.info(
+      [
+        "Template exported.",
+        `Name: ${result.name}`,
+        `Source: ${result.sourcePath}`,
+        `Output: ${result.outputPath}`,
+      ].join("\n"),
+    );
+    return;
+  }
+
+  throw new Error(`Unknown templates command: ${command}`);
 }
