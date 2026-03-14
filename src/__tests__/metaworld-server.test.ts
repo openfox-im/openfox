@@ -123,6 +123,30 @@ describe("metaWorld server", () => {
     expect(res.body).toContain("World Feed");
   });
 
+  it("serves the personalized feed page", async () => {
+    const res = await httpGet(server.url + "/personalized-feed");
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("Personalized Feed");
+  });
+
+  it("serves the search page", async () => {
+    const res = await httpGet(server.url + "/search?query=test");
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("Search");
+  });
+
+  it("serves the recommended foxes page", async () => {
+    const res = await httpGet(server.url + "/recommended/foxes");
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("Recommended Foxes");
+  });
+
+  it("serves the subscriptions page", async () => {
+    const res = await httpGet(server.url + "/subscriptions");
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("Subscriptions");
+  });
+
   it("serves the fox directory page", async () => {
     const res = await httpGet(server.url + "/directory/foxes");
     expect(res.status).toBe(200);
@@ -180,6 +204,39 @@ describe("metaWorld server", () => {
     const data = JSON.parse(res.body);
     expect(data).toHaveProperty("items");
     expect(data).toHaveProperty("generatedAt");
+  });
+
+  it("returns JSON personalized feed", async () => {
+    const res = await httpGet(server.url + "/api/v1/personalized-feed");
+    expect(res.status).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty("items");
+    expect(data).toHaveProperty("summary");
+  });
+
+  it("returns JSON search results", async () => {
+    const res = await httpGet(server.url + "/api/v1/search?query=test");
+    expect(res.status).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty("results");
+    expect(data).toHaveProperty("query", "test");
+  });
+
+  it("returns JSON recommendations", async () => {
+    const foxes = await httpGet(server.url + "/api/v1/recommended/foxes");
+    expect(foxes.status).toBe(200);
+    expect(JSON.parse(foxes.body)).toHaveProperty("items");
+
+    const groups = await httpGet(server.url + "/api/v1/recommended/groups");
+    expect(groups.status).toBe(200);
+    expect(JSON.parse(groups.body)).toHaveProperty("items");
+  });
+
+  it("returns JSON subscriptions", async () => {
+    const res = await httpGet(server.url + "/api/v1/subscriptions");
+    expect(res.status).toBe(200);
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty("subscriptions");
   });
 
   it("returns JSON fox directory", async () => {
@@ -270,7 +327,10 @@ describe("metaWorld server", () => {
     const res = await httpGet(server.url + "/");
     expect(res.body).toContain("Home");
     expect(res.body).toContain("Feed");
+    expect(res.body).toContain("For You");
+    expect(res.body).toContain("Search");
     expect(res.body).toContain("Directory");
+    expect(res.body).toContain("Recommended");
     expect(res.body).toContain("Boards");
     expect(res.body).toContain("Presence");
     expect(res.body).toContain("Notifications");

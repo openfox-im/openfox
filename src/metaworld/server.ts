@@ -36,6 +36,13 @@ import {
   dismissWorldNotification,
 } from "./notifications.js";
 import { buildFoxProfile } from "./profile.js";
+import { buildSearchResultSnapshot } from "./search.js";
+import {
+  buildPersonalizedFeedSnapshot,
+  buildRecommendedFoxes,
+  buildRecommendedGroups,
+} from "./ranking.js";
+import { listSubscriptions } from "./subscriptions.js";
 
 const logger = createLogger("metaworld-server");
 
@@ -105,18 +112,27 @@ function renderFeedHtml(
   db: OpenFoxDatabase,
   groupId?: string,
   limit = 25,
+  subscriberAddress?: string,
+  subscribedOnly = false,
+  title = "World Feed",
+  activeRoute = "/feed",
 ): string {
-  const snapshot = buildWorldFeedSnapshot(db, { groupId, limit });
+  const snapshot = buildWorldFeedSnapshot(db, {
+    groupId,
+    limit,
+    subscriberAddress,
+    subscribedOnly,
+  });
   const items = snapshot.items
     .map(
       (item) =>
         `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.occurredAt)}</span><span>${escapeHtml(item.kind)}</span></div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.summary)}</p></div>`,
     )
     .join("");
-  const content = `<h2 class="mw-title">World Feed</h2>
+  const content = `<h2 class="mw-title">${escapeHtml(title)}</h2>
 <p style="color:var(--text-muted);margin-bottom:16px;">${escapeHtml(snapshot.summary)}</p>
 <div class="mw-grid">${items || '<p class="mw-empty">No feed items yet.</p>'}</div>`;
-  return wrapInLayout("Feed", content, "/feed");
+  return wrapInLayout(title, content, activeRoute);
 }
 
 function renderDirectoryFoxesHtml(
@@ -195,10 +211,12 @@ function renderNotificationsHtml(
   db: OpenFoxDatabase,
   config: OpenFoxConfig,
   limit = 25,
+  subscribedOnly = false,
 ): string {
   const snapshot = buildWorldNotificationsSnapshot(db, {
     actorAddress: config.walletAddress,
     limit,
+    subscribedOnly,
   });
   const items = snapshot.items
     .map(
@@ -210,6 +228,78 @@ function renderNotificationsHtml(
 <p style="color:var(--text-muted);margin-bottom:16px;">${snapshot.unreadCount} unread</p>
 <div class="mw-grid">${items || '<p class="mw-empty">Nothing needs attention.</p>'}</div>`;
   return wrapInLayout("Notifications", content, "/notifications");
+}
+
+function renderSearchHtml(
+  db: OpenFoxDatabase,
+  config: OpenFoxConfig,
+  query?: string,
+  kind?: "fox" | "group" | "board_item",
+  limit = 25,
+): string {
+  const snapshot = buildSearchResultSnapshot(db, config, query || "", {
+    kinds: kind ? [kind] : undefined,
+    limit,
+  });
+  const items = snapshot.results
+    .map(
+      (item) =>
+        `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.kind)}</span><span>score ${escapeHtml(String(item.relevanceScore))}</span></div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.summary)}</p></div>`,
+    )
+    .join("");
+  const content = `<h2 class="mw-title">Search</h2>
+<p style="color:var(--text-muted);margin-bottom:16px;">${escapeHtml(snapshot.summary)}</p>
+<div class="mw-grid">${items || '<p class="mw-empty">No results.</p>'}</div>`;
+  return wrapInLayout("Search", content, "/search");
+}
+
+function renderRecommendedHtml(
+  db: OpenFoxDatabase,
+  config: OpenFoxConfig,
+  kind: "foxes" | "groups",
+  limit = 25,
+): string {
+  const snapshot =
+    kind === "foxes"
+      ? buildRecommendedFoxes(db, config, { limit })
+      : buildRecommendedGroups(db, config, { limit });
+  const items = snapshot.items
+    .map((item) => {
+      const title = "displayName" in item ? item.displayName : item.name;
+      return `<div class="mw-card"><div class="mw-meta"><span>recommended</span><span>${escapeHtml(String(item.score))}</span></div><h4>${escapeHtml(title)}</h4><p>${escapeHtml(item.reason)}</p></div>`;
+    })
+    .join("");
+  const content = `<h2 class="mw-title">${kind === "foxes" ? "Recommended Foxes" : "Recommended Groups"}</h2>
+<p style="margin-bottom:12px;"><a href="/recommended/foxes">Foxes</a> | <a href="/recommended/groups">Groups</a></p>
+<p style="color:var(--text-muted);margin-bottom:16px;">${escapeHtml(snapshot.summary)}</p>
+<div class="mw-grid">${items || '<p class="mw-empty">No recommendations yet.</p>'}</div>`;
+  return wrapInLayout(
+    kind === "foxes" ? "Recommended Foxes" : "Recommended Groups",
+    content,
+    `/recommended/${kind}`,
+  );
+}
+
+function renderSubscriptionsHtml(
+  db: OpenFoxDatabase,
+  config: OpenFoxConfig,
+  kind?: "fox" | "group" | "board",
+  limit = 50,
+): string {
+  const subscriptions = listSubscriptions(db, config.walletAddress, {
+    feedKind: kind,
+    limit,
+  });
+  const items = subscriptions
+    .map(
+      (item) =>
+        `<li><span class="mw-li-label">${escapeHtml(`${item.feedKind}:${item.targetId}`)}</span><span class="mw-li-value">${escapeHtml(item.notifyOn.join(", "))}</span></li>`,
+    )
+    .join("");
+  const content = `<h2 class="mw-title">Subscriptions</h2>
+<p style="color:var(--text-muted);margin-bottom:16px;">${subscriptions.length} subscription(s).</p>
+<ul class="mw-list">${items || '<li class="mw-empty">No subscriptions configured.</li>'}</ul>`;
+  return wrapInLayout("Subscriptions", content, "/subscriptions");
 }
 
 function renderShellHtml(db: OpenFoxDatabase, config: OpenFoxConfig): string {
@@ -273,7 +363,19 @@ export async function startMetaWorldServer(
         if (req.method === "GET" && pathname === "/api/v1/feed") {
           const groupId = url.searchParams.get("group") || undefined;
           const limit = parseIntParam(url.searchParams.get("limit"), 25);
-          jsonResponse(res, 200, buildWorldFeedSnapshot(db, { groupId, limit }));
+          const subscribedOnly = url.searchParams.get("subscribed_only") === "1";
+          jsonResponse(res, 200, buildWorldFeedSnapshot(db, {
+            groupId,
+            limit,
+            subscriberAddress: config.walletAddress,
+            subscribedOnly,
+          }));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/personalized-feed") {
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          jsonResponse(res, 200, buildPersonalizedFeedSnapshot(db, config, { limit }));
           return;
         }
 
@@ -339,10 +441,55 @@ export async function startMetaWorldServer(
 
         if (req.method === "GET" && pathname === "/api/v1/notifications") {
           const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          const subscribedOnly = url.searchParams.get("subscribed_only") === "1";
           jsonResponse(res, 200, buildWorldNotificationsSnapshot(db, {
             actorAddress: config.walletAddress,
             limit,
+            subscribedOnly,
           }));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/search") {
+          const query = url.searchParams.get("query") || "";
+          const kindRaw = url.searchParams.get("kind");
+          const kind =
+            kindRaw === "fox" || kindRaw === "group" || kindRaw === "board_item"
+              ? kindRaw
+              : undefined;
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          jsonResponse(res, 200, buildSearchResultSnapshot(db, config, query, {
+            kinds: kind ? [kind] : undefined,
+            limit,
+          }));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/recommended/foxes") {
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          jsonResponse(res, 200, buildRecommendedFoxes(db, config, { limit }));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/recommended/groups") {
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          jsonResponse(res, 200, buildRecommendedGroups(db, config, { limit }));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/subscriptions") {
+          const kindRaw = url.searchParams.get("kind");
+          const kind =
+            kindRaw === "fox" || kindRaw === "group" || kindRaw === "board"
+              ? kindRaw
+              : undefined;
+          const limit = parseIntParam(url.searchParams.get("limit"), 50);
+          jsonResponse(res, 200, {
+            subscriptions: listSubscriptions(db, config.walletAddress, {
+              feedKind: kind,
+              limit,
+            }),
+          });
           return;
         }
 
@@ -400,7 +547,76 @@ export async function startMetaWorldServer(
         if (req.method === "GET" && pathname === "/feed") {
           const groupId = url.searchParams.get("group") || undefined;
           const limit = parseIntParam(url.searchParams.get("limit"), 25);
-          htmlResponse(res, 200, renderFeedHtml(db, groupId, limit));
+          const subscribedOnly = url.searchParams.get("subscribed_only") === "1";
+          htmlResponse(
+            res,
+            200,
+            renderFeedHtml(
+              db,
+              groupId,
+              limit,
+              config.walletAddress,
+              subscribedOnly,
+              subscribedOnly ? "Subscribed Feed" : "World Feed",
+              "/feed",
+            ),
+          );
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/personalized-feed") {
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          const snapshot = buildPersonalizedFeedSnapshot(db, config, { limit });
+          const items = snapshot.items
+            .map(
+              (item) =>
+                `<div class="mw-card"><div class="mw-meta"><span>${escapeHtml(item.occurredAt)}</span><span>${escapeHtml(item.boostReasons.join(", ") || "ranked")}</span></div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.summary)}</p></div>`,
+            )
+            .join("");
+          htmlResponse(
+            res,
+            200,
+            wrapInLayout(
+              "Personalized Feed",
+              `<h2 class="mw-title">Personalized Feed</h2><p style="color:var(--text-muted);margin-bottom:16px;">${escapeHtml(snapshot.summary)}</p><div class="mw-grid">${items || '<p class="mw-empty">No personalized items yet.</p>'}</div>`,
+              "/personalized-feed",
+            ),
+          );
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/search") {
+          const query = url.searchParams.get("query") || undefined;
+          const kindRaw = url.searchParams.get("kind");
+          const kind =
+            kindRaw === "fox" || kindRaw === "group" || kindRaw === "board_item"
+              ? kindRaw
+              : undefined;
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          htmlResponse(res, 200, renderSearchHtml(db, config, query, kind, limit));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/recommended/foxes") {
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          htmlResponse(res, 200, renderRecommendedHtml(db, config, "foxes", limit));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/recommended/groups") {
+          const limit = parseIntParam(url.searchParams.get("limit"), 25);
+          htmlResponse(res, 200, renderRecommendedHtml(db, config, "groups", limit));
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/subscriptions") {
+          const kindRaw = url.searchParams.get("kind");
+          const kind =
+            kindRaw === "fox" || kindRaw === "group" || kindRaw === "board"
+              ? kindRaw
+              : undefined;
+          const limit = parseIntParam(url.searchParams.get("limit"), 50);
+          htmlResponse(res, 200, renderSubscriptionsHtml(db, config, kind, limit));
           return;
         }
 

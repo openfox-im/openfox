@@ -11,7 +11,10 @@ export interface MetaWorldLayoutOptions {
 const NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "Feed", href: "/feed" },
+  { label: "For You", href: "/personalized-feed" },
+  { label: "Search", href: "/search" },
   { label: "Directory", href: "/directory/foxes" },
+  { label: "Recommended", href: "/recommended/foxes" },
   { label: "Boards", href: "/boards/work" },
   { label: "Presence", href: "/presence" },
   { label: "Notifications", href: "/notifications" },

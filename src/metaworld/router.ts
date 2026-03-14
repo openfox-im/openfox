@@ -17,6 +17,11 @@ export function buildMetaWorldRouterScript(): string {
   var routeToApi = {
     "/": "/api/v1/shell",
     "/feed": "/api/v1/feed",
+    "/personalized-feed": "/api/v1/personalized-feed",
+    "/search": "/api/v1/search",
+    "/recommended/foxes": "/api/v1/recommended/foxes",
+    "/recommended/groups": "/api/v1/recommended/groups",
+    "/subscriptions": "/api/v1/subscriptions",
     "/directory/foxes": "/api/v1/directory/foxes",
     "/directory/groups": "/api/v1/directory/groups",
     "/presence": "/api/v1/presence",
@@ -86,6 +91,45 @@ export function buildMetaWorldRouterScript(): string {
     return h;
   }
 
+  function renderSearch(data) {
+    var h = '<h2 class="mw-title">Search</h2>';
+    h += '<p style="color:#8b949e;margin-bottom:12px;">' + escapeHtml(data.summary || "") + '</p>';
+    if (!data.results || !data.results.length) return h + '<p class="mw-empty">No results.</p>';
+    h += '<div class="mw-grid">';
+    data.results.forEach(function(item) {
+      h += '<div class="mw-card"><div class="mw-meta"><span>' + escapeHtml(item.kind) + '</span><span>score ' + escapeHtml(item.relevanceScore) + '</span></div><h4>' + escapeHtml(item.title) + '</h4><p>' + escapeHtml(item.summary) + '</p></div>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  function renderRecommended(data, label) {
+    var h = '<h2 class="mw-title">' + escapeHtml(label) + '</h2>';
+    h += '<p style="margin-bottom:12px;"><a href="/recommended/foxes" data-nav>Foxes</a> | <a href="/recommended/groups" data-nav>Groups</a></p>';
+    h += '<p style="color:#8b949e;margin-bottom:12px;">' + escapeHtml(data.summary || "") + '</p>';
+    if (!data.items || !data.items.length) return h + '<p class="mw-empty">No recommendations yet.</p>';
+    h += '<div class="mw-grid">';
+    data.items.forEach(function(item) {
+      var title = item.displayName || item.name || item.address || item.groupId || "";
+      var score = item.score != null ? String(item.score) : "";
+      var summary = item.reason || item.description || "";
+      h += '<div class="mw-card"><div class="mw-meta"><span>recommended</span><span>' + escapeHtml(score) + '</span></div><h4>' + escapeHtml(title) + '</h4><p>' + escapeHtml(summary) + '</p></div>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  function renderSubscriptions(data) {
+    var h = '<h2 class="mw-title">Subscriptions</h2>';
+    if (!data.subscriptions || !data.subscriptions.length) return h + '<p class="mw-empty">No subscriptions configured.</p>';
+    h += '<ul class="mw-list">';
+    data.subscriptions.forEach(function(item) {
+      h += renderListItem(item.feedKind + ':' + item.targetId, item.notifyOn.join(', '));
+    });
+    h += '</ul>';
+    return h;
+  }
+
   function renderPresence(data) {
     var h = '<h2 class="mw-title">Presence</h2>';
     if (!data.items || !data.items.length) return h + '<p class="mw-empty">No live presence.</p>';
@@ -110,6 +154,11 @@ export function buildMetaWorldRouterScript(): string {
   function renderJson(data, path) {
     if (path === "/") return renderShell(data);
     if (path === "/feed") return renderFeed(data);
+    if (path === "/personalized-feed") return renderFeed(data);
+    if (path.indexOf("/search") === 0) return renderSearch(data);
+    if (path === "/recommended/foxes") return renderRecommended(data, "Recommended Foxes");
+    if (path === "/recommended/groups") return renderRecommended(data, "Recommended Groups");
+    if (path === "/subscriptions") return renderSubscriptions(data);
     if (path.indexOf("/directory/foxes") === 0) return renderDirectory(data, "foxes");
     if (path.indexOf("/directory/groups") === 0) return renderDirectory(data, "groups");
     if (path === "/presence") return renderPresence(data);
