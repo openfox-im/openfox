@@ -1,0 +1,13 @@
+{
+  "market_id": "public-verification-market-1",
+  "committee_base_url": "https://operator.example.com",
+  "oracle_base_url": "https://oracle.example.com",
+  "artifacts_base_url": "https://artifacts.example.com",
+  "required_capabilities": [
+    "proof.verify",
+    "news.vote",
+    "news.aggregate",
+    "storage.put",
+    "storage.get"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "Gateway Relay",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "dbPath": "~/.openfox/gateway-state.db",
+  "heartbeatConfigPath": "~/.openfox/gateway-heartbeat.yml",
+  "skillsDir": "~/.openfox/skills",
+  "agentDiscovery": {
+    "enabled": true,
+    "publishCard": true,
+    "cardTtlSeconds": 3600,
+    "endpoints": [],
+    "capabilities": [],
+    "gatewayServer": {
+      "enabled": true,
+      "bindHost": "0.0.0.0",
+      "port": 4880,
+      "sessionPath": "/agent-gateway/session",
+      "publicPathPrefix": "/a",
+      "publicBaseUrl": "https://gw.example.com",
+      "capability": "gateway.relay",
+      "mode": "paid",
+      "sessionTtlSeconds": 3600,
+      "requestTimeoutMs": 5000,
+      "maxRoutesPerSession": 8,
+      "maxRequestBodyBytes": 131072,
+      "priceModel": "x402-exact",
+      "paymentDirection": "requester_pays",
+      "sessionFeeWei": "0",
+      "perRequestFeeWei": "1000000000000000"
+    }
+  }
+}

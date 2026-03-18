@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "name": "storage-1",
+      "role": "storage",
+      "baseUrl": "https://storage.example.com/operator",
+      "authToken": "replace-with-storage-token"
+    },
+    {
+      "name": "artifact-1",
+      "role": "artifacts",
+      "baseUrl": "https://artifacts.example.com/operator",
+      "authToken": "replace-with-artifact-token"
+    }
+  ]
+}

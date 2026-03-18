@@ -1,0 +1,12 @@
+{
+  "role": "artifacts",
+  "allowed_kinds": [
+    "zktls.bundle",
+    "proof.verifier_receipt",
+    "proof.material",
+    "committee.vote",
+    "committee.aggregate"
+  ],
+  "auto_anchor": true,
+  "retention_class": "public-proof"
+}

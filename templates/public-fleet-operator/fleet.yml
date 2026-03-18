@@ -1,0 +1,26 @@
+version: 1
+nodes:
+  - name: public-gateway-1
+    role: gateway
+    baseUrl: https://gateway-1.example.com/operator
+    authToken: replace-me-gateway-token
+  - name: storage-provider-1
+    role: storage
+    baseUrl: https://storage-1.example.com/operator
+    authToken: replace-me-storage-token
+  - name: artifact-provider-1
+    role: artifacts
+    baseUrl: https://artifacts-1.example.com/operator
+    authToken: replace-me-artifacts-token
+  - name: signer-provider-1
+    role: signer
+    baseUrl: https://signer-1.example.com/operator
+    authToken: replace-me-signer-token
+  - name: paymaster-provider-1
+    role: paymaster
+    baseUrl: https://paymaster-1.example.com/operator
+    authToken: replace-me-paymaster-token
+  - name: host-runtime-1
+    role: host
+    baseUrl: https://host-1.example.com/operator
+    authToken: replace-me-host-token

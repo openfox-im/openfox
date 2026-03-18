@@ -1,0 +1,7 @@
+{
+  "role": "committee",
+  "min_threshold_m": 2,
+  "max_committee_size": 9,
+  "require_diverse_members": true,
+  "allow_bounded_reruns": true
+}

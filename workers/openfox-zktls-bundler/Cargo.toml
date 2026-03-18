@@ -1,0 +1,12 @@
+[package]
+name = "openfox-zktls-bundler"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+openfox-worker-contracts = { path = "../openfox-worker-contracts" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true

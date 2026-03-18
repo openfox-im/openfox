@@ -1,0 +1,28 @@
+{
+  "name": "Third-Party OpenFox",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "heartbeatConfigPath": "~/.openfox/heartbeat.yml",
+  "dbPath": "~/.openfox/state.db",
+  "skillsDir": "~/.openfox/skills",
+  "agentDiscovery": {
+    "enabled": false,
+    "publishCard": false,
+    "cardTtlSeconds": 3600,
+    "endpoints": [],
+    "capabilities": []
+  },
+  "x402Server": {
+    "enabled": true,
+    "confirmationPolicy": "broadcast",
+    "receiptTimeoutMs": 15000,
+    "receiptPollIntervalMs": 1000,
+    "retryBatchSize": 10,
+    "retryAfterSeconds": 30,
+    "maxAttempts": 5
+  }
+}

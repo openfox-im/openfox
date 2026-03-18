@@ -1,0 +1,29 @@
+{
+  "name": "Sentiment Analysis Provider",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "dbPath": "~/.openfox/sentiment-provider-state.db",
+  "heartbeatConfigPath": "~/.openfox/sentiment-provider-heartbeat.yml",
+  "skillsDir": "~/.openfox/skills",
+  "agentDiscovery": {
+    "enabled": true,
+    "publishCard": true,
+    "cardTtlSeconds": 3600,
+    "endpoints": [],
+    "capabilities": [],
+    "sentimentAnalysisServer": {
+      "enabled": true,
+      "bindHost": "127.0.0.1",
+      "port": 4884,
+      "path": "/agent-discovery/sentiment-analyze",
+      "capability": "sentiment.analyze",
+      "priceWei": "1500000000000000",
+      "maxTextChars": 4096,
+      "requestTimeoutMs": 10000
+    }
+  }
+}

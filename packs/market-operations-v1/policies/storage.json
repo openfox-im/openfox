@@ -1,0 +1,6 @@
+{
+  "role": "storage",
+  "default_ttl_seconds": 259200,
+  "max_ttl_seconds": 2592000,
+  "target_copies": 2
+}

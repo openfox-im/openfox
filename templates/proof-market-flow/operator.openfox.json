@@ -1,0 +1,20 @@
+{
+  "agentDiscovery": {
+    "enabled": true,
+    "publishCard": true,
+    "newsFetchServer": {
+      "enabled": true,
+      "capability": "news.fetch"
+    },
+    "proofVerifyServer": {
+      "enabled": true,
+      "capability": "proof.verify"
+    }
+  },
+  "storage": {
+    "enabled": true
+  },
+  "artifacts": {
+    "enabled": true
+  }
+}

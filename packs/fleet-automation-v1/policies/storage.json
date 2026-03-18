@@ -1,0 +1,6 @@
+{
+  "role": "storage",
+  "max_ttl_seconds": 604800,
+  "target_copies": 2,
+  "audit_interval_seconds": 3600
+}

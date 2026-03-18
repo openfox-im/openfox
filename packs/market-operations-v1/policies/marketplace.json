@@ -1,0 +1,12 @@
+{
+  "role": "marketplace",
+  "max_open_campaigns": 10,
+  "max_open_bounties": 100,
+  "allowed_kinds": [
+    "question",
+    "translation",
+    "social_proof",
+    "problem_solving",
+    "data_labeling"
+  ]
+}

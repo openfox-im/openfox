@@ -1,0 +1,17 @@
+{
+  "name": "proof-market-v1",
+  "version": "1.0.0",
+  "description": "Versioned control-plane pack for public proof capture, verification, and retrieval lanes.",
+  "policies": [
+    "policies/storage.json",
+    "policies/artifacts.json",
+    "policies/proof-verifier.json"
+  ],
+  "manifests": [
+    "manifests/proof-market.public.json"
+  ],
+  "contracts": [
+    "contracts/proof-capture-callback.json",
+    "contracts/proof-verification-callback.json"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "market_id": "public-task-market-1",
+  "callback_base_url": "https://callbacks.example.com",
+  "artifacts_base_url": "https://artifacts.example.com",
+  "storage_provider": "https://storage.example.com",
+  "required_capabilities": [
+    "task_market",
+    "oracle.resolve",
+    "news.fetch",
+    "proof.verify"
+  ]
+}

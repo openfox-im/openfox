@@ -1,0 +1,9 @@
+{
+  "role": "paymaster",
+  "trust_tier": "org_trusted",
+  "max_value_wei": "10000000000000000",
+  "max_gas": 500000,
+  "allowed_targets": [
+    "0x752a3d0f953b4ae91fca3bf4c1b93863c1884902f778aa65ff6e3aa02f730d02"
+  ]
+}

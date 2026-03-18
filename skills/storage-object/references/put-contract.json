@@ -1,0 +1,61 @@
+{
+  "contractVersion": "v1",
+  "backend": "storage-object.put",
+  "input": {
+    "type": "object",
+    "required": ["request", "options", "nowMs"],
+    "additionalProperties": false,
+    "properties": {
+      "request": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "content_text": { "type": "string" },
+          "content_base64": { "type": "string" },
+          "object_key": { "type": "string" },
+          "content_type": { "type": "string" },
+          "ttl_seconds": { "type": "number", "minimum": 1 }
+        }
+      },
+      "options": {
+        "type": "object",
+        "required": [
+          "maxObjectBytes",
+          "defaultTtlSeconds",
+          "maxTtlSeconds"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "maxObjectBytes": { "type": "number", "minimum": 1 },
+          "defaultTtlSeconds": { "type": "number", "minimum": 1 },
+          "maxTtlSeconds": { "type": "number", "minimum": 1 }
+        }
+      },
+      "nowMs": { "type": "number", "minimum": 1 }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "objectId",
+      "contentType",
+      "contentSha256",
+      "sizeBytes",
+      "ttlSeconds",
+      "expiresAt",
+      "bufferBase64"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "objectId": { "type": "string" },
+      "objectKey": { "type": "string" },
+      "contentType": { "type": "string" },
+      "contentSha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+      "sizeBytes": { "type": "number", "minimum": 0 },
+      "ttlSeconds": { "type": "number", "minimum": 1 },
+      "expiresAt": { "type": "number", "minimum": 1 },
+      "bufferBase64": { "type": "string" },
+      "backend": { "type": "string", "const": "skill:storage-object.put" }
+    }
+  }
+}

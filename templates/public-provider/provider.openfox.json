@@ -1,0 +1,62 @@
+{
+  "name": "Public Service Provider",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "dbPath": "~/.openfox/provider-state.db",
+  "heartbeatConfigPath": "~/.openfox/provider-heartbeat.yml",
+  "skillsDir": "~/.openfox/skills",
+  "agentDiscovery": {
+    "enabled": true,
+    "publishCard": true,
+    "cardTtlSeconds": 3600,
+    "endpoints": [],
+    "capabilities": [],
+    "observationServer": {
+      "enabled": true,
+      "bindHost": "127.0.0.1",
+      "port": 4895,
+      "path": "/agent-discovery/observe-once",
+      "capability": "observation.once"
+    },
+    "oracleServer": {
+      "enabled": true,
+      "bindHost": "127.0.0.1",
+      "port": 4896,
+      "path": "/agent-discovery/oracle/resolve",
+      "capability": "oracle.resolve"
+    },
+    "gatewayClient": {
+      "enabled": true,
+      "gatewayBootnodes": [
+        {
+          "agentId": "0xREPLACE_WITH_GATEWAY_AGENT_ID",
+          "url": "wss://gw.example.com/agent-gateway/session",
+          "payToAddress": "0xREPLACE_WITH_GATEWAY_PAY_TO_ADDRESS",
+          "paymentDirection": "requester_pays",
+          "perRequestFeeWei": "1000000000000000"
+        }
+      ],
+      "sessionTtlSeconds": 3600,
+      "requestTimeoutMs": 5000,
+      "maxGatewaySessions": 2,
+      "routes": [
+        {
+          "path": "/observe-once",
+          "capability": "observation.once",
+          "mode": "paid",
+          "targetUrl": "http://127.0.0.1:4895/agent-discovery/observe-once"
+        },
+        {
+          "path": "/oracle/resolve",
+          "capability": "oracle.resolve",
+          "mode": "paid",
+          "targetUrl": "http://127.0.0.1:4896/agent-discovery/oracle/resolve"
+        }
+      ]
+    }
+  }
+}

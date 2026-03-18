@@ -1,0 +1,57 @@
+{
+  "contractVersion": "v1",
+  "backend": "newsfetch.capture",
+  "input": {
+    "type": "object",
+    "required": ["request", "options"],
+    "additionalProperties": false,
+    "properties": {
+      "request": {
+        "type": "object",
+        "required": ["source_url"],
+        "additionalProperties": true,
+        "properties": {
+          "source_url": { "type": "string", "format": "uri" },
+          "publisher_hint": { "type": "string" },
+          "headline_hint": { "type": "string" }
+        }
+      },
+      "options": {
+        "type": "object",
+        "required": [
+          "allowPrivateTargets",
+          "requestTimeoutMs",
+          "maxResponseBytes",
+          "maxArticleChars"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "allowPrivateTargets": { "type": "boolean" },
+          "requestTimeoutMs": { "type": "number", "minimum": 1 },
+          "maxResponseBytes": { "type": "number", "minimum": 1 },
+          "maxArticleChars": { "type": "number", "minimum": 1 }
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "canonicalUrl",
+      "httpStatus",
+      "contentType",
+      "articleSha256"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "canonicalUrl": { "type": "string", "format": "uri" },
+      "httpStatus": { "type": "number", "minimum": 100, "maximum": 599 },
+      "contentType": { "type": "string" },
+      "articleSha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+      "articleText": { "type": "string" },
+      "headline": { "type": "string" },
+      "publisher": { "type": "string" },
+      "backend": { "type": "string", "const": "skill:newsfetch.capture" }
+    }
+  }
+}

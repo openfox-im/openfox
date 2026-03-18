@@ -1,0 +1,25 @@
+# Source & dev files (not needed in published package)
+src
+*.ts
+!*.d.ts
+tsconfig.json
+vitest.config.*
+.env
+*.log
+
+# Dev tooling
+.github
+.vscode
+.automaton
+packages
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Build artifacts that aren't needed
+*.tgz
+.DS_Store
+node_modules

@@ -1,0 +1,33 @@
+{
+  "name": "Data Labeling Solver",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "dbPath": "~/.openfox/data-labeling-solver-state.db",
+  "heartbeatConfigPath": "~/.openfox/data-labeling-solver-heartbeat.yml",
+  "skillsDir": "~/.openfox/skills",
+  "bounty": {
+    "enabled": true,
+    "role": "solver",
+    "skill": "data-labeling-bounty-solver",
+    "defaultKind": "data_labeling",
+    "bindHost": "127.0.0.1",
+    "port": 4899,
+    "pathPrefix": "/bounty",
+    "remoteBaseUrl": "http://127.0.0.1:4898",
+    "discoveryCapability": "task.submit",
+    "rewardWei": "10000000000000000",
+    "autoPayConfidenceThreshold": 0.9,
+    "defaultSubmissionTtlSeconds": 3600,
+    "pollIntervalSeconds": 30,
+    "maxOpenBounties": 10,
+    "judgeMode": "local_model",
+    "autoOpenOnStartup": false,
+    "autoOpenWhenIdle": false,
+    "autoSolveOnStartup": true,
+    "autoSolveEnabled": true
+  }
+}

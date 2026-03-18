@@ -1,0 +1,6 @@
+{
+  "role": "signer",
+  "trust_tier": "public_low_trust",
+  "max_value_wei": "1000000000000000",
+  "max_gas": 250000
+}

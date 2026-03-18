@@ -1,0 +1,80 @@
+{
+  "contractVersion": "v1",
+  "backend": "zktls.bundle",
+  "input": {
+    "type": "object",
+    "required": ["request", "fetchedAt", "capture"],
+    "additionalProperties": false,
+    "properties": {
+      "request": {
+        "type": "object",
+        "required": ["source_url"],
+        "additionalProperties": true,
+        "properties": {
+          "source_url": { "type": "string", "format": "uri" },
+          "publisher_hint": { "type": "string" },
+          "headline_hint": { "type": "string" }
+        }
+      },
+      "fetchedAt": { "type": "number", "minimum": 1 },
+      "capture": {
+        "type": "object",
+        "required": [
+          "canonicalUrl",
+          "httpStatus",
+          "contentType",
+          "articleSha256"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "httpStatus": { "type": "number", "minimum": 100, "maximum": 599 },
+          "contentType": { "type": "string" },
+          "articleSha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+          "articleText": { "type": "string" },
+          "headline": { "type": "string" },
+          "publisher": { "type": "string" }
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": ["format", "bundle", "bundleSha256"],
+    "additionalProperties": true,
+    "properties": {
+      "format": { "type": "string" },
+      "bundleSha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+      "bundle": {
+        "type": "object",
+        "required": [
+          "version",
+          "backend",
+          "fetched_at",
+          "source_url",
+          "canonical_url",
+          "http_status",
+          "content_type",
+          "article_sha256"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "version": { "type": "number", "const": 1 },
+          "backend": { "type": "string", "const": "skill:zktls.bundle" },
+          "fetched_at": { "type": "number", "minimum": 1 },
+          "source_url": { "type": "string", "format": "uri" },
+          "canonical_url": { "type": "string", "format": "uri" },
+          "publisher_hint": { "type": ["string", "null"] },
+          "headline_hint": { "type": ["string", "null"] },
+          "http_status": { "type": "number", "minimum": 100, "maximum": 599 },
+          "content_type": { "type": "string" },
+          "article_sha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+          "headline": { "type": ["string", "null"] },
+          "publisher": { "type": ["string", "null"] },
+          "article_preview": { "type": ["string", "null"] }
+        }
+      },
+      "backend": { "type": "string", "const": "skill:zktls.bundle" }
+    }
+  }
+}

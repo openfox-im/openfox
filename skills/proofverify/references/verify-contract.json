@@ -1,0 +1,61 @@
+{
+  "contractVersion": "v1",
+  "backend": "proofverify.verify",
+  "input": {
+    "type": "object",
+    "required": ["request", "options"],
+    "additionalProperties": false,
+    "properties": {
+      "request": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "subject_url": { "type": "string", "format": "uri" },
+          "subject_sha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+          "proof_bundle_url": { "type": "string", "format": "uri" },
+          "proof_bundle_sha256": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{64}$"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "required": [
+          "allowPrivateTargets",
+          "requestTimeoutMs",
+          "maxFetchBytes"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "allowPrivateTargets": { "type": "boolean" },
+          "requestTimeoutMs": { "type": "number", "minimum": 1 },
+          "maxFetchBytes": { "type": "number", "minimum": 1 }
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "summary",
+      "metadata",
+      "verifierReceiptSha256"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "verdict": {
+        "type": "string",
+        "enum": ["valid", "invalid", "inconclusive"]
+      },
+      "summary": { "type": "string" },
+      "metadata": { "type": "object", "additionalProperties": true },
+      "verifierReceiptSha256": {
+        "type": "string",
+        "pattern": "^0x[0-9a-fA-F]{64}$"
+      },
+      "backend": { "type": "string", "const": "skill:proofverify.verify" }
+    }
+  }
+}

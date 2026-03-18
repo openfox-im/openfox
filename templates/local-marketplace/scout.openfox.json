@@ -1,0 +1,25 @@
+{
+  "name": "Marketplace Scout",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "dbPath": "~/.openfox/scout-state.db",
+  "heartbeatConfigPath": "~/.openfox/scout-heartbeat.yml",
+  "skillsDir": "~/.openfox/skills",
+  "opportunityScout": {
+    "enabled": true,
+    "maxItems": 25,
+    "discoveryCapabilities": [
+      "task.submit",
+      "task.solve",
+      "observation.once",
+      "oracle.resolve"
+    ],
+    "remoteBaseUrls": [
+      "http://127.0.0.1:4891"
+    ]
+  }
+}

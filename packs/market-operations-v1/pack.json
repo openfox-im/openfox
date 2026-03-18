@@ -1,0 +1,18 @@
+{
+  "name": "market-operations-v1",
+  "version": "1.0.0",
+  "description": "Versioned control-plane pack for marketplace, settlement, and callback operators.",
+  "policies": [
+    "policies/marketplace.json",
+    "policies/storage.json",
+    "policies/signer.json",
+    "policies/paymaster.json"
+  ],
+  "manifests": [
+    "manifests/market-operator.json"
+  ],
+  "contracts": [
+    "contracts/market-binding-callback.json",
+    "contracts/settlement-callback.json"
+  ]
+}

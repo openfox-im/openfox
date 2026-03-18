@@ -1,0 +1,13 @@
+{
+  "agentDiscovery": {
+    "enabled": true
+  },
+  "evidenceWorkflow": {
+    "enabled": true,
+    "defaultNewsFetchBaseUrl": "https://news.example.com/news/fetch",
+    "defaultProofVerifyBaseUrl": "https://proof.example.com/proof/verify",
+    "defaultStorageBaseUrl": "https://storage.example.com/storage/put",
+    "defaultQuorumM": 2,
+    "defaultQuorumN": 3
+  }
+}

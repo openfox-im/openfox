@@ -1,0 +1,35 @@
+{
+  "backend": "zktls.prove",
+  "contractVersion": "v1",
+  "description": "Generate a native TLSNotary attestation for a bounded news fetch session.",
+  "input": {
+    "request": {
+      "source_url": "string (required) — HTTPS URL to fetch",
+      "source_policy_id": "string (optional) — bounded source policy identifier",
+      "publisher_hint": "string (optional)",
+      "headline_hint": "string (optional)"
+    },
+    "capture": {
+      "canonicalUrl": "string (required)",
+      "httpStatus": "number (required)",
+      "contentType": "string (required)",
+      "articleSha256": "0x-prefixed 32-byte hex (required)",
+      "articleText": "string (optional)",
+      "headline": "string (optional)",
+      "publisher": "string (optional)"
+    },
+    "options": {
+      "sourcePolicyId": "string (optional)"
+    },
+    "context": {
+      "fetchedAt": "number (optional unix seconds)"
+    }
+  },
+  "output": {
+    "attestation": "string — serialized TLSNotary attestation bundle",
+    "attestationSha256": "0x-prefixed 32-byte hex",
+    "serverName": "string",
+    "sentLen": "number",
+    "recvLen": "number"
+  }
+}

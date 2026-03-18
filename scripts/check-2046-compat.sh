@@ -1,0 +1,1 @@
+/home/tomi/gtos/scripts/check-2046-compat.sh

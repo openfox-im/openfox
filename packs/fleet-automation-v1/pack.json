@@ -1,0 +1,17 @@
+{
+  "name": "fleet-automation-v1",
+  "version": "1.0.0",
+  "description": "Versioned control-plane pack for public fleet automation and bounded recovery.",
+  "policies": [
+    "policies/signer.json",
+    "policies/paymaster.json",
+    "policies/storage.json",
+    "policies/marketplace.json"
+  ],
+  "manifests": [
+    "manifests/fleet.public.json"
+  ],
+  "contracts": [
+    "contracts/fleet-recovery-callback.json"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "proof-verification-callback",
+  "path": "/contracts/proof/verification/callback",
+  "method": "POST",
+  "body": {
+    "record_id": "proof:1",
+    "verifier_class": "m_of_n_consensus_verification",
+    "verdict": "valid",
+    "receipt_hash": "0xdca90de7e66cec3a5c7683922036c75aa691b36b473f162b905590f8031217c2"
+  }
+}

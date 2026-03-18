@@ -1,0 +1,37 @@
+name: 2046 Architecture Compatibility
+on:
+  push:
+    paths:
+      - 'src/intent/**'
+      - 'src/terminal/**'
+      - 'src/sponsor/**'
+      - 'src/audit/**'
+      - 'src/routing/**'
+      - 'src/pipeline/**'
+  pull_request:
+    paths:
+      - 'src/intent/**'
+      - 'src/terminal/**'
+      - 'src/sponsor/**'
+      - 'src/audit/**'
+      - 'src/routing/**'
+      - 'src/pipeline/**'
+
+jobs:
+  boundary-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: pnpm install
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Run 2046 module tests
+        run: npx vitest run src/__tests__/intent.test.ts src/__tests__/terminal.test.ts src/__tests__/intent-explain.test.ts src/__tests__/routing.test.ts src/__tests__/pipeline.test.ts --reporter=verbose
+      - name: Verify schema version consistency
+        run: |
+          SCHEMA_VERSION=$(grep 'BOUNDARY_SCHEMA_VERSION' src/intent/types.ts | grep -o '"[^"]*"' | tr -d '"')
+          echo "OpenFox boundary schema version: $SCHEMA_VERSION"

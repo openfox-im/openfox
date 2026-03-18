@@ -1,0 +1,14 @@
+{
+  "name": "fleet-recovery-callback",
+  "description": "Example callback payload for bounded fleet recovery completion.",
+  "path": "/contracts/fleet/recovery/callback",
+  "method": "POST",
+  "body": {
+    "kind": "replication",
+    "manifest_id": "fleet-main",
+    "run_id": "recovery-run-1",
+    "status": "partial",
+    "recovered": 2,
+    "failed": 1
+  }
+}

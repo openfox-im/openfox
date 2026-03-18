@@ -1,0 +1,32 @@
+{
+  "name": "Marketplace Host",
+  "inferenceModel": "ollama/llama3.1:8b",
+  "ollamaBaseUrl": "http://127.0.0.1:11434",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "chainId": 1666,
+  "walletAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "creatorAddress": "0xREPLACE_WITH_32_BYTE_TOS_ADDRESS",
+  "dbPath": "~/.openfox/host-state.db",
+  "heartbeatConfigPath": "~/.openfox/host-heartbeat.yml",
+  "skillsDir": "~/.openfox/skills",
+  "bounty": {
+    "enabled": true,
+    "role": "host",
+    "skill": "question-bounty-host",
+    "defaultKind": "question",
+    "bindHost": "127.0.0.1",
+    "port": 4891,
+    "pathPrefix": "/bounty",
+    "discoveryCapability": "task.submit",
+    "rewardWei": "10000000000000000",
+    "autoPayConfidenceThreshold": 0.9,
+    "defaultSubmissionTtlSeconds": 3600,
+    "pollIntervalSeconds": 30,
+    "maxOpenBounties": 10,
+    "judgeMode": "local_model",
+    "autoOpenOnStartup": true,
+    "autoOpenWhenIdle": true,
+    "autoSolveOnStartup": false,
+    "autoSolveEnabled": false
+  }
+}

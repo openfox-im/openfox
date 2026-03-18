@@ -1,0 +1,98 @@
+{
+  "contractVersion": "v1",
+  "backend": "storage-object.get",
+  "input": {
+    "type": "object",
+    "required": ["request", "object", "bufferBase64", "nowMs"],
+    "additionalProperties": false,
+    "properties": {
+      "request": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "object_id": { "type": "string" },
+          "content_sha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+          "inline_base64": { "type": "boolean" },
+          "max_bytes": { "type": "number", "minimum": 1 }
+        }
+      },
+      "object": {
+        "type": "object",
+        "required": [
+          "objectId",
+          "contentType",
+          "contentSha256",
+          "sizeBytes",
+          "storedAt",
+          "ttlSeconds",
+          "expiresAt"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "objectId": { "type": "string" },
+          "objectKey": { "type": ["string", "null"] },
+          "contentType": { "type": "string" },
+          "contentSha256": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+          "sizeBytes": { "type": "number", "minimum": 0 },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "storedAt": { "type": "string", "format": "date-time" },
+          "ttlSeconds": { "type": "number", "minimum": 1 },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "bufferBase64": { "type": "string" },
+      "nowMs": { "type": "number", "minimum": 1 }
+    }
+  },
+  "output": {
+    "oneOf": [
+      {
+        "type": "object",
+        "required": ["status", "response"],
+        "additionalProperties": true,
+        "properties": {
+          "status": { "type": "string", "const": "ok" },
+          "response": {
+            "type": "object",
+            "required": [
+              "status",
+              "object_id",
+              "expires_at",
+              "content_type",
+              "content_sha256",
+              "size_bytes"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "status": { "type": "string", "const": "ok" },
+              "object_id": { "type": "string" },
+              "expires_at": { "type": "number", "minimum": 1 },
+              "content_type": { "type": "string" },
+              "content_sha256": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              "size_bytes": { "type": "number", "minimum": 0 },
+              "content_text": { "type": "string" },
+              "content_base64": { "type": "string" },
+              "metadata": { "type": "object", "additionalProperties": true }
+            }
+          },
+          "backend": { "type": "string", "const": "skill:storage-object.get" }
+        }
+      },
+      {
+        "type": "object",
+        "required": ["status", "httpStatus", "reason"],
+        "additionalProperties": true,
+        "properties": {
+          "status": { "type": "string", "const": "rejected" },
+          "httpStatus": { "type": "number", "minimum": 100, "maximum": 599 },
+          "reason": { "type": "string" },
+          "pruneExpired": { "type": "boolean" },
+          "backend": { "type": "string", "const": "skill:storage-object.get" }
+        }
+      }
+    ]
+  }
+}

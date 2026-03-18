@@ -1,0 +1,9 @@
+{
+  "role": "signer",
+  "trust_tier": "org_trusted",
+  "max_value_wei": "10000000000000000",
+  "max_gas": 500000,
+  "allowed_selectors": [
+    "0xa9059cbb"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "role": "marketplace",
+  "max_open_tasks": 50,
+  "max_auto_pay_per_solver_24h_wei": "100000000000000000",
+  "allowed_kinds": [
+    "question",
+    "translation",
+    "data_labeling"
+  ]
+}

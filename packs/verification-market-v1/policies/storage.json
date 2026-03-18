@@ -1,0 +1,7 @@
+{
+  "role": "storage",
+  "default_ttl_seconds": 604800,
+  "max_ttl_seconds": 7776000,
+  "target_copies": 3,
+  "retention_class": "verification-history"
+}

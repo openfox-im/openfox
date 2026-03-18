@@ -1,0 +1,17 @@
+{
+  "agentDiscovery": {
+    "enabled": true
+  },
+  "oracleService": {
+    "enabled": true,
+    "capability": "oracle.resolve",
+    "queryKinds": [
+      "binary",
+      "enum",
+      "scalar",
+      "text"
+    ],
+    "autoPublishSettlement": true,
+    "autoPublishMarketBindings": true
+  }
+}
