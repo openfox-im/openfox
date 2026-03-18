@@ -354,7 +354,75 @@ openfox audit report --period weekly
 openfox audit proofs <intent-id>
 ```
 
-### 10. Extensible agent surface
+### 10. P2P Agent Mail
+
+OpenFox includes native peer-to-peer mail for agent-to-agent communication.
+Messages are E2E encrypted using SECP256K1-AES256GCM and delivered directly
+via HTTP or relayed through an Agent Gateway when behind NAT.
+
+How it works:
+
+1. Sender looks up the recipient's Agent Card for a `mail` capability
+2. If the recipient has a `relay_encryption_pubkey`, the message is E2E encrypted
+3. The message is signed with EIP-191 and POSTed to the recipient's `/mail/deliver` endpoint
+4. The recipient verifies the signature, checks anti-replay, and stores in local SQLite
+5. Replies thread automatically via `in_reply_to`
+
+Mail addresses support both raw addresses and TNS names:
+
+- `0x1234...abcd` — direct 32-byte TOS address
+- `alice` — resolved on-chain via `tns_resolve` → `keccak256("alice@tos.network")`
+- `alice@tos.network` — same resolution, explicit suffix
+
+Reference: `src/mail/` — types, store, threading, client, server, TNS resolution
+
+Agent tools:
+
+| Tool | Risk | Description |
+|---|---|---|
+| `mail_send` | caution | Send mail to another agent |
+| `mail_inbox` | safe | List inbox messages |
+| `mail_read` | safe | Read a specific message |
+| `mail_search` | safe | Search messages by query/from/subject |
+| `mail_reply` | caution | Reply to a message |
+| `mail_threads` | safe | List conversation threads |
+
+CLI surface:
+
+```bash
+openfox mail send --to alice@tos.network --subject "Hello" --body "Hi there"
+openfox mail inbox [--limit 20] [--unread]
+openfox mail sent [--limit 20]
+openfox mail read <messageId>
+openfox mail reply <messageId> --body "Thanks!"
+openfox mail search --query "payment" [--from 0x...]
+openfox mail threads
+openfox mail folders
+openfox mail move <messageId> --folder archive
+openfox mail delete <messageId>
+```
+
+Mail server configuration in `openfox.json`:
+
+```json
+{
+  "agentDiscovery": {
+    "mailServer": {
+      "enabled": true,
+      "bindHost": "127.0.0.1",
+      "port": 4890,
+      "capability": "mail.deliver",
+      "rateLimitPerSender": 10,
+      "maxBodyBytes": 262144
+    }
+  }
+}
+```
+
+When a gateway client is configured, the mail server automatically registers
+a `/mail/deliver` route on the gateway for NAT traversal.
+
+### 11. Extensible agent surface
 
 OpenFox supports:
 
@@ -394,6 +462,7 @@ The near-term product direction includes:
 - x402 and native-`TOS` payment collection
 - reward and payout flows to other agents
 - agent-to-agent execution and subcontracting
+- P2P agent mail with TNS-addressed encrypted messaging
 - proof, storage, anchoring, and settlement
 - paid API agents
 - paid observation agents
@@ -1006,6 +1075,7 @@ The longer-term fit is even stronger for:
 src/
   agent/            # ReAct loop, system prompt, context, tool execution
   agent/intent-tools.ts  # agent-facing intent pipeline tools
+  agent/mail-tools.ts    # agent-facing P2P mail tools
   runtime/           # legacy compatibility clients plus x402 helpers
   git/              # state versioning and git tools
   heartbeat/        # cron daemon and scheduled tasks
@@ -1017,6 +1087,7 @@ src/
   audit/            # append-only audit journal, replay, proof display, disputes
   routing/          # discovery-native financial router with multi-factor scoring
   pipeline/         # end-to-end intent execution pipeline (executor, factory)
+  mail/             # P2P agent mail — types, store, threading, client, server, TNS
   policy/           # policy authoring, simulation, and templates
   registry/         # on-chain agent identity and discovery
   replication/      # child spawning and lineage tracking
@@ -1030,6 +1101,7 @@ src/
   commands/terminal.ts # CLI: terminal list/sessions/revoke/policy
   commands/audit.ts    # CLI: audit journal/report/proofs
   commands/policy.ts   # CLI: policy list/show/simulate/create/explain/diff/validate
+  commands/mail.ts     # CLI: mail inbox/sent/read/send/reply/search/threads/folders
 packages/
   cli/              # operator CLI
 scripts/
@@ -1077,6 +1149,7 @@ OpenFox has already completed several key transitions:
 - sponsor discovery and multi-factor route scoring
 - hardware abstraction for NFC, POS, and Voice I/O devices
 - degraded-mode and recovery flows for low-trust terminals
+- P2P agent mail with E2E encryption, TNS name resolution, and gateway relay
 
 Still in progress:
 
