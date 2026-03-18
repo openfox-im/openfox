@@ -4,6 +4,7 @@ import type {
   AgentDiscoveryConfig,
   AgentDiscoveryEndpointConfig,
   AgentDiscoveryFaucetServerConfig,
+  AgentDiscoveryMailServerConfig,
   AgentDiscoveryNewsFetchServerConfig,
   NewsFetchSourcePolicyConfig,
   AgentDiscoveryObservationServerConfig,
@@ -22,6 +23,7 @@ export type {
   AgentDiscoveryCapabilityConfig,
   AgentDiscoveryEndpointConfig,
   AgentDiscoveryFaucetServerConfig,
+  AgentDiscoveryMailServerConfig,
   AgentDiscoveryNewsFetchServerConfig,
   NewsFetchSourcePolicyConfig,
   AgentDiscoveryObservationServerConfig,
@@ -611,6 +613,25 @@ export function normalizeAgentDiscoveryConfig(
       });
     }
   }
+  const mailServer = config.mailServer;
+  if (includeHostedServerEndpoints && mailServer?.enabled) {
+    const mailUrl = `${buildMailServerUrl(mailServer)}/deliver`;
+    if (!endpoints.some((entry) => entry.url === mailUrl)) {
+      endpoints.push({
+        kind: "http",
+        url: mailUrl,
+        role: "mail",
+      });
+    }
+    if (!capabilities.some((entry) => entry.name === mailServer.capability)) {
+      capabilities.push({
+        name: mailServer.capability,
+        mode: "sponsored",
+        rate_limit: `${mailServer.rateLimitPerSender}/60s`,
+        description: "Accept P2P agent mail",
+      });
+    }
+  }
   if (!endpoints.length || !capabilities.length) {
     return null;
   }
@@ -704,6 +725,16 @@ export function buildStorageGetServerUrl(
 
 export function buildSentimentAnalysisServerUrl(
   config: AgentDiscoverySentimentAnalysisServerConfig,
+): string {
+  const host = config.bindHost.includes(":")
+    ? `[${config.bindHost}]`
+    : config.bindHost;
+  const path = config.path.startsWith("/") ? config.path : `/${config.path}`;
+  return `http://${host}:${config.port}${path}`;
+}
+
+export function buildMailServerUrl(
+  config: AgentDiscoveryMailServerConfig,
 ): string {
   const host = config.bindHost.includes(":")
     ? `[${config.bindHost}]`

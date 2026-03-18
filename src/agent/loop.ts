@@ -36,6 +36,7 @@ import {
   executeTool,
 } from "./tools.js";
 import { createIntentTools } from "./intent-tools.js";
+import { createMailTools } from "./mail-tools.js";
 import { sanitizeInput } from "./injection-defense.js";
 import { getSurvivalTier } from "../runtime/credits.js";
 import { getWalletBalance } from "../runtime/x402.js";
@@ -104,7 +105,8 @@ export async function runAgentLoop(
   });
   const installedTools = loadInstalledTools(db);
   const intentTools = createIntentTools();
-  const tools = [...builtinTools, ...installedTools, ...intentTools];
+  const mailTools = createMailTools();
+  const tools = [...builtinTools, ...installedTools, ...intentTools, ...mailTools];
   const toolContext: ToolContext = {
     identity,
     config,

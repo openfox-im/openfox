@@ -88,6 +88,16 @@ export interface AgentDiscoveryCapabilityConfig {
   description?: string;
 }
 
+export interface AgentDiscoveryMailServerConfig {
+  enabled: boolean;
+  bindHost: string;
+  port: number;
+  path: string;
+  capability: string;
+  rateLimitPerSender: number;
+  maxBodyBytes: number;
+}
+
 export interface AgentDiscoveryFaucetServerConfig {
   enabled: boolean;
   bindHost: string;
@@ -343,9 +353,21 @@ export interface AgentDiscoveryConfig {
   proofVerifyServer?: AgentDiscoveryProofVerifyServerConfig;
   storageServer?: AgentDiscoveryStorageServerConfig;
   sentimentAnalysisServer?: AgentDiscoverySentimentAnalysisServerConfig;
+  mailServer?: AgentDiscoveryMailServerConfig;
   gatewayServer?: AgentGatewayServerConfig;
   gatewayClient?: AgentGatewayClientConfig;
 }
+
+export const DEFAULT_AGENT_DISCOVERY_MAIL_SERVER_CONFIG: AgentDiscoveryMailServerConfig =
+  {
+    enabled: false,
+    bindHost: "127.0.0.1",
+    port: 4890,
+    path: "/mail",
+    capability: "mail.deliver",
+    rateLimitPerSender: 10,
+    maxBodyBytes: 262144,
+  };
 
 export const DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG: AgentDiscoveryFaucetServerConfig =
   {
@@ -592,6 +614,7 @@ export const DEFAULT_AGENT_DISCOVERY_CONFIG: AgentDiscoveryConfig = {
   selectionPolicy: DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
   policyProfiles: DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES,
   reputationUpdates: DEFAULT_AGENT_DISCOVERY_REPUTATION_UPDATE_CONFIG,
+  mailServer: DEFAULT_AGENT_DISCOVERY_MAIL_SERVER_CONFIG,
   faucetServer: DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG,
   observationServer: DEFAULT_AGENT_DISCOVERY_OBSERVATION_SERVER_CONFIG,
   oracleServer: DEFAULT_AGENT_DISCOVERY_ORACLE_SERVER_CONFIG,
@@ -2438,7 +2461,8 @@ export type ToolCategory =
   | "registry"
   | "replication"
   | "memory"
-  | "metaworld";
+  | "metaworld"
+  | "communication";
 
 export interface ToolContext {
   identity: OpenFoxIdentity;

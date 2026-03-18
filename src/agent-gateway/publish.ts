@@ -42,6 +42,7 @@ export function buildGatewayProviderRoutes(params: {
   storageUrl?: string;
   discoveryStorageUrl?: string;
   artifactUrl?: string;
+  mailUrl?: string;
 }): AgentGatewayProviderRoute[] {
   const routes: AgentGatewayProviderRoute[] = [
     ...(params.config.agentDiscovery?.gatewayClient?.routes ?? []),
@@ -251,6 +252,19 @@ export function buildGatewayProviderRoutes(params: {
       });
     }
   }
+  const mail = params.config.agentDiscovery?.mailServer;
+  if (
+    mail?.enabled &&
+    params.mailUrl &&
+    !routes.some((entry) => entry.capability === mail.capability)
+  ) {
+    routes.push({
+      path: "/mail/deliver",
+      capability: mail.capability,
+      mode: "sponsored",
+      targetUrl: `${params.mailUrl}/deliver`,
+    });
+  }
   return uniqueByName(routes, (entry) => `${entry.path}:${entry.capability}`);
 }
 
@@ -370,6 +384,12 @@ export function buildPublishedAgentDiscoveryConfig(params: {
     storageServer: params.baseConfig.storageServer
       ? {
           ...params.baseConfig.storageServer,
+          enabled: false,
+        }
+      : undefined,
+    mailServer: params.baseConfig.mailServer
+      ? {
+          ...params.baseConfig.mailServer,
           enabled: false,
         }
       : undefined,

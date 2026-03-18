@@ -43,6 +43,7 @@ import { startAgentDiscoveryObservationServer } from "../agent-discovery/observa
 import { startAgentDiscoveryOracleServer } from "../agent-discovery/oracle-server.js";
 import { startAgentDiscoveryProofVerifyServer } from "../agent-discovery/proof-verify-server.js";
 import { startAgentDiscoverySentimentAnalysisServer } from "../agent-discovery/sentiment-analysis-server.js";
+import { startMailServer } from "../mail/server.js";
 import { startAgentDiscoveryStorageServer } from "../agent-discovery/storage-server.js";
 import { normalizeAgentDiscoveryConfig } from "../agent-discovery/types.js";
 import { startAgentGatewayServer } from "../agent-gateway/server.js";
@@ -186,6 +187,9 @@ export async function run(): Promise<void> {
     | undefined;
   let sentimentAnalysisServer:
     | Awaited<ReturnType<typeof startAgentDiscoverySentimentAnalysisServer>>
+    | undefined;
+  let mailServer:
+    | Awaited<ReturnType<typeof startMailServer>>
     | undefined;
   let storageServer:
     | Awaited<ReturnType<typeof startStorageProviderServer>>
@@ -368,6 +372,23 @@ export async function run(): Promise<void> {
     } catch (error) {
       logger.warn(
         `Agent Discovery sentiment analysis server failed to start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  if (config.agentDiscovery?.mailServer?.enabled) {
+    try {
+      mailServer = await startMailServer({
+        identity,
+        config,
+        db,
+        mailConfig: config.agentDiscovery.mailServer,
+        privateKey,
+      });
+      logger.info(`P2P Agent Mail server enabled at ${mailServer.url}`);
+    } catch (error) {
+      logger.warn(
+        `Mail server failed to start: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -580,6 +601,7 @@ export async function run(): Promise<void> {
         storageUrl: storageServer?.url,
         discoveryStorageUrl: discoveryStorageServer?.url,
         artifactUrl: artifactServer?.url,
+        mailUrl: mailServer?.url,
       });
       current = buildPublishedAgentDiscoveryConfig({
         baseConfig: current,
@@ -916,6 +938,7 @@ export async function run(): Promise<void> {
         storageUrl: storageServer?.url,
         discoveryStorageUrl: discoveryStorageServer?.url,
         artifactUrl: artifactServer?.url,
+        mailUrl: mailServer?.url,
       });
       if (!routes.length) {
         logger.warn(
@@ -1167,6 +1190,7 @@ export async function run(): Promise<void> {
       newsFetchServer?.close(),
       proofVerifyServer?.close(),
       discoveryStorageServer?.close(),
+      mailServer?.close(),
     ]).finally(() => {
       db.close();
       process.exit(0);

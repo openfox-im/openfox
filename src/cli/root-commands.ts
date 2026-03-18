@@ -39,6 +39,7 @@ import { handleIntentCommand } from "../commands/intent.js";
 import { handleTerminalCommand } from "../commands/terminal.js";
 import { handleAuditCommand } from "../commands/audit.js";
 import { handlePolicyCommand } from "../commands/policy.js";
+import { handleMailCommand } from "../commands/mail.js";
 
 export type RootCommandHandler = (args: string[]) => Promise<void>;
 
@@ -93,6 +94,7 @@ export const ROOT_COMMANDS: readonly RootCommandDefinition[] = [
   { name: "terminal", invocation: "openfox terminal ...", summary: "Inspect terminal adapters, sessions, and policies", handler: handleTerminalCommand },
   { name: "audit", invocation: "openfox audit ...", summary: "Query the append-only audit journal and generate reports", handler: handleAuditCommand },
   { name: "policy", invocation: "openfox policy ...", summary: "Author, simulate, and manage policy templates", handler: handlePolicyCommand },
+  { name: "mail", invocation: "openfox mail ...", summary: "Send, receive, and manage P2P agent mail", handler: handleMailCommand },
 ] as const;
 
 const ROOT_COMMAND_MAP = new Map(

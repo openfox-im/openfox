@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 51;
+export const SCHEMA_VERSION = 52;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -2070,4 +2070,42 @@ export const CREATE_TABLES = `
   CREATE INDEX IF NOT EXISTS idx_terminal_sessions_terminal ON terminal_sessions(terminal_id);
   CREATE INDEX IF NOT EXISTS idx_terminal_sessions_expires ON terminal_sessions(expires_at);
   CREATE INDEX IF NOT EXISTS idx_terminal_sessions_revoked ON terminal_sessions(revoked);
+
+  -- P2P Agent Mail (v52)
+  CREATE TABLE IF NOT EXISTS mail_messages (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    in_reply_to TEXT,
+    from_address TEXT NOT NULL,
+    to_addresses TEXT NOT NULL,
+    cc_addresses TEXT DEFAULT '[]',
+    subject TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    body_html TEXT DEFAULT '',
+    folder TEXT NOT NULL DEFAULT 'inbox',
+    status TEXT NOT NULL DEFAULT 'unread',
+    sender_signature TEXT NOT NULL,
+    has_attachments INTEGER NOT NULL DEFAULT 0,
+    attachments_json TEXT DEFAULT '[]',
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    sent_at TEXT NOT NULL,
+    received_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS mail_threads (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL DEFAULT '',
+    participants TEXT NOT NULL DEFAULT '[]',
+    message_count INTEGER NOT NULL DEFAULT 0,
+    unread_count INTEGER NOT NULL DEFAULT 0,
+    last_message_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_mail_messages_thread ON mail_messages(thread_id);
+  CREATE INDEX IF NOT EXISTS idx_mail_messages_folder ON mail_messages(folder, received_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_mail_messages_from ON mail_messages(from_address);
+  CREATE INDEX IF NOT EXISTS idx_mail_messages_status ON mail_messages(status);
+  CREATE INDEX IF NOT EXISTS idx_mail_threads_last ON mail_threads(last_message_at DESC);
 `;
