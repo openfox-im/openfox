@@ -43,3 +43,11 @@ export {
   type MailServer,
   type StartMailServerParams,
 } from "./server.js";
+
+export {
+  isTnsName,
+  parseTnsName,
+  resolveTnsAddress,
+  resolveMailAddress,
+  resolveMailAddresses,
+} from "./tns.js";

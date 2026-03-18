@@ -24,6 +24,7 @@ import type {
 } from "./types.js";
 import { insertMessage } from "./store.js";
 import { resolveThreadId, updateThreadSummary } from "./threading.js";
+import { isTnsName, resolveMailAddresses } from "./tns.js";
 
 const logger = createLogger("mail.client");
 
@@ -141,6 +142,34 @@ export async function deliverMessage(
     config,
   } = params;
 
+  // Resolve TNS names (e.g. "alice@tos.network") to 0x addresses
+  const rpcUrl = config.rpcUrl || process.env.TOS_RPC_URL;
+  const hasTnsNames = [...to, ...(cc ?? [])].some(isTnsName);
+  let resolvedTo = to;
+  let resolvedCc = cc;
+  if (hasTnsNames) {
+    const toResult = await resolveMailAddresses(to, rpcUrl);
+    if (toResult.errors.length > 0) {
+      logger.warn(`Could not resolve TNS names: ${toResult.errors.join(", ")}`);
+    }
+    resolvedTo = toResult.resolved;
+    if (cc && cc.length > 0) {
+      const ccResult = await resolveMailAddresses(cc, rpcUrl);
+      resolvedCc = ccResult.resolved;
+    }
+    if (resolvedTo.length === 0) {
+      return {
+        messageId: "",
+        threadId: "",
+        deliveries: to.map((r) => ({
+          recipient: r,
+          status: "failed" as const,
+          reason: "TNS name could not be resolved",
+        })),
+      };
+    }
+  }
+
   const messageId = ulid();
   const threadId = resolveThreadId(db, inReplyTo);
   const sentAt = Math.floor(Date.now() / 1000);
@@ -151,8 +180,8 @@ export async function deliverMessage(
     thread_id: threadId,
     in_reply_to: inReplyTo,
     from: fromAddress.toLowerCase(),
-    to: to.map((a) => a.toLowerCase()),
-    cc: cc?.map((a) => a.toLowerCase()),
+    to: resolvedTo.map((a) => a.toLowerCase()),
+    cc: resolvedCc?.map((a) => a.toLowerCase()),
     subject,
     body,
     body_html: bodyHtml,
@@ -170,8 +199,8 @@ export async function deliverMessage(
     threadId,
     inReplyTo,
     from: fromAddress.toLowerCase(),
-    to: to.map((a) => a.toLowerCase()),
-    cc: cc?.map((a) => a.toLowerCase()),
+    to: resolvedTo.map((a) => a.toLowerCase()),
+    cc: resolvedCc?.map((a) => a.toLowerCase()),
     subject,
     body,
     bodyHtml,
@@ -187,7 +216,7 @@ export async function deliverMessage(
 
   // Deliver to each recipient
   const deliveries: DeliverMessageResult["deliveries"] = [];
-  const allRecipients = [...to, ...(cc ?? [])];
+  const allRecipients = [...resolvedTo, ...(resolvedCc ?? [])];
 
   for (const recipient of allRecipients) {
     const endpoint = resolveMailEndpoint(db, recipient);

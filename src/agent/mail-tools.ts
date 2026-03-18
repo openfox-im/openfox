@@ -33,7 +33,7 @@ export function createMailTools(): OpenFoxTool[] {
         properties: {
           to: {
             type: "string",
-            description: "Recipient agent address (0x...)",
+            description: "Recipient agent address (0x...) or TNS name (e.g. 'alice' or 'alice@tos.network')",
           },
           subject: {
             type: "string",

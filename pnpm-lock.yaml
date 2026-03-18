@@ -42,8 +42,8 @@ importers:
         specifier: ^2.3.0
         version: 2.3.2(ethers@6.16.0)
       tosdk:
-        specifier: npm:@tosnetwork/tosdk@0.3.1
-        version: '@tosnetwork/tosdk@0.3.1(typescript@5.9.3)'
+        specifier: file:/home/tomi/tosdk
+        version: '@tosnetwork/tosdk@file:../tosdk(typescript@5.9.3)'
       ulid:
         specifier: ^2.3.0
         version: 2.4.0
@@ -581,8 +581,8 @@ packages:
   '@stablelib/wipe@1.0.1':
     resolution: {integrity: sha512-WfqfX/eXGiAd3RJe4VU2snh/ZPwtSjLG4ynQ/vYzvghTh7dHFcI1wl+nrkWG6lGhukOxOsUHfv8dUXr58D0ayg==}
 
-  '@tosnetwork/tosdk@0.3.1':
-    resolution: {integrity: sha512-mMGvXlSSgXPv1IBksxFMq2udikxWtbgznmFtvkfC7LHFJK8iy0rSWuZvCxYJbzrFHt8lyMPthGQ2ouvLYPYAXw==}
+  '@tosnetwork/tosdk@file:../tosdk':
+    resolution: {directory: ../tosdk, type: directory}
     engines: {node: '>=20'}
 
   '@types/better-sqlite3@7.6.13':
@@ -1501,7 +1501,7 @@ snapshots:
 
   '@stablelib/wipe@1.0.1': {}
 
-  '@tosnetwork/tosdk@0.3.1(typescript@5.9.3)':
+  '@tosnetwork/tosdk@file:../tosdk(typescript@5.9.3)':
     dependencies:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
