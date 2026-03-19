@@ -8,7 +8,7 @@
 export interface SponsorQuote {
   sponsorAddress: string;
   sponsorName?: string;
-  feeAmount: string;          // wei - what sponsor charges
+  feeAmount: string;          // tomi - what sponsor charges
   feeCurrency: string;        // "TOS" or token address
   gasLimit: number;
   expiresAt: number;          // unix timestamp
@@ -28,7 +28,7 @@ export interface SponsorSelection {
 export interface SponsorPolicy {
   preferredSponsors: string[];       // preferred sponsor addresses
   maxFeePercent: number;             // max fee as % of tx value (e.g. 1.0 = 1%)
-  maxFeeAbsolute: string;            // max absolute fee in wei
+  maxFeeAbsolute: string;            // max absolute fee in tomi
   minTrustTier: number;              // minimum trust tier required
   strategy: "cheapest" | "fastest" | "highest_trust" | "preferred_first";
   fallbackEnabled: boolean;

@@ -36,14 +36,14 @@ describe("group treasury", () => {
 
   it("treasury init creates address and default budget lines", () => {
     const treasury = initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "operations", capWei: "1000000000000000000", period: "monthly" },
-      { lineName: "bounties", capWei: "5000000000000000000", period: "weekly" },
+      { lineName: "operations", capTomi: "1000000000000000000", period: "monthly" },
+      { lineName: "bounties", capTomi: "5000000000000000000", period: "weekly" },
     ]);
 
     expect(treasury.groupId).toBe(TEST_GROUP_ID);
     expect(treasury.treasuryAddress).toBeTruthy();
     expect(treasury.treasuryAddress.startsWith("0x")).toBe(true);
-    expect(treasury.balanceWei).toBe("0");
+    expect(treasury.balanceTomi).toBe("0");
     expect(treasury.status).toBe("active");
 
     const lines = listBudgetLines(db, TEST_GROUP_ID);
@@ -80,21 +80,21 @@ describe("group treasury", () => {
 
     const line = setBudgetLine(db, TEST_GROUP_ID, "rewards", "2000000000000000000", "weekly");
     expect(line.lineName).toBe("rewards");
-    expect(line.capWei).toBe("2000000000000000000");
+    expect(line.capTomi).toBe("2000000000000000000");
     expect(line.period).toBe("weekly");
-    expect(line.spentWei).toBe("0");
+    expect(line.spentTomi).toBe("0");
     expect(line.requiresSupermajority).toBe(false);
 
     // Update existing line
     const updated = setBudgetLine(db, TEST_GROUP_ID, "rewards", "5000000000000000000", "monthly", true);
-    expect(updated.capWei).toBe("5000000000000000000");
+    expect(updated.capTomi).toBe("5000000000000000000");
     expect(updated.period).toBe("monthly");
     expect(updated.requiresSupermajority).toBe(true);
   });
 
   it("recordTreasuryOutflow validates budget line cap", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "operations", capWei: "1000" },
+      { lineName: "operations", capTomi: "1000" },
     ]);
 
     // Fund treasury first
@@ -103,19 +103,19 @@ describe("group treasury", () => {
     // Spend within budget
     const log = recordTreasuryOutflow(db, TEST_GROUP_ID, "500", "0xrecipient", "operations");
     expect(log.direction).toBe("outflow");
-    expect(log.amountWei).toBe("500");
+    expect(log.amountTomi).toBe("500");
 
     const treasury = getGroupTreasury(db, TEST_GROUP_ID)!;
-    expect(treasury.balanceWei).toBe("1500");
+    expect(treasury.balanceTomi).toBe("1500");
 
     const lines = listBudgetLines(db, TEST_GROUP_ID);
     const opsLine = lines.find((l) => l.lineName === "operations")!;
-    expect(opsLine.spentWei).toBe("500");
+    expect(opsLine.spentTomi).toBe("500");
   });
 
   it("recordTreasuryOutflow rejects if over budget", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "operations", capWei: "1000" },
+      { lineName: "operations", capTomi: "1000" },
     ]);
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "5000");
@@ -131,7 +131,7 @@ describe("group treasury", () => {
 
   it("recordTreasuryOutflow rejects if treasury frozen", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "operations", capWei: "1000" },
+      { lineName: "operations", capTomi: "1000" },
     ]);
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "5000");
@@ -144,14 +144,14 @@ describe("group treasury", () => {
 
   it("resetExpiredBudgetPeriods resets spent counter", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "daily-ops", capWei: "1000", period: "daily" },
+      { lineName: "daily-ops", capTomi: "1000", period: "daily" },
     ]);
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "5000");
     recordTreasuryOutflow(db, TEST_GROUP_ID, "500", "0xrecipient", "daily-ops");
 
     let lines = listBudgetLines(db, TEST_GROUP_ID);
-    expect(lines[0].spentWei).toBe("500");
+    expect(lines[0].spentTomi).toBe("500");
 
     // Simulate time passing (25 hours later)
     const future = new Date(Date.now() + 25 * 60 * 60 * 1000);
@@ -159,7 +159,7 @@ describe("group treasury", () => {
     expect(resetCount).toBe(1);
 
     lines = listBudgetLines(db, TEST_GROUP_ID);
-    expect(lines[0].spentWei).toBe("0");
+    expect(lines[0].spentTomi).toBe("0");
   });
 
   it("recordTreasuryInflow updates balance", () => {
@@ -167,11 +167,11 @@ describe("group treasury", () => {
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "1000000", "0xfunder", "0xtxhash1", "initial deposit");
     let treasury = getGroupTreasury(db, TEST_GROUP_ID)!;
-    expect(treasury.balanceWei).toBe("1000000");
+    expect(treasury.balanceTomi).toBe("1000000");
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "500000", "0xfunder2");
     treasury = getGroupTreasury(db, TEST_GROUP_ID)!;
-    expect(treasury.balanceWei).toBe("1500000");
+    expect(treasury.balanceTomi).toBe("1500000");
 
     const log = getTreasuryLog(db, TEST_GROUP_ID);
     expect(log).toHaveLength(2);
@@ -181,7 +181,7 @@ describe("group treasury", () => {
 
   it("buildTreasurySnapshot returns complete snapshot", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "operations", capWei: "1000" },
+      { lineName: "operations", capTomi: "1000" },
     ]);
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "5000", "0xfunder");
@@ -189,7 +189,7 @@ describe("group treasury", () => {
 
     const snapshot = buildTreasurySnapshot(db, TEST_GROUP_ID);
     expect(snapshot.groupId).toBe(TEST_GROUP_ID);
-    expect(snapshot.balanceWei).toBe("4800");
+    expect(snapshot.balanceTomi).toBe("4800");
     expect(snapshot.status).toBe("active");
     expect(snapshot.budgetLines).toHaveLength(1);
     expect(snapshot.recentLog).toHaveLength(2);
@@ -209,7 +209,7 @@ describe("group treasury", () => {
 
   it("validateSpendBudget rejects insufficient balance", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "operations", capWei: "10000" },
+      { lineName: "operations", capTomi: "10000" },
     ]);
 
     // Treasury has 0 balance
@@ -237,7 +237,7 @@ describe("group treasury", () => {
 
   it("epoch budget periods do not auto-expire", () => {
     initializeGroupTreasury(db, TEST_GROUP_ID, TEST_PRIVATE_KEY, [
-      { lineName: "epoch-fund", capWei: "1000", period: "epoch" },
+      { lineName: "epoch-fund", capTomi: "1000", period: "epoch" },
     ]);
 
     recordTreasuryInflow(db, TEST_GROUP_ID, "5000");
@@ -249,6 +249,6 @@ describe("group treasury", () => {
     expect(resetCount).toBe(0);
 
     const lines = listBudgetLines(db, TEST_GROUP_ID);
-    expect(lines[0].spentWei).toBe("500");
+    expect(lines[0].spentTomi).toBe("500");
   });
 });

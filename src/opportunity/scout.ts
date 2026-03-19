@@ -32,10 +32,10 @@ export interface OpportunityItem {
   providerAgentId?: string;
   providerAddress?: string;
   mode?: string;
-  rewardWei?: string;
-  grossValueWei: string;
-  estimatedCostWei: string;
-  marginWei: string;
+  rewardTomi?: string;
+  grossValueTomi: string;
+  estimatedCostTomi: string;
+  marginTomi: string;
   marginBps: number;
   deadlineAt?: string;
   rawScore: number;
@@ -53,7 +53,7 @@ function safeBigInt(value: string | undefined): bigint {
   }
 }
 
-function clampWeiScore(value: bigint): number {
+function clampTomiScore(value: bigint): number {
   const capped = value > 1_000_000_000_000_000_000n
     ? 1_000_000_000_000_000_000n
     : value < -1_000_000_000_000_000_000n
@@ -106,11 +106,11 @@ function classifyProviderClass(capability: string): OpportunityProviderClass {
   return "general_provider";
 }
 
-function computeMarginBps(grossValueWei: bigint, estimatedCostWei: bigint): number {
-  if (grossValueWei <= 0n) {
-    return estimatedCostWei === 0n ? 0 : -10_000;
+function computeMarginBps(grossValueTomi: bigint, estimatedCostTomi: bigint): number {
+  if (grossValueTomi <= 0n) {
+    return estimatedCostTomi === 0n ? 0 : -10_000;
   }
-  return Number(((grossValueWei - estimatedCostWei) * 10_000n) / grossValueWei);
+  return Number(((grossValueTomi - estimatedCostTomi) * 10_000n) / grossValueTomi);
 }
 
 function buildRawOpportunity(params: {
@@ -126,14 +126,14 @@ function buildRawOpportunity(params: {
   providerAgentId?: string;
   providerAddress?: string;
   mode?: string;
-  grossValueWei: bigint;
-  estimatedCostWei: bigint;
+  grossValueTomi: bigint;
+  estimatedCostTomi: bigint;
   deadlineAt?: string;
 }): OpportunityItem {
-  const marginWei = params.grossValueWei - params.estimatedCostWei;
-  const marginBps = computeMarginBps(params.grossValueWei, params.estimatedCostWei);
+  const marginTomi = params.grossValueTomi - params.estimatedCostTomi;
+  const marginBps = computeMarginBps(params.grossValueTomi, params.estimatedCostTomi);
   const rawScore =
-    clampWeiScore(marginWei > 0n ? marginWei : 0n) +
+    clampTomiScore(marginTomi > 0n ? marginTomi : 0n) +
     (params.mode === "sponsored" ? 500 : 0);
   return {
     kind: params.kind,
@@ -148,10 +148,10 @@ function buildRawOpportunity(params: {
     providerAgentId: params.providerAgentId,
     providerAddress: params.providerAddress,
     mode: params.mode,
-    rewardWei: params.grossValueWei.toString(),
-    grossValueWei: params.grossValueWei.toString(),
-    estimatedCostWei: params.estimatedCostWei.toString(),
-    marginWei: marginWei.toString(),
+    rewardTomi: params.grossValueTomi.toString(),
+    grossValueTomi: params.grossValueTomi.toString(),
+    estimatedCostTomi: params.estimatedCostTomi.toString(),
+    marginTomi: marginTomi.toString(),
     marginBps,
     deadlineAt: params.deadlineAt,
     rawScore,
@@ -200,7 +200,7 @@ function evaluatePolicyFit(
   strategy: OpportunityStrategyProfile,
 ): { matched: boolean; reasons: string[] } {
   const reasons: string[] = [];
-  const costWei = safeBigInt(item.estimatedCostWei);
+  const costTomi = safeBigInt(item.estimatedCostTomi);
   if (!strategy.enabledOpportunityKinds.includes(item.kind)) {
     reasons.push(`kind ${item.kind} is disabled`);
   }
@@ -210,7 +210,7 @@ function evaluatePolicyFit(
   if (!strategy.allowedTrustTiers.includes(item.trustTier)) {
     reasons.push(`trust tier ${item.trustTier} is not allowed`);
   }
-  if (costWei > safeBigInt(strategy.maxSpendPerOpportunityWei)) {
+  if (costTomi > safeBigInt(strategy.maxSpendPerOpportunityTomi)) {
     reasons.push("estimated cost exceeds strategy max spend");
   }
   if (item.marginBps < strategy.minMarginBps) {
@@ -237,11 +237,11 @@ export function rankOpportunityItems(params: {
   maxItems?: number;
 }): OpportunityItem[] {
   const ranked = params.items.map((item) => {
-    const grossValueWei = safeBigInt(item.grossValueWei);
-    const estimatedCostWei = safeBigInt(item.estimatedCostWei);
-    const marginWei = grossValueWei - estimatedCostWei;
-    const valueScore = clampWeiScore(marginWei > 0n ? marginWei : 0n);
-    const costPenalty = clampWeiScore(estimatedCostWei);
+    const grossValueTomi = safeBigInt(item.grossValueTomi);
+    const estimatedCostTomi = safeBigInt(item.estimatedCostTomi);
+    const marginTomi = grossValueTomi - estimatedCostTomi;
+    const valueScore = clampTomiScore(marginTomi > 0n ? marginTomi : 0n);
+    const costPenalty = clampTomiScore(estimatedCostTomi);
     const trustScore = trustTierScore(item.trustTier);
     const deadline = calculateDeadlineScore(item.deadlineAt, params.strategy);
     const fit = evaluatePolicyFit(item, params.strategy);
@@ -290,17 +290,17 @@ export async function collectOpportunityItems(params: {
   if (params.config.bounty?.remoteBaseUrl) {
     remoteBaseUrls.add(params.config.bounty.remoteBaseUrl);
   }
-  const minRewardWei = safeBigInt(params.config.opportunityScout.minRewardWei);
+  const minRewardTomi = safeBigInt(params.config.opportunityScout.minRewardTomi);
 
   for (const baseUrl of remoteBaseUrls) {
     try {
       const campaigns = await fetchRemoteCampaigns(baseUrl);
       for (const campaign of campaigns) {
         if (campaign.status !== "open" && campaign.status !== "exhausted") continue;
-        const remainingWei = safeBigInt(campaign.progress.remainingWei);
-        const allocatedWei = safeBigInt(campaign.progress.allocatedWei);
-        const scoreBase = remainingWei > 0n ? remainingWei : allocatedWei;
-        if (scoreBase < minRewardWei) continue;
+        const remainingTomi = safeBigInt(campaign.progress.remainingTomi);
+        const allocatedTomi = safeBigInt(campaign.progress.allocatedTomi);
+        const scoreBase = remainingTomi > 0n ? remainingTomi : allocatedTomi;
+        if (scoreBase < minRewardTomi) continue;
         items.push(
           buildRawOpportunity({
             kind: "campaign",
@@ -313,8 +313,8 @@ export async function collectOpportunityItems(params: {
             campaignId: campaign.campaignId,
             providerAgentId: campaign.hostAgentId,
             providerAddress: campaign.hostAddress,
-            grossValueWei: remainingWei > 0n ? remainingWei : allocatedWei,
-            estimatedCostWei: 0n,
+            grossValueTomi: remainingTomi > 0n ? remainingTomi : allocatedTomi,
+            estimatedCostTomi: 0n,
           }),
         );
       }
@@ -322,8 +322,8 @@ export async function collectOpportunityItems(params: {
       const bounties = await fetchRemoteBounties(baseUrl);
       for (const bounty of bounties) {
         if (bounty.status !== "open") continue;
-        const rewardWei = safeBigInt(bounty.rewardWei);
-        if (rewardWei < minRewardWei) continue;
+        const rewardTomi = safeBigInt(bounty.rewardTomi);
+        if (rewardTomi < minRewardTomi) continue;
         items.push(
           buildRawOpportunity({
             kind: "bounty",
@@ -336,8 +336,8 @@ export async function collectOpportunityItems(params: {
             bountyId: bounty.bountyId,
             providerAgentId: bounty.hostAgentId,
             providerAddress: bounty.hostAddress,
-            grossValueWei: rewardWei,
-            estimatedCostWei: 0n,
+            grossValueTomi: rewardTomi,
+            estimatedCostTomi: 0n,
             deadlineAt: bounty.submissionDeadline,
           }),
         );
@@ -359,14 +359,14 @@ export async function collectOpportunityItems(params: {
         for (const provider of providers) {
           const providerClass = classifyProviderClass(provider.matchedCapability.name);
           const trustTier = parseTrustTierFromProvider(provider);
-          const amountWei = safeBigInt(provider.matchedCapability.max_amount);
-          let grossValueWei = amountWei;
-          let estimatedCostWei = 0n;
+          const amountTomi = safeBigInt(provider.matchedCapability.max_amount);
+          let grossValueTomi = amountTomi;
+          let estimatedCostTomi = 0n;
           if (provider.matchedCapability.mode === "paid") {
-            grossValueWei = 0n;
-            estimatedCostWei = amountWei;
+            grossValueTomi = 0n;
+            estimatedCostTomi = amountTomi;
           } else if (provider.matchedCapability.mode === "hybrid") {
-            estimatedCostWei = amountWei;
+            estimatedCostTomi = amountTomi;
           }
           items.push(
             buildRawOpportunity({
@@ -385,8 +385,8 @@ export async function collectOpportunityItems(params: {
               providerAgentId: provider.card.agent_id,
               providerAddress: provider.search.primaryIdentity,
               mode: provider.matchedCapability.mode,
-              grossValueWei,
-              estimatedCostWei,
+              grossValueTomi,
+              estimatedCostTomi,
             }),
           );
         }
@@ -409,9 +409,9 @@ export function buildOpportunityReport(items: OpportunityItem[]): string {
     .map((item, index) => {
       const capability = item.capability ? ` capability=${item.capability}` : "";
       const mode = item.mode ? ` mode=${item.mode}` : "";
-      const gross = ` gross=${item.grossValueWei}`;
-      const cost = ` cost=${item.estimatedCostWei}`;
-      const margin = ` margin=${item.marginWei}`;
+      const gross = ` gross=${item.grossValueTomi}`;
+      const cost = ` cost=${item.estimatedCostTomi}`;
+      const margin = ` margin=${item.marginTomi}`;
       const trust = ` trust=${item.trustTier}`;
       const providerClass = ` class=${item.providerClass}`;
       return `${index + 1}. [${item.kind}] ${item.title}${capability}${mode}${gross}${cost}${margin}${trust}${providerClass}\n   ${item.description}`;

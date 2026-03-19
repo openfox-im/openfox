@@ -640,7 +640,7 @@ async function requirePayment(params: {
   res: ServerResponse;
   config: OpenFoxConfig;
   providerAddress: string;
-  amountWei: string;
+  amountTomi: string;
 }): Promise<VerifiedPayment | null> {
   const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
@@ -651,7 +651,7 @@ async function requirePayment(params: {
   const requirement: PaymentRequirement = {
     scheme: "exact",
     network: formatNetwork(chainId),
-    maxAmountRequired: params.amountWei,
+    maxAmountRequired: params.amountTomi,
     payToAddress: normalizeAddress(params.providerAddress),
     asset: "native",
     requiredDeadlineSeconds: 300,
@@ -685,7 +685,7 @@ export async function startAgentDiscoveryProofVerifyServer(
         json(res, 200, {
           ok: true,
           capability: proofVerifyConfig.capability,
-          priceWei: proofVerifyConfig.priceWei,
+          priceTomi: proofVerifyConfig.priceTomi,
           address,
           integration: "skill_composed",
           backendMode: proofVerifyConfig.backendMode,
@@ -713,7 +713,7 @@ export async function startAgentDiscoveryProofVerifyServer(
           res,
           config,
           providerAddress: address,
-          amountWei: proofVerifyConfig.priceWei,
+          amountTomi: proofVerifyConfig.priceTomi,
         });
         if (paid) {
           res.statusCode = 200;
@@ -753,7 +753,7 @@ export async function startAgentDiscoveryProofVerifyServer(
         res,
         config,
         providerAddress: address,
-        amountWei: proofVerifyConfig.priceWei,
+        amountTomi: proofVerifyConfig.priceTomi,
       });
       if (!paid) {
         return;
@@ -793,7 +793,7 @@ export async function startAgentDiscoveryProofVerifyServer(
         status: "ok",
         result_id: resultId,
         result_url: buildProofVerifyResultPath(resultId),
-        price_wei: proofVerifyConfig.priceWei,
+        price_tomi: proofVerifyConfig.priceTomi,
         payment_tx_hash: paid.txHash,
         verified_at: verifiedAt,
         verdict: verification.verdict,

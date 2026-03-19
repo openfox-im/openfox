@@ -216,7 +216,7 @@ describe("agent discovery", () => {
       identity,
       config,
       address: config.walletAddress!,
-      requestedAmountWei: 10_000_000_000_000_000n,
+      requestedAmountTomi: 10_000_000_000_000_000n,
       waitForReceipt: false,
     });
 

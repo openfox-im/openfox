@@ -39,11 +39,11 @@ export interface OracleSummarySnapshot {
   settledResults: number;
   marketBoundResults: number;
   averageConfidence: number;
-  estimatedCostWei: string;
+  estimatedCostTomi: string;
   committeeRuns: number;
   committeeQuorumMet: number;
   committeeDisagreements: number;
-  committeePayoutWei: string;
+  committeePayoutTomi: string;
   latestResultId: string | null;
   latestResolvedAt: number | null;
   items: StoredOracleJobSummary[];
@@ -60,7 +60,7 @@ export function buildOracleSummary(params: {
   let marketBoundResults = 0;
   let confidenceTotal = 0;
   let confidenceCount = 0;
-  let estimatedCostWei = 0n;
+  let estimatedCostTomi = 0n;
   const committees = createCommitteeManager(params.db).buildSummary(
     params.limit ?? 20,
     "oracle",
@@ -76,8 +76,8 @@ export function buildOracleSummary(params: {
       confidenceTotal += item.response.confidence;
       confidenceCount += 1;
     }
-    if (item.response.price_wei && /^[0-9]+$/.test(item.response.price_wei)) {
-      estimatedCostWei += BigInt(item.response.price_wei);
+    if (item.response.price_tomi && /^[0-9]+$/.test(item.response.price_tomi)) {
+      estimatedCostTomi += BigInt(item.response.price_tomi);
     }
   }
 
@@ -89,11 +89,11 @@ export function buildOracleSummary(params: {
     marketBoundResults,
     averageConfidence:
       confidenceCount === 0 ? 0 : Number((confidenceTotal / confidenceCount).toFixed(4)),
-    estimatedCostWei: estimatedCostWei.toString(),
+    estimatedCostTomi: estimatedCostTomi.toString(),
     committeeRuns: committees.totalRuns,
     committeeQuorumMet: committees.quorumMet,
     committeeDisagreements: committees.disagreements,
-    committeePayoutWei: committees.totalPayoutWei,
+    committeePayoutTomi: committees.totalPayoutTomi,
     latestResultId: latest?.resultId ?? null,
     latestResolvedAt: latest?.response.resolved_at ?? null,
     items,
@@ -111,9 +111,9 @@ export function buildOracleSummaryReport(snapshot: OracleSummarySnapshot): strin
     `Settled:         ${snapshot.settledResults}`,
     `Market bound:    ${snapshot.marketBoundResults}`,
     `Avg confidence:  ${snapshot.averageConfidence.toFixed(4)}`,
-    `Estimated cost:  ${snapshot.estimatedCostWei} wei`,
+    `Estimated cost:  ${snapshot.estimatedCostTomi} tomi`,
     `Committees:      ${snapshot.committeeRuns} (${snapshot.committeeQuorumMet} quorum met, ${snapshot.committeeDisagreements} disagreements)`,
-    `Committee pay:   ${snapshot.committeePayoutWei} wei`,
+    `Committee pay:   ${snapshot.committeePayoutTomi} tomi`,
     `Latest result:   ${snapshot.latestResultId || "(none)"}`,
     `Latest resolved: ${snapshot.latestResolvedAt ?? "(none)"}`,
     `Kinds:           ${

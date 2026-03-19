@@ -65,13 +65,13 @@ function handleList(db?: OpenFoxDatabase): void {
     logger.info(`    Display approval: ${caps.canDisplayApproval}`);
     logger.info(`    Receive callbacks: ${caps.canReceiveCallbacks}`);
     if (caps.maxTransactionValue) {
-      logger.info(`    Max transaction: ${caps.maxTransactionValue} wei`);
+      logger.info(`    Max transaction: ${caps.maxTransactionValue} tomi`);
     }
     logger.info(`    Supported actions: ${caps.supportedActions.join(", ")}`);
 
     if (policy) {
       logger.info(`    Policy: enabled=${policy.enabled}, requires_approval=${policy.requiresApproval}`);
-      logger.info(`    Max single: ${policy.maxSingleValue} wei, Max daily: ${policy.maxDailyValue} wei`);
+      logger.info(`    Max single: ${policy.maxSingleValue} tomi, Max daily: ${policy.maxDailyValue} tomi`);
     } else {
       logger.info(`    Policy: (no custom policy set)`);
     }
@@ -163,7 +163,7 @@ function handlePolicy(args: string[], db?: OpenFoxDatabase): void {
   logger.info(`  Display approval:    ${caps.canDisplayApproval}`);
   logger.info(`  Receive callbacks:   ${caps.canReceiveCallbacks}`);
   if (caps.maxTransactionValue) {
-    logger.info(`  Max transaction:     ${caps.maxTransactionValue} wei`);
+    logger.info(`  Max transaction:     ${caps.maxTransactionValue} tomi`);
   }
   logger.info(`  Supported actions:   ${caps.supportedActions.join(", ")}`);
   logger.info("");
@@ -173,9 +173,9 @@ function handlePolicy(args: string[], db?: OpenFoxDatabase): void {
     logger.info(`  Enabled:             ${policy.enabled}`);
     logger.info(`  Min trust tier:      ${policy.minTrustTier}`);
     logger.info(`  Requires approval:   ${policy.requiresApproval}`);
-    logger.info(`  Approval threshold:  ${policy.approvalThreshold} wei`);
-    logger.info(`  Max single value:    ${policy.maxSingleValue} wei`);
-    logger.info(`  Max daily value:     ${policy.maxDailyValue} wei`);
+    logger.info(`  Approval threshold:  ${policy.approvalThreshold} tomi`);
+    logger.info(`  Max single value:    ${policy.maxSingleValue} tomi`);
+    logger.info(`  Max daily value:     ${policy.maxDailyValue} tomi`);
     logger.info(`  Allowed actions:     ${policy.allowedActions.join(", ")}`);
   } else {
     logger.info("Policy: (none configured — using adapter defaults)");

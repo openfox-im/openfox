@@ -46,7 +46,7 @@ export interface WalletStatusSnapshot {
   address: ChainAddress;
   rpcUrl?: string;
   chainId?: bigint;
-  balanceWei?: bigint;
+  balanceTomi?: bigint;
   nonce?: bigint;
   signer?: SignerProfile["signer"];
   account?: AccountProfile;
@@ -56,14 +56,14 @@ export interface WalletLocalFundingResult {
   mode: "local";
   from: ChainAddress;
   to: ChainAddress;
-  amountWei: bigint;
+  amountTomi: bigint;
   txHash: HexAddress;
 }
 
 export interface WalletTestnetFundingResult {
   mode: "testnet";
   to: ChainAddress;
-  amountWei: bigint;
+  amountTomi: bigint;
   provider: string;
   txHash?: HexAddress;
   status: FaucetInvocationResponse["status"];
@@ -157,7 +157,7 @@ function buildRequestExpiry(): number {
 async function requestTestnetFaucetViaUrl(params: {
   config: OpenFoxConfig;
   address: ChainAddress;
-  amountWei: bigint;
+  amountTomi: bigint;
   faucetUrl: string;
   reason: string;
   waitForReceipt?: boolean;
@@ -170,7 +170,7 @@ async function requestTestnetFaucetViaUrl(params: {
     },
     request_nonce: Math.random().toString(16).slice(2) + Date.now().toString(16),
     request_expires_at: buildRequestExpiry(),
-    requested_amount: params.amountWei.toString(),
+    requested_amount: params.amountTomi.toString(),
     reason: params.reason,
   };
 
@@ -202,7 +202,7 @@ async function requestTestnetFaucetViaUrl(params: {
   return {
     mode: "testnet",
     to: params.address,
-    amountWei: params.amountWei,
+    amountTomi: params.amountTomi,
     provider: params.faucetUrl,
     txHash: payload.tx_hash as HexAddress | undefined,
     status: payload.status,
@@ -228,7 +228,7 @@ export async function buildWalletStatusSnapshot(
     address,
     rpcUrl,
     chainId,
-    balanceWei: account.balance,
+    balanceTomi: account.balance,
     nonce: account.nonce,
     signer: signer.signer,
     account,
@@ -241,7 +241,7 @@ export function formatWalletStatusReport(snapshot: WalletStatusSnapshot): string
     `Address: ${snapshot.address}`,
     `RPC: ${snapshot.rpcUrl || "(unset)"}`,
     `Network: ${snapshot.chainId !== undefined ? formatNetwork(snapshot.chainId) : "(unknown)"}`,
-    `Balance: ${snapshot.balanceWei !== undefined ? snapshot.balanceWei.toString() : "(unknown)"} wei`,
+    `Balance: ${snapshot.balanceTomi !== undefined ? snapshot.balanceTomi.toString() : "(unknown)"} tomi`,
     `Pending nonce: ${snapshot.nonce !== undefined ? snapshot.nonce.toString() : "(unknown)"}`,
     `Signer type: ${snapshot.signer?.type || "(unknown)"}`,
     `Signer value: ${snapshot.signer?.value || "(unknown)"}`,
@@ -251,7 +251,7 @@ export function formatWalletStatusReport(snapshot: WalletStatusSnapshot): string
 
 export async function fundWalletFromLocalDevnet(params: {
   config: OpenFoxConfig;
-  amountWei?: bigint;
+  amountTomi?: bigint;
   from?: ChainAddress | string;
   password?: string;
   waitForReceipt?: boolean;
@@ -282,10 +282,10 @@ export async function fundWalletFromLocalDevnet(params: {
       "No local funding account is available on this node. Configure walletFunding.localFunderAddress or expose tos_accounts on the local node.",
     );
   }
-  const amountWei =
-    params.amountWei ||
+  const amountTomi =
+    params.amountTomi ||
     BigInt(
-      params.config.walletFunding?.localDefaultAmountWei || "5000000000000000000",
+      params.config.walletFunding?.localDefaultAmountTomi || "5000000000000000000",
     );
   const normalizedFrom = normalizeAddress(from);
   let txHash: HexAddress;
@@ -293,14 +293,14 @@ export async function fundWalletFromLocalDevnet(params: {
     txHash = await client.sendManagedTransaction({
       from: normalizedFrom,
       to: address,
-      value: amountWei,
+      value: amountTomi,
       gas: 21_000n,
     });
   } catch (error) {
     txHash = await client.sendPersonalTransaction({
       from: normalizedFrom,
       to: address,
-      value: amountWei,
+      value: amountTomi,
       gas: 21_000n,
       password:
         params.password ??
@@ -323,23 +323,23 @@ export async function fundWalletFromLocalDevnet(params: {
     mode: "local",
     from: normalizedFrom,
     to: address,
-    amountWei,
+    amountTomi,
     txHash,
   };
 }
 
 export async function fundWalletFromTestnet(params: {
   config: OpenFoxConfig;
-  amountWei?: bigint;
+  amountTomi?: bigint;
   faucetUrl?: string;
   reason?: string;
   waitForReceipt?: boolean;
 }): Promise<WalletTestnetFundingResult> {
   const { identity, address } = await buildIdentity(params.config);
-  const amountWei =
-    params.amountWei ||
+  const amountTomi =
+    params.amountTomi ||
     BigInt(
-      params.config.walletFunding?.testnetDefaultAmountWei || "10000000000000000",
+      params.config.walletFunding?.testnetDefaultAmountTomi || "10000000000000000",
     );
   const reason =
     params.reason ||
@@ -354,7 +354,7 @@ export async function fundWalletFromTestnet(params: {
     return requestTestnetFaucetViaUrl({
       config: params.config,
       address,
-      amountWei,
+      amountTomi,
       faucetUrl,
       reason,
       waitForReceipt: params.waitForReceipt,
@@ -367,7 +367,7 @@ export async function fundWalletFromTestnet(params: {
       identity,
       config: params.config,
       address,
-      requestedAmountWei: amountWei,
+      requestedAmountTomi: amountTomi,
       reason,
       waitForReceipt: params.waitForReceipt,
       db,
@@ -375,7 +375,7 @@ export async function fundWalletFromTestnet(params: {
     return {
       mode: "testnet",
       to: address,
-      amountWei,
+      amountTomi,
       provider: result.provider.endpoint.url,
       txHash: result.response.tx_hash as HexAddress | undefined,
       status: result.response.status,

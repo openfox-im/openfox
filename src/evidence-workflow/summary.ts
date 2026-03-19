@@ -16,7 +16,7 @@ function listEvidenceWorkflowRuns(
     .map((raw) => JSON.parse(raw) as EvidenceWorkflowRunRecord);
 }
 
-function sumPriceWei(...values: Array<string | undefined>): bigint {
+function sumPriceTomi(...values: Array<string | undefined>): bigint {
   return values.reduce((acc, value) => {
     if (!value || !/^[0-9]+$/.test(value)) return acc;
     return acc + BigInt(value);
@@ -30,7 +30,7 @@ export interface EvidenceWorkflowSummarySnapshot {
   validSources: number;
   attemptedSources: number;
   aggregatePublished: number;
-  estimatedCostWei: string;
+  estimatedCostTomi: string;
   zktlsBundles: number;
   proofVerifications: number;
   nativeAttestedVerifications: number;
@@ -62,15 +62,15 @@ export function buildEvidenceWorkflowSummary(params: {
     params.limit ?? 20,
     "evidence",
   );
-  const estimatedCostWei = runs
+  const estimatedCostTomi = runs
     .reduce((acc, run) => {
       const sourceCost = run.sourceRecords.reduce((inner, source) => {
         return (
           inner +
-          sumPriceWei(source.fetchResponse?.price_wei, source.verifyResponse?.price_wei)
+          sumPriceTomi(source.fetchResponse?.price_tomi, source.verifyResponse?.price_tomi)
         );
       }, 0n);
-      return acc + sourceCost + sumPriceWei(run.aggregateResponse?.price_wei);
+      return acc + sourceCost + sumPriceTomi(run.aggregateResponse?.price_tomi);
     }, 0n)
     .toString();
   const latest = runs[0] ?? null;
@@ -81,7 +81,7 @@ export function buildEvidenceWorkflowSummary(params: {
     validSources,
     attemptedSources,
     aggregatePublished,
-    estimatedCostWei,
+    estimatedCostTomi,
     zktlsBundles: zktls.totalBundles,
     proofVerifications: proofs.totalResults,
     nativeAttestedVerifications: proofs.nativeAttestationVerifications,
@@ -109,7 +109,7 @@ export function buildEvidenceWorkflowSummaryReport(
     `Failed:          ${snapshot.failedRuns}`,
     `Valid sources:   ${snapshot.validSources}/${snapshot.attemptedSources}`,
     `Aggregates:      ${snapshot.aggregatePublished}`,
-    `Estimated cost:  ${snapshot.estimatedCostWei} wei`,
+    `Estimated cost:  ${snapshot.estimatedCostTomi} tomi`,
     `zkTLS bundles:   ${snapshot.zktlsBundles}`,
     `Proof results:   ${snapshot.proofVerifications} (${snapshot.nativeAttestedVerifications} native, ${snapshot.committeeVerifiedResults} committee, ${snapshot.fallbackOnlyVerifications} fallback)`,
     `Committees:      ${snapshot.committeeRuns} (${snapshot.committeeQuorumMet} quorum met)`,

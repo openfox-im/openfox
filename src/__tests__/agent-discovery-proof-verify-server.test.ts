@@ -62,7 +62,7 @@ function makeConfig(): OpenFoxConfig {
         port: 0,
         path: "/agent-discovery/proof-verify",
         capability: "proof.verify",
-        priceWei: "2000000000000000",
+        priceTomi: "2000000000000000",
         maxPayloadChars: 16384,
         requestTimeoutMs: 5000,
         maxFetchBytes: 65536,

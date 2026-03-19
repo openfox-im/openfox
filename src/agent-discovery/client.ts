@@ -287,7 +287,7 @@ function resolveSelectionPolicy(
     requireRegistered: true,
     excludeSuspended: true,
     onchainCapabilityMode: "off",
-    minimumStakeWei: "0",
+    minimumStakeTomi: "0",
     minimumReputation: "0",
     preferHigherStake: true,
     preferHigherReputation: true,
@@ -507,7 +507,7 @@ function providerMatchesSelectionPolicy(
     }
   }
   if (
-    parseBigIntAmount(policy.minimumStakeWei) > parseBigIntAmount(trust.stake)
+    parseBigIntAmount(policy.minimumStakeTomi) > parseBigIntAmount(trust.stake)
   ) {
     return false;
   }
@@ -837,7 +837,7 @@ export async function requestTestnetFaucet(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
   address: string;
-  requestedAmountWei: bigint;
+  requestedAmountTomi: bigint;
   capability?: string;
   reason?: string;
   limit?: number;
@@ -860,7 +860,7 @@ export async function requestTestnetFaucet(params: {
   });
   const ranked = sortProviders(
     providers,
-    params.requestedAmountWei,
+    params.requestedAmountTomi,
     resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
     params.db,
     capability,
@@ -881,7 +881,7 @@ export async function requestTestnetFaucet(params: {
     },
     request_nonce: randomBytes(16).toString("hex"),
     request_expires_at: buildRequestExpiry(),
-    requested_amount: params.requestedAmountWei.toString(),
+    requested_amount: params.requestedAmountTomi.toString(),
     reason: params.reason || "bootstrap openfox wallet",
   };
 

@@ -40,7 +40,7 @@ export interface BountyApiConfig {
 export interface CampaignCreationParams {
   title: string;
   description: string;
-  budgetWei: string;
+  budgetTomi: string;
   maxOpenBounties?: number;
   allowedKinds?: string[];
   metadata?: Record<string, unknown>;
@@ -55,7 +55,7 @@ export interface BountyCreationParams {
   title?: string;
   taskPrompt: string;
   referenceOutput?: string;
-  rewardWei?: string;
+  rewardTomi?: string;
   submissionTtlSeconds?: number;
   skillName?: string | null;
   metadata?: Record<string, unknown>;
@@ -88,7 +88,7 @@ export interface CampaignResponse {
   hostAddress: Address;
   title: string;
   description: string;
-  budgetWei: string;
+  budgetTomi: string;
   maxOpenBounties: number;
   allowedKinds: string[];
   metadata?: Record<string, unknown>;
@@ -111,7 +111,7 @@ export interface BountyResponse {
   referenceOutput: string;
   skillName?: string | null;
   metadata?: Record<string, unknown>;
-  rewardWei: string;
+  rewardTomi: string;
   submissionDeadline: string;
   status: string;
   createdAt: string;
@@ -215,7 +215,7 @@ async function fetchApi<T>(
  *   {
  *     title: "AI Translation Project",
  *     description: "Translate technical documentation to Spanish",
- *     budgetWei: "1000000000000000000", // 1 ETH in wei
+ *     budgetTomi: "1000000000000000000", // 1 TOS in tomi
  *     maxOpenBounties: 10,
  *     allowedKinds: ["translation"],
  *     metadata: { priority: "high" }
@@ -238,7 +238,7 @@ export async function createCampaign(
       body: JSON.stringify({
         title: params.title,
         description: params.description,
-        budget_wei: params.budgetWei,
+        budget_tomi: params.budgetTomi,
         max_open_bounties: params.maxOpenBounties,
         allowed_kinds: params.allowedKinds,
         metadata: params.metadata,
@@ -267,7 +267,7 @@ export async function createCampaign(
  *     title: "How to optimize database queries?",
  *     taskPrompt: "Explain three techniques for optimizing slow database queries",
  *     referenceOutput: "1. Add indexes on frequently queried columns...",
- *     rewardWei: "100000000000000000", // 0.1 ETH
+ *     rewardTomi: "100000000000000000", // 0.1 TOS
  *     submissionTtlSeconds: 3600, // 1 hour
  *     metadata: { tags: ["database", "performance"] }
  *   }
@@ -292,7 +292,7 @@ export async function createBounty(
         title: params.title,
         task_prompt: params.taskPrompt,
         reference_output: params.referenceOutput,
-        reward_wei: params.rewardWei,
+        reward_tomi: params.rewardTomi,
         submission_ttl_seconds: params.submissionTtlSeconds,
         skill_name: params.skillName,
         metadata: params.metadata,
@@ -370,7 +370,7 @@ export async function submitAnswer(
  *   "bounty-456"
  * );
  * console.log(`Bounty status: ${bounty.status}`);
- * console.log(`Reward: ${bounty.rewardWei} wei`);
+ * console.log(`Reward: ${bounty.rewardTomi} tomi`);
  * ```
  */
 export async function getBountyDetails(
@@ -537,7 +537,7 @@ export async function healthCheck(
  * const campaign = await createCampaign(config, {
  *   title: "My Bounty Campaign",
  *   description: "Testing the bounty API",
- *   budgetWei: "1000000000000000000"
+ *   budgetTomi: "1000000000000000000"
  * });
  *
  * // Create a bounty in the campaign
@@ -546,7 +546,7 @@ export async function healthCheck(
  *   kind: "question",
  *   taskPrompt: "What is the capital of France?",
  *   referenceOutput: "Paris",
- *   rewardWei: "100000000000000000"
+ *   rewardTomi: "100000000000000000"
  * });
  *
  * // Check bounty status

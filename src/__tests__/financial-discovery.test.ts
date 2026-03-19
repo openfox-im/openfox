@@ -91,7 +91,7 @@ describe("financial discovery", () => {
     fetchSignerQuoteMock.mockResolvedValue({
       provider_address: "0x" + "b".repeat(64),
       trust_tier: "org_trusted",
-      amount_wei: "17",
+      amount_tomi: "17",
     } as any);
 
     const providers = await discoverIntentRouteProviders({
@@ -125,7 +125,7 @@ describe("financial discovery", () => {
     discoverCapabilityProvidersMock.mockResolvedValue([makeProvider("paymaster.quote")] as any);
     fetchPaymasterQuoteMock.mockResolvedValue({
       sponsor_address: "0x" + "e".repeat(64),
-      amount_wei: "23",
+      amount_tomi: "23",
       gas: "70000",
       expires_at: 123456,
       policy_hash: "0x" + "9".repeat(64),

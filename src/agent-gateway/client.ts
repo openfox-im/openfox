@@ -53,8 +53,8 @@ interface GatewayTarget {
   paymentAddress?: `0x${string}`;
   provider?: VerifiedAgentProvider;
   paymentDirection?: "provider_pays" | "requester_pays" | "split";
-  sessionFeeWei?: string;
-  perRequestFeeWei?: string;
+  sessionFeeTomi?: string;
+  perRequestFeeTomi?: string;
 }
 
 interface RouteUpdateWaiter {
@@ -96,7 +96,7 @@ function targetPaymentMetadata(
   target: GatewayTarget,
 ): Pick<
   GatewayTarget,
-  "paymentDirection" | "sessionFeeWei" | "perRequestFeeWei"
+  "paymentDirection" | "sessionFeeTomi" | "perRequestFeeTomi"
 > {
   const policy =
     target.provider?.matchedCapability.policy &&
@@ -112,14 +112,14 @@ function targetPaymentMetadata(
         | "requester_pays"
         | "split"
         | undefined,
-    sessionFeeWei:
+    sessionFeeTomi:
       typeof policy?.session_fee_tos === "string"
         ? policy.session_fee_tos
-        : target.sessionFeeWei,
-    perRequestFeeWei:
+        : target.sessionFeeTomi,
+    perRequestFeeTomi:
       typeof policy?.per_request_fee_tos === "string"
         ? policy.per_request_fee_tos
-        : target.perRequestFeeWei,
+        : target.perRequestFeeTomi,
   };
 }
 
@@ -183,8 +183,8 @@ async function selectGatewayTargets(params: {
       gatewayUrl: bootnode.url,
       paymentAddress: bootnode.payToAddress,
       paymentDirection: bootnode.paymentDirection,
-      sessionFeeWei: bootnode.sessionFeeWei,
-      perRequestFeeWei: bootnode.perRequestFeeWei,
+      sessionFeeTomi: bootnode.sessionFeeTomi,
+      perRequestFeeTomi: bootnode.perRequestFeeTomi,
     });
   }
 
@@ -260,8 +260,8 @@ async function buildSessionPayment(params: {
   ) {
     return undefined;
   }
-  const sessionFeeWei = payment.sessionFeeWei || "0";
-  if (!/^\d+$/.test(sessionFeeWei) || BigInt(sessionFeeWei) === 0n) {
+  const sessionFeeTomi = payment.sessionFeeTomi || "0";
+  if (!/^\d+$/.test(sessionFeeTomi) || BigInt(sessionFeeTomi) === 0n) {
     return undefined;
   }
   const privateKey = params.privateKey || loadWalletPrivateKey();
@@ -283,7 +283,7 @@ async function buildSessionPayment(params: {
     requirement: {
       scheme: "exact",
       network: chainId ? `tos:${chainId}` : "tos:1666",
-      maxAmountRequired: sessionFeeWei,
+      maxAmountRequired: sessionFeeTomi,
       payToAddress,
     },
   });

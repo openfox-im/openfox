@@ -31,8 +31,8 @@ OpenFox bounty
 Usage:
   openfox bounty list [--url <base-url>]
   openfox bounty status <bounty-id> [--url <base-url>]
-  openfox bounty open --kind <question|translation|social_proof|problem_solving|public_news_capture|oracle_evidence_capture|data_labeling> --title "<text>" --task "<prompt>" --reference "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>] [--skill <name>] [--campaign-id <id>]
-  openfox bounty open --question "<text>" --answer "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>] [--campaign-id <id>]
+  openfox bounty open --kind <question|translation|social_proof|problem_solving|public_news_capture|oracle_evidence_capture|data_labeling> --title "<text>" --task "<prompt>" --reference "<canonical>" [--reward-tomi <tomi>] [--ttl-seconds <n>] [--skill <name>] [--campaign-id <id>]
+  openfox bounty open --question "<text>" --answer "<canonical>" [--reward-tomi <tomi>] [--ttl-seconds <n>] [--campaign-id <id>]
   openfox bounty submit <bounty-id> --submission "<text>" [--proof-url <url>] [--url <base-url>]
   openfox bounty submit <bounty-id> --answer "<text>" [--url <base-url>]
   openfox bounty solve <bounty-id> --url <base-url>
@@ -136,7 +136,7 @@ Usage:
         readOption(args, "--reference") || readOption(args, "--answer");
       if (!taskPrompt || !referenceOutput) {
         throw new Error(
-          'Usage: openfox bounty open --kind <question|translation|social_proof|problem_solving|public_news_capture|oracle_evidence_capture|data_labeling> --title "<text>" --task "<prompt>" --reference "<canonical>" [--reward-wei <wei>] [--ttl-seconds <n>] [--campaign-id <id>]',
+          'Usage: openfox bounty open --kind <question|translation|social_proof|problem_solving|public_news_capture|oracle_evidence_capture|data_labeling> --title "<text>" --task "<prompt>" --reference "<canonical>" [--reward-tomi <tomi>] [--ttl-seconds <n>] [--campaign-id <id>]',
         );
       }
       const ttlSeconds = readNumberOption(
@@ -150,7 +150,7 @@ Usage:
         title: readOption(args, "--title") || taskPrompt.slice(0, 160),
         taskPrompt,
         referenceOutput,
-        rewardWei: readOption(args, "--reward-wei") || config.bounty.rewardWei,
+        rewardTomi: readOption(args, "--reward-tomi") || config.bounty.rewardTomi,
         submissionDeadline: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
         skillName: readOption(args, "--skill") || resolveBountySkillName(config.bounty),
       });

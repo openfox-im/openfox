@@ -59,7 +59,7 @@ describe("metaWorld artifact and settlement pages", () => {
       title: "Trail Subject Bounty",
       taskPrompt: "Collect evidence.",
       referenceOutput: "Evidence bundle",
-      rewardWei: "1000000000000000000",
+      rewardTomi: "1000000000000000000",
       submissionDeadline: "2026-03-15T00:00:00.000Z",
       judgeMode: "local_model",
       status: "paid",

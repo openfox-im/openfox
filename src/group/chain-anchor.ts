@@ -21,7 +21,7 @@ export interface ChainCommitmentRecord {
   epoch: number;
   membersRoot: string;
   eventsMerkleRoot: string | null;
-  treasuryBalanceWei: string | null;
+  treasuryBalanceTomi: string | null;
   txHash: string;
   blockNumber: number | null;
   createdAt: string;
@@ -85,7 +85,7 @@ function mapCommitmentRow(row: any): ChainCommitmentRecord {
     epoch: row.epoch,
     membersRoot: row.members_root,
     eventsMerkleRoot: row.events_merkle_root ?? null,
-    treasuryBalanceWei: row.treasury_balance_wei ?? null,
+    treasuryBalanceTomi: row.treasury_balance_tomi ?? null,
     txHash: row.tx_hash,
     blockNumber: row.block_number ?? null,
     createdAt: row.created_at,
@@ -148,7 +148,7 @@ export async function registerGroupOnChain(params: {
   db.raw
     .prepare(
       `INSERT INTO group_chain_commitments
-       (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_wei, tx_hash, block_number, created_at)
+       (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_tomi, tx_hash, block_number, created_at)
        VALUES (?, ?, 'register', ?, ?, NULL, NULL, ?, NULL, ?)`,
     )
     .run(
@@ -192,10 +192,10 @@ export async function publishGroupStateCommitment(params: {
 
   // Get treasury balance if available
   const treasury = db.raw
-    .prepare("SELECT balance_wei FROM group_treasury WHERE group_id = ?")
-    .get(groupId) as { balance_wei: string } | undefined;
+    .prepare("SELECT balance_tomi FROM group_treasury WHERE group_id = ?")
+    .get(groupId) as { balance_tomi: string } | undefined;
 
-  const treasuryBalanceWei = treasury?.balance_wei ?? "0";
+  const treasuryBalanceTomi = treasury?.balance_tomi ?? "0";
   const epoch = group.current_epoch ?? 0;
   const membersRoot = group.current_members_root;
 
@@ -208,7 +208,7 @@ export async function publishGroupStateCommitment(params: {
       epoch,
       members_root: membersRoot,
       events_merkle_root: eventsMerkleRoot,
-      treasury_balance_wei: treasuryBalanceWei,
+      treasury_balance_tomi: treasuryBalanceTomi,
     },
   });
 
@@ -218,7 +218,7 @@ export async function publishGroupStateCommitment(params: {
   db.raw
     .prepare(
       `INSERT INTO group_chain_commitments
-       (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_wei, tx_hash, block_number, created_at)
+       (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_tomi, tx_hash, block_number, created_at)
        VALUES (?, ?, 'state_commit', ?, ?, ?, ?, ?, NULL, ?)`,
     )
     .run(
@@ -227,7 +227,7 @@ export async function publishGroupStateCommitment(params: {
       epoch,
       membersRoot,
       eventsMerkleRoot,
-      treasuryBalanceWei,
+      treasuryBalanceTomi,
       result.txHash,
       now,
     );

@@ -305,7 +305,7 @@ export class ReplayInspector {
       lines.push(`  Tx: ${r.txHash}`);
       lines.push(`  Block: ${r.blockNumber}`);
       lines.push(`  Status: ${r.receiptStatus}`);
-      lines.push(`  Value: ${r.value} wei`);
+      lines.push(`  Value: ${r.value} tomi`);
       lines.push(`  Gas used: ${r.gasUsed}`);
       lines.push(`  Settled: ${formatTimestamp(r.settledAt)}`);
       lines.push("");

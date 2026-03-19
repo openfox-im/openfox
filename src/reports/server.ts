@@ -174,7 +174,7 @@ function renderOwnerAlertsHtml(params: {
         `<p><strong>Kind:</strong> ${alert.kind}</p>`,
         `<p><strong>Provider class:</strong> ${alert.providerClass}</p>`,
         `<p><strong>Trust tier:</strong> ${alert.trustTier}</p>`,
-        `<p><strong>Margin:</strong> ${alert.marginWei} (${alert.marginBps} bps)</p>`,
+        `<p><strong>Margin:</strong> ${alert.marginTomi} (${alert.marginBps} bps)</p>`,
         alert.strategyScore == null
           ? ""
           : `<p><strong>Strategy score:</strong> ${alert.strategyScore}</p>`,

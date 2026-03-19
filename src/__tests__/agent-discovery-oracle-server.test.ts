@@ -50,7 +50,7 @@ function makeConfig(): OpenFoxConfig {
         port: 0,
         path: "/agent-discovery/oracle-resolve",
         capability: "oracle.resolve",
-        priceWei: "2000000000000000",
+        priceTomi: "2000000000000000",
         maxQuestionChars: 1024,
         maxContextChars: 8192,
         maxOptions: 16,
@@ -297,9 +297,9 @@ describe("agent discovery oracle server", () => {
         headers: { Accept: "application/json" },
       });
       expect(quote.status).toBe(200);
-      const quoteBody = (await quote.json()) as { capability: string; price_wei: string };
+      const quoteBody = (await quote.json()) as { capability: string; price_tomi: string };
       expect(quoteBody.capability).toBe("oracle.resolve");
-      expect(quoteBody.price_wei).toBe("2000000000000000");
+      expect(quoteBody.price_tomi).toBe("2000000000000000");
 
       const first = await x402Fetch(
         resolveUrl,

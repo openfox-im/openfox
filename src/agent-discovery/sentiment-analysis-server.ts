@@ -223,7 +223,7 @@ export async function startAgentDiscoverySentimentAnalysisServer(
           providerAddress: identity.address,
           requestKey,
           requestHash,
-          amountWei: sentimentConfig.priceWei,
+          amountTomi: sentimentConfig.priceTomi,
           description: `OpenFox sentiment.analyze payment`,
         });
         if (payment.state === "required") {

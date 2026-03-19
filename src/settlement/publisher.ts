@@ -107,7 +107,7 @@ export function createNativeSettlementPublisher(params: {
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: params.config.sinkAddress || params.publisherAddress,
-        amountWei: 0n,
+        amountTomi: 0n,
         gas: BigInt(params.config.gas),
         data: toHex(canonicalReceipt),
         waitForReceipt: params.config.waitForReceipt,

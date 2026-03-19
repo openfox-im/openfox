@@ -69,7 +69,7 @@ export async function startBountyHttpServer(params: {
         const campaign = params.engine.createCampaign({
           title: String(body.title || "").trim(),
           description: String(body.description || "").trim(),
-          budgetWei: String(body.budget_wei || "").trim(),
+          budgetTomi: String(body.budget_tomi || "").trim(),
           maxOpenBounties:
             typeof body.max_open_bounties === "number" &&
             Number.isFinite(body.max_open_bounties)
@@ -136,10 +136,10 @@ export async function startBountyHttpServer(params: {
               : taskPrompt.slice(0, 160),
           taskPrompt,
           referenceOutput,
-          rewardWei:
-            typeof body.reward_wei === "string" && body.reward_wei.trim()
-              ? body.reward_wei.trim()
-              : params.bountyConfig.rewardWei,
+          rewardTomi:
+            typeof body.reward_tomi === "string" && body.reward_tomi.trim()
+              ? body.reward_tomi.trim()
+              : params.bountyConfig.rewardTomi,
           submissionDeadline: deadline,
           skillName:
             typeof body.skill_name === "string" && body.skill_name.trim()

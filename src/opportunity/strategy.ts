@@ -54,8 +54,8 @@ export interface OpportunityStrategyValidation {
 export interface OpportunityStrategyUpdateInput {
   profileId?: string;
   name?: string;
-  revenueTargetWei?: string;
-  maxSpendPerOpportunityWei?: string;
+  revenueTargetTomi?: string;
+  maxSpendPerOpportunityTomi?: string;
   minMarginBps?: number;
   enabledOpportunityKinds?: OpportunityKind[];
   enabledProviderClasses?: OpportunityProviderClass[];
@@ -78,8 +78,8 @@ export function createDefaultStrategyProfile(): OpportunityStrategyProfile {
   return {
     profileId: "default",
     name: "Default Strategy",
-    revenueTargetWei: "0",
-    maxSpendPerOpportunityWei: "0",
+    revenueTargetTomi: "0",
+    maxSpendPerOpportunityTomi: "0",
     minMarginBps: 0,
     enabledOpportunityKinds: [...ALL_OPPORTUNITY_KINDS],
     enabledProviderClasses: [...ALL_PROVIDER_CLASSES],
@@ -164,11 +164,11 @@ export function validateStrategyProfile(
 
   if (!profile.profileId.trim()) errors.push("profileId is required.");
   if (!profile.name.trim()) errors.push("name is required.");
-  if (!isDecimalString(profile.revenueTargetWei)) {
-    errors.push("revenueTargetWei must be a non-negative integer string.");
+  if (!isDecimalString(profile.revenueTargetTomi)) {
+    errors.push("revenueTargetTomi must be a non-negative integer string.");
   }
-  if (!isDecimalString(profile.maxSpendPerOpportunityWei)) {
-    errors.push("maxSpendPerOpportunityWei must be a non-negative integer string.");
+  if (!isDecimalString(profile.maxSpendPerOpportunityTomi)) {
+    errors.push("maxSpendPerOpportunityTomi must be a non-negative integer string.");
   }
   if (!Number.isFinite(profile.minMarginBps) || profile.minMarginBps < 0) {
     errors.push("minMarginBps must be a non-negative number.");
@@ -212,8 +212,8 @@ export function validateStrategyProfile(
   if (!VALID_REPORT_CADENCES.includes(profile.reportCadence)) {
     errors.push(`Unsupported reportCadence: ${profile.reportCadence}`);
   }
-  if (profile.maxSpendPerOpportunityWei === "0") {
-    warnings.push("maxSpendPerOpportunityWei is zero, so paid provider opportunities will not match.");
+  if (profile.maxSpendPerOpportunityTomi === "0") {
+    warnings.push("maxSpendPerOpportunityTomi is zero, so paid provider opportunities will not match.");
   }
 
   return {
@@ -238,10 +238,10 @@ export function upsertStrategyProfile(
     ...current,
     profileId,
     name: input.name?.trim() || current.name,
-    revenueTargetWei: input.revenueTargetWei?.trim() || current.revenueTargetWei,
-    maxSpendPerOpportunityWei:
-      input.maxSpendPerOpportunityWei?.trim() ||
-      current.maxSpendPerOpportunityWei,
+    revenueTargetTomi: input.revenueTargetTomi?.trim() || current.revenueTargetTomi,
+    maxSpendPerOpportunityTomi:
+      input.maxSpendPerOpportunityTomi?.trim() ||
+      current.maxSpendPerOpportunityTomi,
     minMarginBps: input.minMarginBps ?? current.minMarginBps,
     enabledOpportunityKinds: sanitizeUnique(
       input.enabledOpportunityKinds ?? current.enabledOpportunityKinds,

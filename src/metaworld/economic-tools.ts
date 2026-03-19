@@ -68,7 +68,7 @@ function getDefaultStrategy() {
     ] as any[],
     allowedTrustTiers: ["self_hosted", "org_trusted", "public_low_trust", "unknown"] as any[],
     minMarginBps: 0,
-    maxSpendPerOpportunityWei: "1000000000000000000",
+    maxSpendPerOpportunityTomi: "1000000000000000000",
     maxDeadlineHours: 168,
   };
 }
@@ -124,10 +124,10 @@ export const metaworldScoutOpportunitiesTool: OpenFoxTool = {
         enum: ["work", "opportunity", "procurement", "collaboration", "custom"],
         description: "Kind of intent to create (default: 'opportunity').",
       },
-      budget_wei: {
+      budget_tomi: {
         type: "string",
         description:
-          "Budget in wei for the intent. Should be less than the opportunity's gross value.",
+          "Budget in tomi for the intent. Should be less than the opportunity's gross value.",
       },
       group_id: {
         type: "string",
@@ -182,12 +182,12 @@ export const metaworldScoutOpportunitiesTool: OpenFoxTool = {
       const description =
         (args.intent_description as string) || opp.description;
       const kind = (args.intent_kind as IntentKind) || "opportunity";
-      const budgetWei = args.budget_wei as string | undefined;
+      const budgetTomi = args.budget_tomi as string | undefined;
       const groupId = args.group_id as string | undefined;
 
       // Validate budget doesn't exceed gross value
-      if (budgetWei && BigInt(budgetWei) > BigInt(opp.grossValueWei)) {
-        return `Budget ${budgetWei} exceeds opportunity gross value ${opp.grossValueWei}. Set a lower budget.`;
+      if (budgetTomi && BigInt(budgetTomi) > BigInt(opp.grossValueTomi)) {
+        return `Budget ${budgetTomi} exceeds opportunity gross value ${opp.grossValueTomi}. Set a lower budget.`;
       }
 
       try {
@@ -197,13 +197,13 @@ export const metaworldScoutOpportunitiesTool: OpenFoxTool = {
           kind,
           title,
           description,
-          budgetWei,
+          budgetTomi,
           requirements: opp.capability
             ? [{ kind: "capability", capability_name: opp.capability }]
             : [],
         });
 
-        return `Intent created successfully.\n\nIntent ID: ${intent.intentId}\nTitle: ${intent.title}\nKind: ${intent.kind}\nStatus: ${intent.status}\nBudget: ${intent.budgetWei || "none"}\nExpires: ${intent.expiresAt}\n\nBased on opportunity: ${opp.title} (margin=${opp.marginWei} wei, score=${opp.strategyScore ?? opp.rawScore})`;
+        return `Intent created successfully.\n\nIntent ID: ${intent.intentId}\nTitle: ${intent.title}\nKind: ${intent.kind}\nStatus: ${intent.status}\nBudget: ${intent.budgetTomi || "none"}\nExpires: ${intent.expiresAt}\n\nBased on opportunity: ${opp.title} (margin=${opp.marginTomi} tomi, score=${opp.strategyScore ?? opp.rawScore})`;
       } catch (err: any) {
         return `Error creating intent: ${err.message}`;
       }
@@ -238,9 +238,9 @@ export const metaworldFindMatchingIntentsTool: OpenFoxTool = {
         type: "string",
         description: "Your proposal explaining how you will fulfill the intent requirements.",
       },
-      proposed_amount_wei: {
+      proposed_amount_tomi: {
         type: "string",
-        description: "Your proposed amount in wei (should be <= intent budget).",
+        description: "Your proposed amount in tomi (should be <= intent budget).",
       },
       capability_refs: {
         type: "string",
@@ -293,7 +293,7 @@ export const metaworldFindMatchingIntentsTool: OpenFoxTool = {
           .join(", ");
 
         const responses = listIntentResponses(ctx.db, intent.intentId);
-        return `${i + 1}. [${intent.kind}] ${intent.title}\n   ID: ${intent.intentId}\n   Publisher: ${intent.publisherAddress}\n   Budget: ${intent.budgetWei || "none"} wei\n   Requirements: ${reqs || "none"}\n   Responses: ${responses.length}\n   Expires: ${intent.expiresAt}\n   ${intent.description.slice(0, 200)}`;
+        return `${i + 1}. [${intent.kind}] ${intent.title}\n   ID: ${intent.intentId}\n   Publisher: ${intent.publisherAddress}\n   Budget: ${intent.budgetTomi || "none"} tomi\n   Requirements: ${reqs || "none"}\n   Responses: ${responses.length}\n   Expires: ${intent.expiresAt}\n   ${intent.description.slice(0, 200)}`;
       });
 
       return `Found ${intents.length} open intent(s):\n\n${lines.join("\n\n")}\n\nTo respond to an intent, call this tool with action='respond' and intent_id=<id>.`;
@@ -306,7 +306,7 @@ export const metaworldFindMatchingIntentsTool: OpenFoxTool = {
       }
 
       const proposalText = (args.proposal_text as string) || "";
-      const proposedAmountWei = args.proposed_amount_wei as string | undefined;
+      const proposedAmountTomi = args.proposed_amount_tomi as string | undefined;
       const capabilityRefs = args.capability_refs
         ? (args.capability_refs as string).split(",").map((s) => s.trim())
         : [];
@@ -330,11 +330,11 @@ export const metaworldFindMatchingIntentsTool: OpenFoxTool = {
 
       // Validate proposed amount
       if (
-        proposedAmountWei &&
-        intent.budgetWei &&
-        BigInt(proposedAmountWei) > BigInt(intent.budgetWei)
+        proposedAmountTomi &&
+        intent.budgetTomi &&
+        BigInt(proposedAmountTomi) > BigInt(intent.budgetTomi)
       ) {
-        return `Error: Proposed amount ${proposedAmountWei} exceeds intent budget ${intent.budgetWei}.`;
+        return `Error: Proposed amount ${proposedAmountTomi} exceeds intent budget ${intent.budgetTomi}.`;
       }
 
       try {
@@ -342,11 +342,11 @@ export const metaworldFindMatchingIntentsTool: OpenFoxTool = {
           intentId,
           solverAddress: ctx.identity.address,
           proposalText,
-          proposedAmountWei,
+          proposedAmountTomi,
           capabilityRefs,
         });
 
-        return `Response submitted successfully.\n\nResponse ID: ${response.responseId}\nIntent: ${intent.title}\nProposal: ${response.proposalText.slice(0, 200)}\nProposed amount: ${response.proposedAmountWei || "none"}\nCapabilities: ${response.capabilityRefs.join(", ") || "none"}\nStatus: ${response.status}`;
+        return `Response submitted successfully.\n\nResponse ID: ${response.responseId}\nIntent: ${intent.title}\nProposal: ${response.proposalText.slice(0, 200)}\nProposed amount: ${response.proposedAmountTomi || "none"}\nCapabilities: ${response.capabilityRefs.join(", ") || "none"}\nStatus: ${response.status}`;
       } catch (err: any) {
         return `Error submitting response: ${err.message}`;
       }
@@ -406,7 +406,7 @@ export const metaworldReviewArtifactsTool: OpenFoxTool = {
           ? `Artifacts: ${acceptedResponse.artifactIds.length > 0 ? acceptedResponse.artifactIds.join(", ") : "none submitted"}\n   Review status: ${acceptedResponse.reviewStatus}`
           : "No accepted response found";
 
-        return `${i + 1}. ${intent.title}\n   ID: ${intent.intentId}\n   Solver: ${intent.matchedSolverAddress}\n   Budget: ${intent.budgetWei || "none"} wei\n   ${artifactInfo}\n   Description: ${intent.description.slice(0, 200)}`;
+        return `${i + 1}. ${intent.title}\n   ID: ${intent.intentId}\n   Solver: ${intent.matchedSolverAddress}\n   Budget: ${intent.budgetTomi || "none"} tomi\n   ${artifactInfo}\n   Description: ${intent.description.slice(0, 200)}`;
       });
 
       return `${reviewIntents.length} intent(s) awaiting your review:\n\n${lines.join("\n\n")}\n\nUse action='approve' or action='request_revision' with intent_id to take action.`;
@@ -523,12 +523,12 @@ export const metaworldExecutePendingSpendsTool: OpenFoxTool = {
       const budgetSummary = budgets
         .map(
           (b) =>
-            `  ${b.lineName}: spent=${b.spentWei}/${b.capWei} wei (${b.period})`,
+            `  ${b.lineName}: spent=${b.spentTomi}/${b.capTomi} tomi (${b.period})`,
         )
         .join("\n");
 
       let msg = `Treasury status for group ${groupId}:\n`;
-      msg += `  Balance: ${treasury.balanceWei} wei\n`;
+      msg += `  Balance: ${treasury.balanceTomi} tomi\n`;
       msg += `  Status: ${treasury.status}\n`;
       msg += `  Budget lines:\n${budgetSummary || "    (none)"}\n\n`;
 
@@ -538,10 +538,10 @@ export const metaworldExecutePendingSpendsTool: OpenFoxTool = {
       }
 
       const lines = spendProposals.map((p, i) => {
-        const amount = (p.params.amountWei as string) || "unknown";
+        const amount = (p.params.amountTomi as string) || "unknown";
         const recipient = (p.params.recipient as string) || "unknown";
         const budgetLine = (p.params.budgetLine as string) || "default";
-        return `${i + 1}. ${p.title}\n   Proposal ID: ${p.proposalId}\n   Amount: ${amount} wei\n   Recipient: ${recipient}\n   Budget line: ${budgetLine}\n   Votes: ${p.votesApprove} approve / ${p.votesReject} reject\n   Approved at: ${p.updatedAt}`;
+        return `${i + 1}. ${p.title}\n   Proposal ID: ${p.proposalId}\n   Amount: ${amount} tomi\n   Recipient: ${recipient}\n   Budget line: ${budgetLine}\n   Votes: ${p.votesApprove} approve / ${p.votesReject} reject\n   Approved at: ${p.updatedAt}`;
       });
 
       msg += `${spendProposals.length} approved spend proposal(s):\n\n${lines.join("\n\n")}\n\nUse action='execute' with proposal_id to execute a spend.`;
@@ -569,7 +569,7 @@ export const metaworldExecutePendingSpendsTool: OpenFoxTool = {
         return `Error: Proposal ${proposalId} is not a spend proposal (type: ${proposal.proposalType}).`;
       }
 
-      const amountWei = (proposal.params.amountWei as string) || "0";
+      const amountTomi = (proposal.params.amountTomi as string) || "0";
       const recipient = (proposal.params.recipient as string) || "";
       const budgetLine = (proposal.params.budgetLine as string) || "default";
 
@@ -578,7 +578,7 @@ export const metaworldExecutePendingSpendsTool: OpenFoxTool = {
         ctx.db,
         groupId,
         budgetLine,
-        amountWei,
+        amountTomi,
       );
       if (!validation.valid) {
         return `Error: Spend validation failed: ${validation.reason}`;
@@ -589,7 +589,7 @@ export const metaworldExecutePendingSpendsTool: OpenFoxTool = {
         const logEntry = recordTreasuryOutflow(
           ctx.db,
           groupId,
-          amountWei,
+          amountTomi,
           recipient,
           budgetLine,
           proposalId,
@@ -605,7 +605,7 @@ export const metaworldExecutePendingSpendsTool: OpenFoxTool = {
           actorAddress: ctx.identity.address,
         });
 
-        return `Spend executed successfully.\n\nProposal: ${executedProposal.title}\nAmount: ${amountWei} wei\nRecipient: ${recipient}\nBudget line: ${budgetLine}\nTreasury log ID: ${logEntry.logId}\nNew treasury balance: ${(BigInt(treasury.balanceWei) - BigInt(amountWei)).toString()} wei`;
+        return `Spend executed successfully.\n\nProposal: ${executedProposal.title}\nAmount: ${amountTomi} tomi\nRecipient: ${recipient}\nBudget line: ${budgetLine}\nTreasury log ID: ${logEntry.logId}\nNew treasury balance: ${(BigInt(treasury.balanceTomi) - BigInt(amountTomi)).toString()} tomi`;
       } catch (err: any) {
         return `Error executing spend: ${err.message}`;
       }
@@ -685,10 +685,10 @@ export const metaworldVoteOnProposalsTool: OpenFoxTool = {
         const lines = entry.proposals.map((p, i) => {
           const treasury = getGroupTreasury(ctx.db, entry.groupId);
           let budgetImpact = "";
-          if (p.proposalType === "spend" && p.params.amountWei && treasury) {
+          if (p.proposalType === "spend" && p.params.amountTomi && treasury) {
             const pct =
-              (Number(BigInt(p.params.amountWei as string) * 100n) /
-                Number(BigInt(treasury.balanceWei) || 1n));
+              (Number(BigInt(p.params.amountTomi as string) * 100n) /
+                Number(BigInt(treasury.balanceTomi) || 1n));
             budgetImpact = ` (${pct.toFixed(1)}% of treasury)`;
           }
 
@@ -726,7 +726,7 @@ export const metaworldVoteOnProposalsTool: OpenFoxTool = {
       if (proposal.proposalType === "spend") {
         const treasury = getGroupTreasury(ctx.db, proposal.groupId);
         if (treasury) {
-          treasuryInfo = `\nTreasury balance: ${treasury.balanceWei} wei\nSpend amount: ${(proposal.params.amountWei as string) || "unknown"} wei\nRecipient: ${(proposal.params.recipient as string) || "unknown"}`;
+          treasuryInfo = `\nTreasury balance: ${treasury.balanceTomi} tomi\nSpend amount: ${(proposal.params.amountTomi as string) || "unknown"} tomi\nRecipient: ${(proposal.params.recipient as string) || "unknown"}`;
         }
       }
 

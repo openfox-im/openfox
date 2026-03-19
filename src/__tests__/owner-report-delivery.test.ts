@@ -76,9 +76,9 @@ describe("owner report delivery", () => {
       suggestedAction: "Review and submit a bounded response.",
       capability: "task.submit",
       baseUrl: "https://host.example.com",
-      rewardWei: "100",
-      estimatedCostWei: "10",
-      marginWei: "90",
+      rewardTomi: "100",
+      estimatedCostTomi: "10",
+      marginTomi: "90",
       marginBps: 9000,
       strategyScore: 1500,
       strategyMatched: true,
@@ -389,7 +389,7 @@ describe("owner report delivery", () => {
       const bounty = hostEngine.openQuestionBounty({
         question: "Capital of Spain?",
         referenceAnswer: "Madrid",
-        rewardWei: "1000",
+        rewardTomi: "1000",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
       });
       bountyServer = await startBountyHttpServer({

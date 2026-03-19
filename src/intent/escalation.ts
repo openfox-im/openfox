@@ -10,7 +10,7 @@ import { TrustTierLabels, type IntentEnvelope, type PlanRecord, type TrustTier }
 
 export interface EscalationRule {
   condition: "value_above" | "recipient_unknown" | "terminal_low_trust" | "action_restricted" | "privacy_action_weak_terminal" | "privacy_action_high_value" | "contract_high_risk";
-  /** Wei string threshold for value_above / privacy_action_high_value; trust tier threshold for terminal_low_trust / privacy_action_weak_terminal. */
+  /** Tomi string threshold for value_above / privacy_action_high_value; trust tier threshold for terminal_low_trust / privacy_action_weak_terminal. */
   threshold?: string;
   action: "require_approval" | "require_guardian" | "deny";
 }
@@ -29,7 +29,7 @@ export interface EscalationResult {
   rules_triggered: EscalationRule[];
 }
 
-/** Compare two wei strings. Returns true if a > b. */
+/** Compare two tomi strings. Returns true if a > b. */
 function weiAbove(a: string, b: string): boolean {
   return BigInt(a || "0") > BigInt(b || "0");
 }
@@ -63,7 +63,7 @@ function evaluateRule(
       if (!rule.threshold) return undefined;
       const value = resolveValue(intent, plan);
       if (weiAbove(value, rule.threshold)) {
-        return `Transaction value (${value} wei) exceeds threshold (${rule.threshold} wei)`;
+        return `Transaction value (${value} tomi) exceeds threshold (${rule.threshold} tomi)`;
       }
       return undefined;
     }
@@ -119,7 +119,7 @@ function evaluateRule(
       if (!rule.threshold) return undefined;
       const value = resolveValue(intent, plan);
       if (weiAbove(value, rule.threshold)) {
-        return `Privacy action "${intent.action}" with high value (${value} wei) exceeds threshold (${rule.threshold} wei)`;
+        return `Privacy action "${intent.action}" with high value (${value} tomi) exceeds threshold (${rule.threshold} tomi)`;
       }
       return undefined;
     }

@@ -37,7 +37,7 @@ function stableStringify(value: unknown): string {
 export interface TreasuryRecord {
   groupId: string;
   treasuryAddress: string;
-  balanceWei: string;
+  balanceTomi: string;
   lastSyncedAt: string | null;
   spendPolicy: Record<string, unknown>;
   status: "active" | "frozen" | "closed";
@@ -48,9 +48,9 @@ export interface TreasuryRecord {
 export interface BudgetLineRecord {
   groupId: string;
   lineName: string;
-  capWei: string;
+  capTomi: string;
   period: "daily" | "weekly" | "monthly" | "epoch";
-  spentWei: string;
+  spentTomi: string;
   periodStart: string;
   requiresSupermajority: boolean;
   createdAt: string;
@@ -61,7 +61,7 @@ export interface TreasuryLogRecord {
   logId: string;
   groupId: string;
   direction: "inflow" | "outflow";
-  amountWei: string;
+  amountTomi: string;
   counterparty: string | null;
   budgetLine: string | null;
   proposalId: string | null;
@@ -72,7 +72,7 @@ export interface TreasuryLogRecord {
 
 export interface BudgetLineInput {
   lineName: string;
-  capWei: string;
+  capTomi: string;
   period?: "daily" | "weekly" | "monthly" | "epoch";
   requiresSupermajority?: boolean;
 }
@@ -80,7 +80,7 @@ export interface BudgetLineInput {
 export interface TreasurySnapshot {
   groupId: string;
   treasuryAddress: string;
-  balanceWei: string;
+  balanceTomi: string;
   status: "active" | "frozen" | "closed";
   budgetLines: BudgetLineRecord[];
   recentLog: TreasuryLogRecord[];
@@ -141,7 +141,7 @@ export function deriveTreasuryAddress(
 interface TreasuryRow {
   group_id: string;
   treasury_address: string;
-  balance_wei: string;
+  balance_tomi: string;
   last_synced_at: string | null;
   spend_policy_json: string;
   status: string;
@@ -152,9 +152,9 @@ interface TreasuryRow {
 interface BudgetLineRow {
   group_id: string;
   line_name: string;
-  cap_wei: string;
+  cap_tomi: string;
   period: string;
-  spent_wei: string;
+  spent_tomi: string;
   period_start: string;
   requires_supermajority: number;
   created_at: string;
@@ -165,7 +165,7 @@ interface TreasuryLogRow {
   log_id: string;
   group_id: string;
   direction: string;
-  amount_wei: string;
+  amount_tomi: string;
   counterparty: string | null;
   budget_line: string | null;
   proposal_id: string | null;
@@ -178,7 +178,7 @@ function mapTreasuryRow(row: TreasuryRow): TreasuryRecord {
   return {
     groupId: row.group_id,
     treasuryAddress: row.treasury_address,
-    balanceWei: row.balance_wei,
+    balanceTomi: row.balance_tomi,
     lastSyncedAt: row.last_synced_at,
     spendPolicy: JSON.parse(row.spend_policy_json),
     status: row.status as TreasuryRecord["status"],
@@ -191,9 +191,9 @@ function mapBudgetLineRow(row: BudgetLineRow): BudgetLineRecord {
   return {
     groupId: row.group_id,
     lineName: row.line_name,
-    capWei: row.cap_wei,
+    capTomi: row.cap_tomi,
     period: row.period as BudgetLineRecord["period"],
-    spentWei: row.spent_wei,
+    spentTomi: row.spent_tomi,
     periodStart: row.period_start,
     requiresSupermajority: row.requires_supermajority === 1,
     createdAt: row.created_at,
@@ -206,7 +206,7 @@ function mapTreasuryLogRow(row: TreasuryLogRow): TreasuryLogRecord {
     logId: row.log_id,
     groupId: row.group_id,
     direction: row.direction as TreasuryLogRecord["direction"],
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     counterparty: row.counterparty,
     budgetLine: row.budget_line,
     proposalId: row.proposal_id,
@@ -235,7 +235,7 @@ export function initializeGroupTreasury(
 
   db.raw
     .prepare(
-      `INSERT INTO group_treasury (group_id, treasury_address, balance_wei, spend_policy_json, status, created_at, updated_at)
+      `INSERT INTO group_treasury (group_id, treasury_address, balance_tomi, spend_policy_json, status, created_at, updated_at)
        VALUES (?, ?, '0', '{}', 'active', ?, ?)`,
     )
     .run(groupId, treasuryAddress, now, now);
@@ -247,7 +247,7 @@ export function initializeGroupTreasury(
         db,
         groupId,
         line.lineName,
-        line.capWei,
+        line.capTomi,
         line.period ?? "monthly",
         line.requiresSupermajority ?? false,
       );
@@ -285,7 +285,7 @@ export function setBudgetLine(
   db: OpenFoxDatabase,
   groupId: string,
   lineName: string,
-  capWei: string,
+  capTomi: string,
   period: "daily" | "weekly" | "monthly" | "epoch" = "monthly",
   requiresSupermajority: boolean = false,
 ): BudgetLineRecord {
@@ -293,10 +293,10 @@ export function setBudgetLine(
 
   db.raw
     .prepare(
-      `INSERT INTO group_budget_lines (group_id, line_name, cap_wei, period, spent_wei, period_start, requires_supermajority, created_at, updated_at)
+      `INSERT INTO group_budget_lines (group_id, line_name, cap_tomi, period, spent_tomi, period_start, requires_supermajority, created_at, updated_at)
        VALUES (?, ?, ?, ?, '0', ?, ?, ?, ?)
        ON CONFLICT(group_id, line_name) DO UPDATE SET
-         cap_wei = excluded.cap_wei,
+         cap_tomi = excluded.cap_tomi,
          period = excluded.period,
          requires_supermajority = excluded.requires_supermajority,
          updated_at = excluded.updated_at`,
@@ -304,7 +304,7 @@ export function setBudgetLine(
     .run(
       groupId,
       lineName,
-      capWei,
+      capTomi,
       period,
       now,
       requiresSupermajority ? 1 : 0,
@@ -336,7 +336,7 @@ export function getTreasuryLog(
 export function recordTreasuryInflow(
   db: OpenFoxDatabase,
   groupId: string,
-  amountWei: string,
+  amountTomi: string,
   fromAddress?: string,
   txHash?: string,
   memo?: string,
@@ -346,28 +346,28 @@ export function recordTreasuryInflow(
     throw new Error(`Treasury not found for group: ${groupId}`);
   }
 
-  const newBalance = (BigInt(treasury.balanceWei) + BigInt(amountWei)).toString();
+  const newBalance = (BigInt(treasury.balanceTomi) + BigInt(amountTomi)).toString();
   const now = new Date().toISOString();
   const logId = ulid();
 
   db.raw
     .prepare(
-      "UPDATE group_treasury SET balance_wei = ?, updated_at = ? WHERE group_id = ?",
+      "UPDATE group_treasury SET balance_tomi = ?, updated_at = ? WHERE group_id = ?",
     )
     .run(newBalance, now, groupId);
 
   db.raw
     .prepare(
-      `INSERT INTO group_treasury_log (log_id, group_id, direction, amount_wei, counterparty, budget_line, proposal_id, tx_hash, memo, created_at)
+      `INSERT INTO group_treasury_log (log_id, group_id, direction, amount_tomi, counterparty, budget_line, proposal_id, tx_hash, memo, created_at)
        VALUES (?, ?, 'inflow', ?, ?, NULL, NULL, ?, ?, ?)`,
     )
-    .run(logId, groupId, amountWei, fromAddress ?? null, txHash ?? null, memo ?? null, now);
+    .run(logId, groupId, amountTomi, fromAddress ?? null, txHash ?? null, memo ?? null, now);
 
-  logger.info("Treasury inflow recorded", { groupId, amountWei, logId });
+  logger.info("Treasury inflow recorded", { groupId, amountTomi, logId });
 
   worldEventBus.publish({
     kind: "treasury.update",
-    payload: { groupId, action: "inflow", amountWei, fromAddress, newBalance: newBalance },
+    payload: { groupId, action: "inflow", amountTomi, fromAddress, newBalance: newBalance },
     timestamp: now,
   });
 
@@ -375,7 +375,7 @@ export function recordTreasuryInflow(
     logId,
     groupId,
     direction: "inflow",
-    amountWei,
+    amountTomi,
     counterparty: fromAddress ?? null,
     budgetLine: null,
     proposalId: null,
@@ -394,7 +394,7 @@ export function validateSpendBudget(
   db: OpenFoxDatabase,
   groupId: string,
   budgetLine: string,
-  amountWei: string,
+  amountTomi: string,
 ): SpendValidation {
   const treasury = getGroupTreasury(db, groupId);
   if (!treasury) {
@@ -415,9 +415,9 @@ export function validateSpendBudget(
     return { valid: false, reason: `Budget line not found: ${budgetLine}` };
   }
 
-  const amount = BigInt(amountWei);
-  const spent = BigInt(line.spent_wei);
-  const cap = BigInt(line.cap_wei);
+  const amount = BigInt(amountTomi);
+  const spent = BigInt(line.spent_tomi);
+  const cap = BigInt(line.cap_tomi);
 
   if (spent + amount > cap) {
     return {
@@ -426,7 +426,7 @@ export function validateSpendBudget(
     };
   }
 
-  const balance = BigInt(treasury.balanceWei);
+  const balance = BigInt(treasury.balanceTomi);
   if (balance < amount) {
     return {
       valid: false,
@@ -440,28 +440,28 @@ export function validateSpendBudget(
 export function recordTreasuryOutflow(
   db: OpenFoxDatabase,
   groupId: string,
-  amountWei: string,
+  amountTomi: string,
   recipient: string,
   budgetLine: string,
   proposalId?: string,
   txHash?: string,
   memo?: string,
 ): TreasuryLogRecord {
-  const validation = validateSpendBudget(db, groupId, budgetLine, amountWei);
+  const validation = validateSpendBudget(db, groupId, budgetLine, amountTomi);
   if (!validation.valid) {
     throw new Error(`Outflow rejected: ${validation.reason}`);
   }
 
   const treasury = getGroupTreasury(db, groupId)!;
-  const amount = BigInt(amountWei);
-  const newBalance = (BigInt(treasury.balanceWei) - amount).toString();
+  const amount = BigInt(amountTomi);
+  const newBalance = (BigInt(treasury.balanceTomi) - amount).toString();
   const now = new Date().toISOString();
   const logId = ulid();
 
   // Update treasury balance
   db.raw
     .prepare(
-      "UPDATE group_treasury SET balance_wei = ?, updated_at = ? WHERE group_id = ?",
+      "UPDATE group_treasury SET balance_tomi = ?, updated_at = ? WHERE group_id = ?",
     )
     .run(newBalance, now, groupId);
 
@@ -471,24 +471,24 @@ export function recordTreasuryOutflow(
       "SELECT * FROM group_budget_lines WHERE group_id = ? AND line_name = ?",
     )
     .get(groupId, budgetLine) as BudgetLineRow;
-  const newSpent = (BigInt(line.spent_wei) + amount).toString();
+  const newSpent = (BigInt(line.spent_tomi) + amount).toString();
 
   db.raw
     .prepare(
-      "UPDATE group_budget_lines SET spent_wei = ?, updated_at = ? WHERE group_id = ? AND line_name = ?",
+      "UPDATE group_budget_lines SET spent_tomi = ?, updated_at = ? WHERE group_id = ? AND line_name = ?",
     )
     .run(newSpent, now, groupId, budgetLine);
 
   // Record log entry
   db.raw
     .prepare(
-      `INSERT INTO group_treasury_log (log_id, group_id, direction, amount_wei, counterparty, budget_line, proposal_id, tx_hash, memo, created_at)
+      `INSERT INTO group_treasury_log (log_id, group_id, direction, amount_tomi, counterparty, budget_line, proposal_id, tx_hash, memo, created_at)
        VALUES (?, ?, 'outflow', ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       logId,
       groupId,
-      amountWei,
+      amountTomi,
       recipient,
       budgetLine,
       proposalId ?? null,
@@ -497,11 +497,11 @@ export function recordTreasuryOutflow(
       now,
     );
 
-  logger.info("Treasury outflow recorded", { groupId, amountWei, budgetLine, logId });
+  logger.info("Treasury outflow recorded", { groupId, amountTomi, budgetLine, logId });
 
   worldEventBus.publish({
     kind: "treasury.update",
-    payload: { groupId, action: "outflow", amountWei, recipient, budgetLine, newBalance: newBalance },
+    payload: { groupId, action: "outflow", amountTomi, recipient, budgetLine, newBalance: newBalance },
     timestamp: now,
   });
 
@@ -509,7 +509,7 @@ export function recordTreasuryOutflow(
     logId,
     groupId,
     direction: "outflow",
-    amountWei,
+    amountTomi,
     counterparty: recipient,
     budgetLine,
     proposalId: proposalId ?? null,
@@ -533,7 +533,7 @@ export function resetExpiredBudgetPeriods(
       const newPeriodStart = nextPeriodStart(line.period, currentTime);
       db.raw
         .prepare(
-          "UPDATE group_budget_lines SET spent_wei = '0', period_start = ?, updated_at = ? WHERE group_id = ? AND line_name = ?",
+          "UPDATE group_budget_lines SET spent_tomi = '0', period_start = ?, updated_at = ? WHERE group_id = ? AND line_name = ?",
         )
         .run(newPeriodStart, currentTime.toISOString(), groupId, line.lineName);
       resetCount++;
@@ -613,7 +613,7 @@ export function buildTreasurySnapshot(
   return {
     groupId,
     treasuryAddress: treasury.treasuryAddress,
-    balanceWei: treasury.balanceWei,
+    balanceTomi: treasury.balanceTomi,
     status: treasury.status,
     budgetLines,
     recentLog,

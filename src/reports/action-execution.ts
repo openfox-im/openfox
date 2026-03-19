@@ -311,7 +311,7 @@ function pickCampaignBounty(
   const open = bounties.filter((bounty) => bounty.status === "open");
   if (!open.length) return null;
   return open.sort((left, right) => {
-    const reward = BigInt(right.rewardWei) - BigInt(left.rewardWei);
+    const reward = BigInt(right.rewardTomi) - BigInt(left.rewardTomi);
     if (reward !== 0n) {
       return reward > 0n ? 1 : -1;
     }

@@ -84,7 +84,7 @@ export function createNativeStorageAnchorPublisher(params: {
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: params.config.sinkAddress || params.publisherAddress,
-        amountWei: 0n,
+        amountTomi: 0n,
         gas: BigInt(params.config.gas),
         data: toHex(canonicalizeStorageAnchorSummary(nextRecord.summary)),
         waitForReceipt: params.config.waitForReceipt,

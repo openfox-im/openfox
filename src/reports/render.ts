@@ -59,8 +59,8 @@ function formatCents(cents: number): string {
 }
 
 function formatAttributionEntry(entry: OwnerFinanceAttributionEntry): string {
-  if (entry.amountWei !== "0") {
-    return `${entry.title}: ${formatTOS(toBigInt(entry.amountWei))}`;
+  if (entry.amountTomi !== "0") {
+    return `${entry.title}: ${formatTOS(toBigInt(entry.amountTomi))}`;
   }
   return `${entry.title}: ${formatCents(entry.amountCents ?? 0)}`;
 }
@@ -134,7 +134,7 @@ function buildEvidenceOracleSections(
         `Failed: ${evidence.failedRuns}`,
         `Valid sources: ${evidence.validSources}/${evidence.attemptedSources}`,
         `Aggregates published: ${evidence.aggregatePublished}`,
-        `Estimated cost: ${formatTOS(toBigInt(evidence.estimatedCostWei))}`,
+        `Estimated cost: ${formatTOS(toBigInt(evidence.estimatedCostTomi))}`,
         evidence.summary,
       ],
     },
@@ -145,7 +145,7 @@ function buildEvidenceOracleSections(
         `Settled: ${oracle.settledResults}`,
         `Market bound: ${oracle.marketBoundResults}`,
         `Average confidence: ${oracle.averageConfidence.toFixed(4)}`,
-        `Estimated cost: ${formatTOS(toBigInt(oracle.estimatedCostWei))}`,
+        `Estimated cost: ${formatTOS(toBigInt(oracle.estimatedCostTomi))}`,
         `Kinds: ${
           Object.keys(oracle.queryKinds).length === 0
             ? "(none)"
@@ -169,10 +169,10 @@ export function buildOwnerRenderedReport(record: OwnerReportRecord): OwnerRender
     generatedAt: record.payload.generatedAt,
     summary: finance.summary,
     financeSummary: {
-      revenue: formatTOS(toBigInt(finance.realizedRevenueWei)),
-      cost: formatTOS(toBigInt(finance.realizedCostWei)),
-      net: formatTOS(toBigInt(finance.realizedNetWei)),
-      pending: formatTOS(toBigInt(finance.pendingNetWei)),
+      revenue: formatTOS(toBigInt(finance.realizedRevenueTomi)),
+      cost: formatTOS(toBigInt(finance.realizedCostTomi)),
+      net: formatTOS(toBigInt(finance.realizedNetTomi)),
+      pending: formatTOS(toBigInt(finance.pendingNetTomi)),
       operatingCost: formatCents(finance.operatingCostCents),
       eventCounts: `revenue=${finance.revenueEvents}, cost=${finance.costEvents}`,
     },

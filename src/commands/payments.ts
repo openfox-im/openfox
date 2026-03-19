@@ -74,7 +74,7 @@ Usage:
       logger.info("=== OPENFOX X402 PAYMENTS ===");
       for (const item of items) {
         logger.info(
-          `${item.paymentId}  [${item.serviceKind}]  status=${item.status}  amount=${item.amountWei}  tx=${item.txHash}`,
+          `${item.paymentId}  [${item.serviceKind}]  status=${item.status}  amount=${item.amountTomi}  tx=${item.txHash}`,
         );
         logger.info(
           `  request=${item.requestKey}  payer=${item.payerAddress}  bound=${item.boundSubjectId ? `${item.boundKind}:${item.boundSubjectId}` : "(none)"}`,
@@ -120,7 +120,7 @@ Request hash:${record.requestHash}
 Payer:       ${record.payerAddress}
 Provider:    ${record.providerAddress}
 Nonce:       ${record.txNonce}
-Amount:      ${record.amountWei}
+Amount:      ${record.amountTomi}
 Status:      ${record.status}
 Policy:      ${record.confirmationPolicy}
 Attempts:    ${record.attemptCount}/${record.maxAttempts}

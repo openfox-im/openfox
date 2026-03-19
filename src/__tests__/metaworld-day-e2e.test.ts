@@ -143,12 +143,12 @@ describe("MetaWorld Day — full economic loop", () => {
 
     // 3. Initialize treasury with a bounties budget
     initializeGroupTreasury(db, groupId, OWNER_KEY, [
-      { lineName: "bounties", capWei: "1000000000000000000", period: "monthly" },
+      { lineName: "bounties", capTomi: "1000000000000000000", period: "monthly" },
     ]);
 
     // Simulate treasury has funds (set balance directly)
     db.raw.prepare(
-      "UPDATE group_treasury SET balance_wei = ? WHERE group_id = ?",
+      "UPDATE group_treasury SET balance_tomi = ? WHERE group_id = ?",
     ).run("5000000000000000000", groupId); // 5 TOS
 
     // 4. Set governance policy: quorum=1, threshold=1/1 for fast testing
@@ -191,12 +191,12 @@ describe("MetaWorld Day — full economic loop", () => {
       kind: "work",
       title: "Build a data pipeline",
       description: "We need a data ingestion pipeline for oracle feeds",
-      budgetWei: "500000000000000000", // 0.5 TOS
+      budgetTomi: "500000000000000000", // 0.5 TOS
       budgetLine: "bounties",
     });
 
     expect(intent.status).toBe("open");
-    expect(intent.budgetWei).toBe("500000000000000000");
+    expect(intent.budgetTomi).toBe("500000000000000000");
     expect(intent.groupId).toBe(groupId);
 
     // ── Step 2: Solver responds with a proposal ─────────────────────
@@ -204,7 +204,7 @@ describe("MetaWorld Day — full economic loop", () => {
       intentId: intent.intentId,
       solverAddress: solverAccount.address,
       proposalText: "I can build this pipeline using streaming transforms.",
-      proposedAmountWei: "500000000000000000",
+      proposedAmountTomi: "500000000000000000",
     });
 
     expect(response.solverAddress).toBe(solverAccount.address);
@@ -281,7 +281,7 @@ describe("MetaWorld Day — full economic loop", () => {
     // ── Step 7: Treasury spend executes ─────────────────────────────
     const spendLog = reactorExecuteTreasurySpend(ctx, {
       groupId,
-      amountWei: "500000000000000000",
+      amountTomi: "500000000000000000",
       recipient: solverAccount.address,
       budgetLine: "bounties",
       proposalId: spendProposal!.proposalId,
@@ -289,21 +289,21 @@ describe("MetaWorld Day — full economic loop", () => {
     });
 
     expect(spendLog.direction).toBe("outflow");
-    expect(spendLog.amountWei).toBe("500000000000000000");
+    expect(spendLog.amountTomi).toBe("500000000000000000");
     expect(spendLog.counterparty).toBe(solverAccount.address);
 
     // Verify: treasury balance decreased
     const treasury = getGroupTreasury(db, groupId);
     expect(treasury).toBeTruthy();
-    expect(BigInt(treasury!.balanceWei)).toBe(
+    expect(BigInt(treasury!.balanceTomi)).toBe(
       BigInt("5000000000000000000") - BigInt("500000000000000000"),
     );
 
-    // Verify: budget line spent_wei updated
+    // Verify: budget line spent_tomi updated
     const budgets = listBudgetLines(db, groupId);
     const bountiesBudget = budgets.find((b) => b.lineName === "bounties");
     expect(bountiesBudget).toBeTruthy();
-    expect(BigInt(bountiesBudget!.spentWei)).toBe(
+    expect(BigInt(bountiesBudget!.spentTomi)).toBe(
       BigInt("500000000000000000"),
     );
 
@@ -360,7 +360,7 @@ describe("MetaWorld Day — full economic loop", () => {
       groupId,
       kind: "work",
       title: "Research task",
-      budgetWei: "200000000000000000",
+      budgetTomi: "200000000000000000",
       budgetLine: "bounties",
     });
 
@@ -414,7 +414,7 @@ describe("MetaWorld Day — full economic loop", () => {
     // Execute treasury spend
     reactorExecuteTreasurySpend(ctx, {
       groupId,
-      amountWei: "200000000000000000",
+      amountTomi: "200000000000000000",
       recipient: solverAccount.address,
       budgetLine: "bounties",
       proposalId: spendProposal!.proposalId,
@@ -422,7 +422,7 @@ describe("MetaWorld Day — full economic loop", () => {
 
     // Verify everything cascaded correctly
     const finalTreasury = getGroupTreasury(db, groupId);
-    expect(BigInt(finalTreasury!.balanceWei)).toBe(
+    expect(BigInt(finalTreasury!.balanceTomi)).toBe(
       BigInt("5000000000000000000") - BigInt("200000000000000000"),
     );
 

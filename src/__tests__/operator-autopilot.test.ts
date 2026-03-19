@@ -81,7 +81,7 @@ function insertFailedPaymasterAuthorizations(providerAddress: `0x${string}`) {
     requesterSignerType: "secp256k1",
     targetAddress:
       "0x9898989898989898989898989898989898989898989898989898989898989898",
-    valueWei: "0",
+    valueTomi: "0",
     dataHex: "0x",
     gas: "21000",
     policyId: "policy-2",

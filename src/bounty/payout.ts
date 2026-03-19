@@ -4,7 +4,7 @@ import { sendNativeTransfer } from "../chain/client.js";
 export interface BountyPayoutSender {
   send(params: {
     to: Address;
-    amountWei: bigint;
+    amountTomi: bigint;
   }): Promise<{ txHash: `0x${string}` | string }>;
 }
 
@@ -13,12 +13,12 @@ export function createNativeBountyPayoutSender(params: {
   privateKey: `0x${string}`;
 }): BountyPayoutSender {
   return {
-    async send({ to, amountWei }) {
+    async send({ to, amountTomi }) {
       const transfer = await sendNativeTransfer({
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to,
-        amountWei,
+        amountTomi,
         waitForReceipt: false,
       });
       return { txHash: transfer.txHash };

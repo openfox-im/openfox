@@ -63,7 +63,7 @@ export function hashSignerPolicy(params: {
     allowed_function_selectors: params.policy.allowedFunctionSelectors.map((entry) =>
       normalizeSelector(entry),
     ),
-    max_value_wei: params.policy.maxValueWei,
+    max_value_tomi: params.policy.maxValueTomi,
     expires_at: params.policy.expiresAt || null,
     allow_system_action: params.policy.allowSystemAction === true,
   };
@@ -73,7 +73,7 @@ export function hashSignerPolicy(params: {
 export function buildSignerScopeHash(params: {
   walletAddress: ChainAddress;
   targetAddress: ChainAddress;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   trustTier: SignerProviderTrustTier;
@@ -81,7 +81,7 @@ export function buildSignerScopeHash(params: {
   const normalized = {
     wallet_address: normalizeAddress(params.walletAddress),
     target_address: normalizeAddress(params.targetAddress),
-    value_wei: params.valueWei,
+    value_tomi: params.valueTomi,
     data_hex: params.dataHex.toLowerCase(),
     gas: params.gas,
     trust_tier: params.trustTier,
@@ -93,13 +93,13 @@ export function validateSignerPolicyRequest(params: {
   providerAddress: ChainAddress;
   config: SignerProviderConfig;
   targetAddress: string;
-  valueWei: string;
+  valueTomi: string;
   dataHex?: string;
   gas?: string;
 }): {
   walletAddress: ChainAddress;
   targetAddress: ChainAddress;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyHash: Hex;
@@ -108,12 +108,12 @@ export function validateSignerPolicyRequest(params: {
   const policy = params.config.policy;
   const walletAddress = getPolicyWalletAddress(params.providerAddress, policy);
   const targetAddress = normalizeAddress(params.targetAddress);
-  const value = BigInt(params.valueWei || "0");
+  const value = BigInt(params.valueTomi || "0");
   if (value < 0n) {
-    throw new Error("value_wei must be non-negative");
+    throw new Error("value_tomi must be non-negative");
   }
-  const maxValueWei = BigInt(policy.maxValueWei || "0");
-  if (value > maxValueWei) {
+  const maxValueTomi = BigInt(policy.maxValueTomi || "0");
+  if (value > maxValueTomi) {
     throw new Error("value exceeds signer provider policy limit");
   }
 
@@ -165,7 +165,7 @@ export function validateSignerPolicyRequest(params: {
   const scopeHash = buildSignerScopeHash({
     walletAddress,
     targetAddress,
-    valueWei: value.toString(),
+    valueTomi: value.toString(),
     dataHex,
     gas,
     trustTier: policy.trustTier,
@@ -174,7 +174,7 @@ export function validateSignerPolicyRequest(params: {
   return {
     walletAddress,
     targetAddress,
-    valueWei: value.toString(),
+    valueTomi: value.toString(),
     dataHex,
     gas,
     policyHash,

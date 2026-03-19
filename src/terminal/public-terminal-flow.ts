@@ -120,7 +120,7 @@ export class PublicTerminalFlowHandler {
         updated.step = "confirm_action";
         return {
           flow: updated,
-          prompt: `Confirm: ${action}${value !== "0" ? ` for ${value} wei` : ""}?`,
+          prompt: `Confirm: ${action}${value !== "0" ? ` for ${value} tomi` : ""}?`,
           options: ["confirm", "cancel"],
         };
       }

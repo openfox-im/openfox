@@ -14,7 +14,7 @@ describe("committee manager", () => {
       artifactIds: ["artifact://capture/1"],
       committeeSize: 3,
       thresholdM: 2,
-      payoutTotalWei: "9",
+      payoutTotalTomi: "9",
       members: [
         { memberId: "agent-a", payoutAddress: "0x12252ae6b5d22fa4f58b295fe42cdb782f41881025d22645816d196b4f2e5143" },
         { memberId: "agent-b", payoutAddress: "0xdca90de7e66cec3a5c7683922036c75aa691b36b473f162b905590f8031217c2" },
@@ -53,13 +53,13 @@ describe("committee manager", () => {
       {
         memberId: "agent-a",
         payoutAddress: "0x12252ae6b5d22fa4f58b295fe42cdb782f41881025d22645816d196b4f2e5143",
-        amountWei: "5",
+        amountTomi: "5",
         reason: `accepted:${`0x${"1".repeat(64)}`}`,
       },
       {
         memberId: "agent-b",
         payoutAddress: "0xdca90de7e66cec3a5c7683922036c75aa691b36b473f162b905590f8031217c2",
-        amountWei: "4",
+        amountTomi: "4",
         reason: `accepted:${`0x${"1".repeat(64)}`}`,
       },
     ]);
@@ -71,7 +71,7 @@ describe("committee manager", () => {
     expect(summary.quorumMet).toBe(1);
     expect(summary.paid).toBe(1);
     expect(summary.verificationModes).toEqual({ committee_verified: 1 });
-    expect(summary.totalPayoutWei).toBe("9");
+    expect(summary.totalPayoutTomi).toBe("9");
     db.close();
   });
 

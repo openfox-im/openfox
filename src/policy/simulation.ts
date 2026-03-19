@@ -26,7 +26,7 @@ export interface SimulationResult {
   explanation: string;
 }
 
-/** Compare two wei strings. Returns true if a > b. */
+/** Compare two tomi strings. Returns true if a > b. */
 function weiAbove(a: string, b: string): boolean {
   return BigInt(a || "0") > BigInt(b || "0");
 }
@@ -231,7 +231,7 @@ export function simulateScenario(policy: PolicyDraft, scenario: SimulationScenar
     scenario,
     allowed: true,
     escalationLevel: "none",
-    explanation: `Action "${action}" with value ${value} wei is fully permitted.`,
+    explanation: `Action "${action}" with value ${value} tomi is fully permitted.`,
   };
 }
 
@@ -312,10 +312,10 @@ export function formatSimulationResults(results: SimulationResult[]): string {
   return lines.join("\n");
 }
 
-function formatTos(wei: string): string {
-  if (!wei || wei === "0") return "0";
-  if (wei.length <= 18) return "<1";
-  return wei.slice(0, wei.length - 18);
+function formatTos(tomi: string): string {
+  if (!tomi || tomi === "0") return "0";
+  if (tomi.length <= 18) return "<1";
+  return tomi.slice(0, tomi.length - 18);
 }
 
 function padRight(s: string, len: number): string {

@@ -327,7 +327,7 @@ describe("reactor events — event bus wiring", () => {
   it("treasury spend publishes treasury.update event", () => {
     const groupId = "treasury-event-group";
     initializeGroupTreasury(db, groupId, TREASURY_KEY, [
-      { lineName: "operations", capWei: "10000" },
+      { lineName: "operations", capTomi: "10000" },
     ]);
     recordTreasuryInflow(db, groupId, "50000", "0xfunder");
 
@@ -344,7 +344,7 @@ describe("reactor events — event bus wiring", () => {
       payload: {
         groupId,
         recipient: "0xrecipient",
-        amountWei: "2000",
+        amountTomi: "2000",
         logId: log.logId,
       },
       timestamp: new Date().toISOString(),
@@ -353,7 +353,7 @@ describe("reactor events — event bus wiring", () => {
     const treasuryEvents = collector.findByKind("treasury.update");
     expect(treasuryEvents.length).toBe(1);
     expect(treasuryEvents[0].payload.groupId).toBe(groupId);
-    expect(treasuryEvents[0].payload.amountWei).toBe("2000");
+    expect(treasuryEvents[0].payload.amountTomi).toBe("2000");
   });
 
   it("reputation event publishes reputation.update event", () => {
@@ -397,7 +397,7 @@ describe("reactor events — event bus wiring", () => {
     // Publish an event the client is NOT subscribed to
     eventBus.publish({
       kind: "treasury.update",
-      payload: { groupId: "g1", amountWei: "100" },
+      payload: { groupId: "g1", amountTomi: "100" },
       timestamp: new Date().toISOString(),
     });
 

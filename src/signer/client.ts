@@ -9,7 +9,7 @@ export interface RemoteSignerQuoteInput {
   providerBaseUrl: string;
   requesterAddress: Address;
   target: Address;
-  valueWei?: string;
+  valueTomi?: string;
   data?: `0x${string}`;
   gas?: string;
   reason?: string;
@@ -56,7 +56,7 @@ export async function fetchSignerQuote(
       },
     },
     target: input.target,
-    value_wei: input.valueWei ?? "0",
+    value_tomi: input.valueTomi ?? "0",
     ...(input.data ? { data: input.data } : {}),
     ...(input.gas ? { gas: input.gas } : {}),
     ...(input.reason ? { reason: input.reason } : {}),
@@ -70,7 +70,7 @@ export async function submitSignerExecution(params: {
   requesterAddress: Address;
   quoteId: string;
   target: Address;
-  valueWei?: string;
+  valueTomi?: string;
   data?: `0x${string}`;
   gas?: string;
   requestNonce: string;
@@ -98,7 +98,7 @@ export async function submitSignerExecution(params: {
     request_nonce: params.requestNonce,
     request_expires_at: params.requestExpiresAt,
     target: params.target,
-    value_wei: params.valueWei ?? "0",
+    value_tomi: params.valueTomi ?? "0",
     ...(params.data ? { data: params.data } : {}),
     ...(params.gas ? { gas: params.gas } : {}),
     ...(params.reason ? { reason: params.reason } : {}),

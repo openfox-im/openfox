@@ -192,7 +192,7 @@ function mapBountyItem(bounty: BountyRecord): WorldFeedItem {
     actorAddress: bounty.hostAddress,
     title: bounty.title,
     summary: trimSummary(
-      `${bounty.kind} bounty opened with reward ${bounty.rewardWei} wei.`,
+      `${bounty.kind} bounty opened with reward ${bounty.rewardTomi} tomi.`,
     ),
     refs: {
       bountyId: bounty.bountyId,

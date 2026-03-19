@@ -117,7 +117,7 @@ export function formatExecutionProofs(
       "Block Hash": receipt.blockHash,
       "From": receipt.from,
       "To": receipt.to,
-      "Value": `${receipt.value} wei`,
+      "Value": `${receipt.value} tomi`,
       "Gas Used": receipt.gasUsed.toString(),
       "Status": receipt.receiptStatus,
       "Settled At": formatTimestamp(receipt.settledAt),

@@ -41,15 +41,15 @@ describe("bounty engine", () => {
       enabled: true,
       role: "host",
     };
-    const payouts: Array<{ to: string; amountWei: bigint }> = [];
+    const payouts: Array<{ to: string; amountTomi: bigint }> = [];
     const engine = createBountyEngine({
       identity: createIdentity(),
       db,
       inference,
       bountyConfig,
       payoutSender: {
-        async send({ to, amountWei }) {
-          payouts.push({ to, amountWei });
+        async send({ to, amountTomi }) {
+          payouts.push({ to, amountTomi });
           return { txHash: "0xpaid" };
         },
       },
@@ -59,7 +59,7 @@ describe("bounty engine", () => {
     const bounty = engine.openQuestionBounty({
       question: "What color is the sky on a clear day?",
       referenceAnswer: "blue",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -73,7 +73,7 @@ describe("bounty engine", () => {
     expect(submission.result.decision).toBe("accepted");
     expect(submission.result.payoutTxHash).toBe("0xpaid");
     expect(submission.bounty.status).toBe("paid");
-    expect(payouts).toEqual([{ to: SOLVER_ADDRESS, amountWei: 1000n }]);
+    expect(payouts).toEqual([{ to: SOLVER_ADDRESS, amountTomi: 1000n }]);
   });
 
   it("keeps the bounty open after a rejected submission", async () => {
@@ -106,7 +106,7 @@ describe("bounty engine", () => {
     const bounty = engine.openQuestionBounty({
       question: "2 + 2 = ?",
       referenceAnswer: "4",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -153,7 +153,7 @@ describe("bounty engine", () => {
       title: "Translate hello",
       taskPrompt: "Translate 'hello' into Chinese.",
       referenceOutput: "你好",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -170,7 +170,7 @@ describe("bounty engine", () => {
       title: "Reply with the phrase",
       taskPrompt: "Reply to the post with the exact phrase 'openfox test' and submit the proof URL.",
       referenceOutput: "openfox test",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -276,7 +276,7 @@ describe("bounty engine", () => {
       title: "Capture this article",
       taskPrompt: "Submit the body text of the target article.",
       referenceOutput: "expected evidence",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 

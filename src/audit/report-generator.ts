@@ -162,7 +162,7 @@ export class AuditReportGenerator {
     lines.push("--- Summary ---");
     lines.push(`Total entries: ${report.summary.totalEntries}`);
     lines.push(
-      `Total value: ${report.summary.totalValue} wei`,
+      `Total value: ${report.summary.totalValue} tomi`,
     );
     if (report.summary.timeRange.from > 0) {
       lines.push(

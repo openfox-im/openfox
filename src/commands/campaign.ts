@@ -36,7 +36,7 @@ OpenFox campaign
 Usage:
   openfox campaign list [--url <base-url>]
   openfox campaign status <campaign-id> [--url <base-url>]
-  openfox campaign open --title "<text>" --description "<text>" --budget-wei <wei> [--max-open-bounties <n>] [--allowed-kinds <csv>]
+  openfox campaign open --title "<text>" --description "<text>" --budget-tomi <tomi> [--max-open-bounties <n>] [--allowed-kinds <csv>]
 `);
     return;
   }
@@ -118,10 +118,10 @@ Usage:
 
   const title = readOption(args, "--title");
   const description = readOption(args, "--description");
-  const budgetWei = readOption(args, "--budget-wei");
-  if (!title || !description || !budgetWei) {
+  const budgetTomi = readOption(args, "--budget-tomi");
+  if (!title || !description || !budgetTomi) {
     throw new Error(
-      'Usage: openfox campaign open --title "<text>" --description "<text>" --budget-wei <wei> [--max-open-bounties <n>] [--allowed-kinds <csv>]',
+      'Usage: openfox campaign open --title "<text>" --description "<text>" --budget-tomi <tomi> [--max-open-bounties <n>] [--allowed-kinds <csv>]',
     );
   }
 
@@ -157,7 +157,7 @@ Usage:
     const campaign = engine.createCampaign({
       title,
       description,
-      budgetWei,
+      budgetTomi,
       maxOpenBounties: readNumberOption(args, "--max-open-bounties", config.bounty.maxOpenBounties),
       allowedKinds,
     });

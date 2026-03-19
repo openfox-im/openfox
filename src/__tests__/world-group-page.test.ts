@@ -60,7 +60,7 @@ function seedGroupEconomics(params: {
     hostAddress: params.adminAddress,
     title: "Ops Budget",
     description: "Budget for group operations.",
-    budgetWei: (10n * TOS).toString(),
+    budgetTomi: (10n * TOS).toString(),
     maxOpenBounties: 8,
     allowedKinds: ["question"],
     metadata: {},
@@ -78,7 +78,7 @@ function seedGroupEconomics(params: {
     title: "Open Research Task",
     taskPrompt: "Investigate one target.",
     referenceOutput: "Expected answer",
-    rewardWei: (1n * TOS).toString(),
+    rewardTomi: (1n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "open",
@@ -94,7 +94,7 @@ function seedGroupEconomics(params: {
     title: "Approved Translation Task",
     taskPrompt: "Translate one note.",
     referenceOutput: "Translated note",
-    rewardWei: (2n * TOS).toString(),
+    rewardTomi: (2n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "approved",
@@ -110,7 +110,7 @@ function seedGroupEconomics(params: {
     title: "Paid Labeling Task",
     taskPrompt: "Label one batch.",
     referenceOutput: "Labels",
-    rewardWei: (3n * TOS).toString(),
+    rewardTomi: (3n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "paid",
@@ -156,7 +156,7 @@ function seedGroupEconomics(params: {
     title: "External Paid Solver Task",
     taskPrompt: "Solve an external problem.",
     referenceOutput: "Answer",
-    rewardWei: (4n * TOS).toString(),
+    rewardTomi: (4n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "paid",
@@ -202,7 +202,7 @@ function seedGroupEconomics(params: {
     title: "External Pending Solver Task",
     taskPrompt: "Pending payout task.",
     referenceOutput: "Pending answer",
-    rewardWei: (5n * TOS).toString(),
+    rewardTomi: (5n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "approved",
@@ -365,9 +365,9 @@ describe("metaWorld group page", () => {
     expect(page.governance.counts.openJoinRequestCount).toBe(1);
     expect(page.treasury.counts.campaignCount).toBe(1);
     expect(page.treasury.counts.settlementCount).toBe(2);
-    expect(page.treasury.totals.totalBudgetWei).toBe((10n * TOS).toString());
-    expect(page.treasury.totals.pendingPayablesWei).toBe((2n * TOS).toString());
-    expect(page.treasury.totals.pendingReceivablesWei).toBe((5n * TOS).toString());
+    expect(page.treasury.totals.totalBudgetTomi).toBe((10n * TOS).toString());
+    expect(page.treasury.totals.pendingPayablesTomi).toBe((2n * TOS).toString());
+    expect(page.treasury.totals.pendingReceivablesTomi).toBe((5n * TOS).toString());
     expect(page.activityFeed.items.map((item) => item.kind)).toContain(
       "group_announcement",
     );

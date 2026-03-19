@@ -67,7 +67,7 @@ function seedGroupEconomics(params: {
     hostAddress: params.adminAddress,
     title: "Server Group Budget",
     description: "Budget for server route tests.",
-    budgetWei: (10n * TOS).toString(),
+    budgetTomi: (10n * TOS).toString(),
     maxOpenBounties: 8,
     allowedKinds: ["question"],
     metadata: {},
@@ -84,7 +84,7 @@ function seedGroupEconomics(params: {
     title: "Server Open Task",
     taskPrompt: "Open task",
     referenceOutput: "Expected",
-    rewardWei: (1n * TOS).toString(),
+    rewardTomi: (1n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "open",
@@ -100,7 +100,7 @@ function seedGroupEconomics(params: {
     title: "Server Approved Task",
     taskPrompt: "Approved task",
     referenceOutput: "Expected",
-    rewardWei: (2n * TOS).toString(),
+    rewardTomi: (2n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "approved",
@@ -116,7 +116,7 @@ function seedGroupEconomics(params: {
     title: "Server Paid Task",
     taskPrompt: "Paid task",
     referenceOutput: "Expected",
-    rewardWei: (3n * TOS).toString(),
+    rewardTomi: (3n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "paid",
@@ -161,7 +161,7 @@ function seedGroupEconomics(params: {
     title: "Server External Paid Solver Task",
     taskPrompt: "Solve external task",
     referenceOutput: "Expected",
-    rewardWei: (4n * TOS).toString(),
+    rewardTomi: (4n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "paid",
@@ -206,7 +206,7 @@ function seedGroupEconomics(params: {
     title: "Server External Pending Solver Task",
     taskPrompt: "Pending external task",
     referenceOutput: "Expected",
-    rewardWei: (5n * TOS).toString(),
+    rewardTomi: (5n * TOS).toString(),
     submissionDeadline: "2026-03-15T00:00:00.000Z",
     judgeMode: "local_model",
     status: "approved",
@@ -561,8 +561,8 @@ describe("metaWorld server", () => {
     expect(data.groupName).toBe("Treasury Group");
     expect(data.counts.campaignCount).toBe(1);
     expect(data.counts.settlementCount).toBe(2);
-    expect(data.totals.pendingPayablesWei).toBe((2n * TOS).toString());
-    expect(data.totals.pendingReceivablesWei).toBe((5n * TOS).toString());
+    expect(data.totals.pendingPayablesTomi).toBe((2n * TOS).toString());
+    expect(data.totals.pendingReceivablesTomi).toBe((5n * TOS).toString());
   });
 
   it("serves artifact and settlement HTML and JSON routes", async () => {
@@ -579,7 +579,7 @@ describe("metaWorld server", () => {
       title: "Route Trail Bounty",
       taskPrompt: "Collect evidence.",
       referenceOutput: "Expected",
-      rewardWei: (1n * TOS).toString(),
+      rewardTomi: (1n * TOS).toString(),
       submissionDeadline: "2026-03-15T00:00:00.000Z",
       judgeMode: "local_model",
       status: "paid",

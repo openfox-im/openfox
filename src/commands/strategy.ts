@@ -35,7 +35,7 @@ OpenFox strategy
 Usage:
   openfox strategy show [--json]
   openfox strategy validate [--json]
-  openfox strategy set [--name <text>] [--revenue-target-wei <wei>] [--max-spend-wei <wei>] [--min-margin-bps <n>] [--opportunity-kinds <csv>] [--provider-classes <csv>] [--trust-tiers <csv>] [--automation-level <manual|assisted|bounded_auto>] [--report-cadence <on_demand|daily|weekly>] [--max-deadline-hours <n>] [--json]
+  openfox strategy set [--name <text>] [--revenue-target-tomi <tomi>] [--max-spend-tomi <tomi>] [--min-margin-bps <n>] [--opportunity-kinds <csv>] [--provider-classes <csv>] [--trust-tiers <csv>] [--automation-level <manual|assisted|bounded_auto>] [--report-cadence <on_demand|daily|weekly>] [--max-deadline-hours <n>] [--json]
 `);
     return;
   }
@@ -73,8 +73,8 @@ Usage:
 
     const strategy = upsertStrategyProfile(db, {
       name: readOption(args, "--name"),
-      revenueTargetWei: readOption(args, "--revenue-target-wei"),
-      maxSpendPerOpportunityWei: readOption(args, "--max-spend-wei"),
+      revenueTargetTomi: readOption(args, "--revenue-target-tomi"),
+      maxSpendPerOpportunityTomi: readOption(args, "--max-spend-tomi"),
       minMarginBps: (() => {
         const raw = readOption(args, "--min-margin-bps");
         return raw ? Number.parseInt(raw, 10) : undefined;

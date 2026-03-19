@@ -36,20 +36,20 @@ function byBigIntDesc<T>(getValue: (item: T) => bigint) {
 export interface OperatorPaymentsCounterpartyEntry {
   address: string;
   kind: "customer" | "provider";
-  confirmedRevenueWei: string;
-  confirmedCostWei: string;
-  pendingRevenueWei: string;
-  pendingCostWei: string;
+  confirmedRevenueTomi: string;
+  confirmedCostTomi: string;
+  pendingRevenueTomi: string;
+  pendingCostTomi: string;
   confirmedCount: number;
   pendingCount: number;
 }
 
 export interface OperatorPaymentsCapabilityEntry {
   capability: X402PaymentServiceKind;
-  confirmedRevenueWei: string;
-  confirmedCostWei: string;
-  pendingRevenueWei: string;
-  pendingCostWei: string;
+  confirmedRevenueTomi: string;
+  confirmedCostTomi: string;
+  pendingRevenueTomi: string;
+  pendingCostTomi: string;
   confirmedCount: number;
   pendingCount: number;
   failedCount: number;
@@ -61,7 +61,7 @@ export interface OperatorPaymentsRequestEntry {
   capability: X402PaymentServiceKind;
   direction: "inbound" | "outbound";
   status: string;
-  amountWei: string;
+  amountTomi: string;
   counterpartyAddress: string;
   boundKind: string | null;
   boundSubjectId: string | null;
@@ -72,10 +72,10 @@ export interface OperatorPaymentsSnapshot {
   generatedAt: string;
   address: string;
   totals: {
-    confirmedRevenueWei: string;
-    confirmedCostWei: string;
-    pendingRevenueWei: string;
-    pendingCostWei: string;
+    confirmedRevenueTomi: string;
+    confirmedCostTomi: string;
+    pendingRevenueTomi: string;
+    pendingCostTomi: string;
     confirmedCount: number;
     pendingCount: number;
     failedCount: number;
@@ -155,10 +155,10 @@ export async function buildOperatorPaymentsSnapshot(
   const address = config.walletAddress.toLowerCase();
   const payments = db.listX402Payments(2000);
 
-  let confirmedRevenueWei = 0n;
-  let confirmedCostWei = 0n;
-  let pendingRevenueWei = 0n;
-  let pendingCostWei = 0n;
+  let confirmedRevenueTomi = 0n;
+  let confirmedCostTomi = 0n;
+  let pendingRevenueTomi = 0n;
+  let pendingCostTomi = 0n;
   let confirmedCount = 0;
   let pendingCount = 0;
   let failedCount = 0;
@@ -167,10 +167,10 @@ export async function buildOperatorPaymentsSnapshot(
   const capabilityMap = new Map<
     X402PaymentServiceKind,
     {
-      confirmedRevenueWei: bigint;
-      confirmedCostWei: bigint;
-      pendingRevenueWei: bigint;
-      pendingCostWei: bigint;
+      confirmedRevenueTomi: bigint;
+      confirmedCostTomi: bigint;
+      pendingRevenueTomi: bigint;
+      pendingCostTomi: bigint;
       confirmedCount: number;
       pendingCount: number;
       failedCount: number;
@@ -182,10 +182,10 @@ export async function buildOperatorPaymentsSnapshot(
     {
       address: string;
       kind: "customer" | "provider";
-      confirmedRevenueWei: bigint;
-      confirmedCostWei: bigint;
-      pendingRevenueWei: bigint;
-      pendingCostWei: bigint;
+      confirmedRevenueTomi: bigint;
+      confirmedCostTomi: bigint;
+      pendingRevenueTomi: bigint;
+      pendingCostTomi: bigint;
       confirmedCount: number;
       pendingCount: number;
     }
@@ -199,15 +199,15 @@ export async function buildOperatorPaymentsSnapshot(
     const outbound = payer === address;
     if (!inbound && !outbound) continue;
 
-    const amountWei = toBigInt(payment.amountWei);
+    const amountTomi = toBigInt(payment.amountTomi);
     const capability =
       (payment.serviceKind as X402PaymentServiceKind) || "gateway_request";
     const capabilityEntry =
       capabilityMap.get(capability) ?? {
-        confirmedRevenueWei: 0n,
-        confirmedCostWei: 0n,
-        pendingRevenueWei: 0n,
-        pendingCostWei: 0n,
+        confirmedRevenueTomi: 0n,
+        confirmedCostTomi: 0n,
+        pendingRevenueTomi: 0n,
+        pendingCostTomi: 0n,
         confirmedCount: 0,
         pendingCount: 0,
         failedCount: 0,
@@ -221,10 +221,10 @@ export async function buildOperatorPaymentsSnapshot(
       counterpartyMap.get(counterpartyKey) ?? {
         address: counterpartyAddress,
         kind: counterpartyKind,
-        confirmedRevenueWei: 0n,
-        confirmedCostWei: 0n,
-        pendingRevenueWei: 0n,
-        pendingCostWei: 0n,
+        confirmedRevenueTomi: 0n,
+        confirmedCostTomi: 0n,
+        pendingRevenueTomi: 0n,
+        pendingCostTomi: 0n,
         confirmedCount: 0,
         pendingCount: 0,
       };
@@ -234,28 +234,28 @@ export async function buildOperatorPaymentsSnapshot(
       capabilityEntry.confirmedCount += 1;
       counterparty.confirmedCount += 1;
       if (inbound) {
-        confirmedRevenueWei += amountWei;
-        capabilityEntry.confirmedRevenueWei += amountWei;
-        counterparty.confirmedRevenueWei += amountWei;
+        confirmedRevenueTomi += amountTomi;
+        capabilityEntry.confirmedRevenueTomi += amountTomi;
+        counterparty.confirmedRevenueTomi += amountTomi;
       }
       if (outbound) {
-        confirmedCostWei += amountWei;
-        capabilityEntry.confirmedCostWei += amountWei;
-        counterparty.confirmedCostWei += amountWei;
+        confirmedCostTomi += amountTomi;
+        capabilityEntry.confirmedCostTomi += amountTomi;
+        counterparty.confirmedCostTomi += amountTomi;
       }
     } else if (payment.status === "verified" || payment.status === "submitted") {
       pendingCount += 1;
       capabilityEntry.pendingCount += 1;
       counterparty.pendingCount += 1;
       if (inbound) {
-        pendingRevenueWei += amountWei;
-        capabilityEntry.pendingRevenueWei += amountWei;
-        counterparty.pendingRevenueWei += amountWei;
+        pendingRevenueTomi += amountTomi;
+        capabilityEntry.pendingRevenueTomi += amountTomi;
+        counterparty.pendingRevenueTomi += amountTomi;
       }
       if (outbound) {
-        pendingCostWei += amountWei;
-        capabilityEntry.pendingCostWei += amountWei;
-        counterparty.pendingCostWei += amountWei;
+        pendingCostTomi += amountTomi;
+        capabilityEntry.pendingCostTomi += amountTomi;
+        counterparty.pendingCostTomi += amountTomi;
       }
     } else if (payment.status === "failed") {
       failedCount += 1;
@@ -273,7 +273,7 @@ export async function buildOperatorPaymentsSnapshot(
       capability,
       direction: inbound ? "inbound" : "outbound",
       status: payment.status,
-      amountWei: payment.amountWei,
+      amountTomi: payment.amountTomi,
       counterpartyAddress,
       boundKind: payment.boundKind ?? null,
       boundSubjectId: payment.boundSubjectId ?? null,
@@ -283,10 +283,10 @@ export async function buildOperatorPaymentsSnapshot(
   const capabilities = Array.from(capabilityMap.entries())
     .map(([capability, entry]) => ({
       capability,
-      confirmedRevenueWei: entry.confirmedRevenueWei.toString(),
-      confirmedCostWei: entry.confirmedCostWei.toString(),
-      pendingRevenueWei: entry.pendingRevenueWei.toString(),
-      pendingCostWei: entry.pendingCostWei.toString(),
+      confirmedRevenueTomi: entry.confirmedRevenueTomi.toString(),
+      confirmedCostTomi: entry.confirmedCostTomi.toString(),
+      pendingRevenueTomi: entry.pendingRevenueTomi.toString(),
+      pendingCostTomi: entry.pendingCostTomi.toString(),
       confirmedCount: entry.confirmedCount,
       pendingCount: entry.pendingCount,
       failedCount: entry.failedCount,
@@ -295,10 +295,10 @@ export async function buildOperatorPaymentsSnapshot(
     .sort((a, b) =>
       byBigIntDesc<OperatorPaymentsCapabilityEntry>(
         (item) =>
-          toBigInt(item.confirmedRevenueWei) +
-          toBigInt(item.pendingRevenueWei) +
-          toBigInt(item.confirmedCostWei) +
-          toBigInt(item.pendingCostWei),
+          toBigInt(item.confirmedRevenueTomi) +
+          toBigInt(item.pendingRevenueTomi) +
+          toBigInt(item.confirmedCostTomi) +
+          toBigInt(item.pendingCostTomi),
       )(a, b),
     );
 
@@ -306,31 +306,31 @@ export async function buildOperatorPaymentsSnapshot(
     .map((entry) => ({
       address: entry.address,
       kind: entry.kind,
-      confirmedRevenueWei: entry.confirmedRevenueWei.toString(),
-      confirmedCostWei: entry.confirmedCostWei.toString(),
-      pendingRevenueWei: entry.pendingRevenueWei.toString(),
-      pendingCostWei: entry.pendingCostWei.toString(),
+      confirmedRevenueTomi: entry.confirmedRevenueTomi.toString(),
+      confirmedCostTomi: entry.confirmedCostTomi.toString(),
+      pendingRevenueTomi: entry.pendingRevenueTomi.toString(),
+      pendingCostTomi: entry.pendingCostTomi.toString(),
       confirmedCount: entry.confirmedCount,
       pendingCount: entry.pendingCount,
     }))
     .sort((a, b) =>
       byBigIntDesc<OperatorPaymentsCounterpartyEntry>(
         (item) =>
-          toBigInt(item.confirmedRevenueWei) +
-          toBigInt(item.pendingRevenueWei) +
-          toBigInt(item.confirmedCostWei) +
-          toBigInt(item.pendingCostWei),
+          toBigInt(item.confirmedRevenueTomi) +
+          toBigInt(item.pendingRevenueTomi) +
+          toBigInt(item.confirmedCostTomi) +
+          toBigInt(item.pendingCostTomi),
       )(a, b),
     )
     .slice(0, 10);
 
-  topRequests.sort((a, b) => byBigIntDesc<OperatorPaymentsRequestEntry>((item) => toBigInt(item.amountWei))(a, b));
+  topRequests.sort((a, b) => byBigIntDesc<OperatorPaymentsRequestEntry>((item) => toBigInt(item.amountTomi))(a, b));
 
   const summary = [
-    `confirmed revenue=${formatTOS(confirmedRevenueWei)}`,
-    `confirmed cost=${formatTOS(confirmedCostWei)}`,
-    `pending receivables=${formatTOS(pendingRevenueWei)}`,
-    `pending liabilities=${formatTOS(pendingCostWei)}`,
+    `confirmed revenue=${formatTOS(confirmedRevenueTomi)}`,
+    `confirmed cost=${formatTOS(confirmedCostTomi)}`,
+    `pending receivables=${formatTOS(pendingRevenueTomi)}`,
+    `pending liabilities=${formatTOS(pendingCostTomi)}`,
     `failed=${failedCount}`,
   ].join(", ");
 
@@ -339,10 +339,10 @@ export async function buildOperatorPaymentsSnapshot(
     generatedAt: new Date().toISOString(),
     address: config.walletAddress,
     totals: {
-      confirmedRevenueWei: confirmedRevenueWei.toString(),
-      confirmedCostWei: confirmedCostWei.toString(),
-      pendingRevenueWei: pendingRevenueWei.toString(),
-      pendingCostWei: pendingCostWei.toString(),
+      confirmedRevenueTomi: confirmedRevenueTomi.toString(),
+      confirmedCostTomi: confirmedCostTomi.toString(),
+      pendingRevenueTomi: pendingRevenueTomi.toString(),
+      pendingCostTomi: pendingCostTomi.toString(),
       confirmedCount,
       pendingCount,
       failedCount,

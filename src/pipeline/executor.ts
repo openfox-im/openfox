@@ -188,7 +188,7 @@ export class IntentPipeline {
           return this.fail(
             intentId,
             timeline,
-            `Transaction value exceeds terminal "${params.terminalClass}" maximum (${caps.maxTransactionValue} wei)`,
+            `Transaction value exceeds terminal "${params.terminalClass}" maximum (${caps.maxTransactionValue} tomi)`,
           );
         }
       }

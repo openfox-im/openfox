@@ -27,7 +27,7 @@ export type AgentRole = "requester" | "actor" | "provider" | "sponsor" | "signer
 export type IntentStatus = "pending" | "planning" | "approved" | "executing" | "settled" | "failed" | "expired" | "cancelled";
 
 export interface IntentConstraints {
-  maxValue?: string;          // wei string
+  maxValue?: string;          // tomi string
   allowedRecipients?: string[];
   requiredTrustTier?: TrustTier;
   maxGas?: number;

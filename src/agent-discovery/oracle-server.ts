@@ -268,7 +268,7 @@ export async function startAgentDiscoveryOracleServer(
         json(res, 200, {
           ok: true,
           capability: oracleConfig.capability,
-          priceWei: oracleConfig.priceWei,
+          priceTomi: oracleConfig.priceTomi,
           address,
         });
         return;
@@ -290,7 +290,7 @@ export async function startAgentDiscoveryOracleServer(
       if (req.method === "POST" && quotePaths.has(url.pathname)) {
         json(res, 200, {
           capability: oracleConfig.capability,
-          price_wei: oracleConfig.priceWei,
+          price_tomi: oracleConfig.priceTomi,
           query_kinds: ["binary", "enum", "scalar", "text"],
           max_question_chars: oracleConfig.maxQuestionChars,
           max_context_chars: oracleConfig.maxContextChars,
@@ -306,7 +306,7 @@ export async function startAgentDiscoveryOracleServer(
           rpcUrl,
           chainId: config.chainId,
           providerAddress: address,
-          amountWei: oracleConfig.priceWei,
+          amountTomi: oracleConfig.priceTomi,
           description: "OpenFox oracle.resolve payment",
         });
         writeX402RequirementResponse({ res, requirement });
@@ -370,7 +370,7 @@ export async function startAgentDiscoveryOracleServer(
         providerAddress: address,
         requestKey,
         requestHash,
-        amountWei: oracleConfig.priceWei,
+        amountTomi: oracleConfig.priceTomi,
         description: "OpenFox oracle.resolve payment",
       });
       if (payment.state === "required") {

@@ -45,7 +45,7 @@ function candidateToQuote(candidate: RouteCandidate): QuoteEntry {
     providerName: candidate.provider.name,
     serviceKind: candidate.serviceKind,
     fee: candidate.estimatedFee,
-    feeDisplay: formatWei(fee),
+    feeDisplay: formatTomi(fee),
     estimatedLatencyMs: candidate.estimatedLatency,
     trustTier: candidate.provider.trustTier,
     reputationScore: candidate.provider.reputationScore,
@@ -246,15 +246,15 @@ function computeBalancedScore(quote: QuoteEntry, all: QuoteEntry[]): number {
   return feeScore * 0.4 + latScore * 0.3 + trustScore * 0.3;
 }
 
-/** Format wei as the native TOS unit with fixed precision. */
-function formatWei(wei: bigint): string {
-  return formatNativeAmount(wei);
+/** Format tomi as the native TOS unit with fixed precision. */
+function formatTomi(tomi: bigint): string {
+  return formatNativeAmount(tomi);
 }
 
-function formatNativeAmount(wei: bigint): string {
-  if (wei === 0n) return "0 TOS";
-  const negative = wei < 0n;
-  const absolute = negative ? -wei : wei;
+function formatNativeAmount(amount: bigint): string {
+  if (amount === 0n) return "0 TOS";
+  const negative = amount < 0n;
+  const absolute = negative ? -amount : amount;
   const whole = absolute / 1_000_000_000_000_000_000n;
   const fraction = absolute % 1_000_000_000_000_000_000n;
   const fractionText = fraction

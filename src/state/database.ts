@@ -665,7 +665,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
   const insertCampaign = (campaign: CampaignRecord): void => {
     db.prepare(
       `INSERT INTO campaigns (
-        campaign_id, host_agent_id, host_address, title, description, budget_wei,
+        campaign_id, host_agent_id, host_address, title, description, budget_tomi,
         max_open_bounties, allowed_kinds_json, metadata_json, status, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
@@ -674,7 +674,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       campaign.hostAddress,
       campaign.title,
       campaign.description,
-      campaign.budgetWei,
+      campaign.budgetTomi,
       campaign.maxOpenBounties,
       JSON.stringify(campaign.allowedKinds),
       JSON.stringify(campaign.metadata ?? {}),
@@ -714,7 +714,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO bounties (
         bounty_id, campaign_id, host_agent_id, host_address, kind, title, task_prompt,
-        reference_output, skill_name, metadata_json, policy_json, reward_wei,
+        reference_output, skill_name, metadata_json, policy_json, reward_tomi,
         submission_deadline, judge_mode, status, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
@@ -729,7 +729,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       bounty.skillName ?? null,
       JSON.stringify(bounty.metadata ?? {}),
       JSON.stringify(bounty.policy ?? {}),
-      bounty.rewardWei,
+      bounty.rewardTomi,
       bounty.submissionDeadline,
       bounty.judgeMode,
       bounty.status,
@@ -1203,7 +1203,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       `INSERT INTO x402_payments (
         payment_id, service_kind, request_key, request_hash, payer_address,
         provider_address, chain_id, tx_nonce, tx_hash, raw_transaction,
-        amount_wei, confirmation_policy, status, attempt_count, max_attempts,
+        amount_tomi, confirmation_policy, status, attempt_count, max_attempts,
         receipt_json, last_error, next_attempt_at, bound_kind, bound_subject_id,
         artifact_url, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1217,7 +1217,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         tx_nonce = excluded.tx_nonce,
         tx_hash = excluded.tx_hash,
         raw_transaction = excluded.raw_transaction,
-        amount_wei = excluded.amount_wei,
+        amount_tomi = excluded.amount_tomi,
         confirmation_policy = excluded.confirmation_policy,
         status = excluded.status,
         attempt_count = excluded.attempt_count,
@@ -1240,7 +1240,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       payment.txNonce,
       payment.txHash,
       payment.rawTransaction,
-      payment.amountWei,
+      payment.amountTomi,
       payment.confirmationPolicy,
       payment.status,
       payment.attemptCount,
@@ -1540,8 +1540,8 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO owner_opportunity_alerts (
         alert_id, opportunity_hash, kind, provider_class, trust_tier,
-        title, summary, suggested_action, capability, base_url, reward_wei,
-        estimated_cost_wei, margin_wei, margin_bps, strategy_score,
+        title, summary, suggested_action, capability, base_url, reward_tomi,
+        estimated_cost_tomi, margin_tomi, margin_bps, strategy_score,
         strategy_matched, strategy_reasons_json, payload_json, status,
         action_kind, action_request_id, action_requested_at,
         read_at, dismissed_at, created_at, updated_at
@@ -1556,9 +1556,9 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         suggested_action = excluded.suggested_action,
         capability = excluded.capability,
         base_url = excluded.base_url,
-        reward_wei = excluded.reward_wei,
-        estimated_cost_wei = excluded.estimated_cost_wei,
-        margin_wei = excluded.margin_wei,
+        reward_tomi = excluded.reward_tomi,
+        estimated_cost_tomi = excluded.estimated_cost_tomi,
+        margin_tomi = excluded.margin_tomi,
         margin_bps = excluded.margin_bps,
         strategy_score = excluded.strategy_score,
         strategy_matched = excluded.strategy_matched,
@@ -1582,9 +1582,9 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.suggestedAction,
       record.capability ?? null,
       record.baseUrl ?? null,
-      record.rewardWei ?? null,
-      record.estimatedCostWei,
-      record.marginWei,
+      record.rewardTomi ?? null,
+      record.estimatedCostTomi,
+      record.marginTomi,
       record.marginBps,
       record.strategyScore ?? null,
       record.strategyMatched ? 1 : 0,
@@ -1905,15 +1905,15 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO signer_quotes (
         quote_id, provider_address, wallet_address, requester_address, target_address,
-        value_wei, data_hex, gas, policy_id, policy_hash, scope_hash,
-        delegate_identity, trust_tier, amount_wei, status, expires_at, created_at, updated_at
+        value_tomi, data_hex, gas, policy_id, policy_hash, scope_hash,
+        delegate_identity, trust_tier, amount_tomi, status, expires_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(quote_id) DO UPDATE SET
         provider_address = excluded.provider_address,
         wallet_address = excluded.wallet_address,
         requester_address = excluded.requester_address,
         target_address = excluded.target_address,
-        value_wei = excluded.value_wei,
+        value_tomi = excluded.value_tomi,
         data_hex = excluded.data_hex,
         gas = excluded.gas,
         policy_id = excluded.policy_id,
@@ -1921,7 +1921,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         scope_hash = excluded.scope_hash,
         delegate_identity = excluded.delegate_identity,
         trust_tier = excluded.trust_tier,
-        amount_wei = excluded.amount_wei,
+        amount_tomi = excluded.amount_tomi,
         status = excluded.status,
         expires_at = excluded.expires_at,
         updated_at = excluded.updated_at`,
@@ -1931,7 +1931,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.walletAddress,
       record.requesterAddress,
       record.targetAddress,
-      record.valueWei,
+      record.valueTomi,
       record.dataHex,
       record.gas,
       record.policyId,
@@ -1939,7 +1939,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.scopeHash,
       record.delegateIdentity ?? null,
       record.trustTier,
-      record.amountWei,
+      record.amountTomi,
       record.status,
       record.expiresAt,
       record.createdAt,
@@ -1989,7 +1989,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO signer_executions (
         execution_id, quote_id, request_key, request_hash, provider_address,
-        wallet_address, requester_address, target_address, value_wei, data_hex, gas,
+        wallet_address, requester_address, target_address, value_tomi, data_hex, gas,
         policy_id, policy_hash, scope_hash, delegate_identity, trust_tier,
         request_nonce, request_expires_at, reason, payment_id, submitted_tx_hash,
         submitted_receipt_json, receipt_hash, status, last_error, created_at, updated_at
@@ -2002,7 +2002,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         wallet_address = excluded.wallet_address,
         requester_address = excluded.requester_address,
         target_address = excluded.target_address,
-        value_wei = excluded.value_wei,
+        value_tomi = excluded.value_tomi,
         data_hex = excluded.data_hex,
         gas = excluded.gas,
         policy_id = excluded.policy_id,
@@ -2029,7 +2029,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.walletAddress,
       record.requesterAddress,
       record.targetAddress,
-      record.valueWei,
+      record.valueTomi,
       record.dataHex,
       record.gas,
       record.policyId,
@@ -2109,8 +2109,8 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO paymaster_quotes (
         quote_id, chain_id, provider_address, sponsor_address, sponsor_signer_type, wallet_address, requester_address, requester_signer_type,
-        target_address, value_wei, data_hex, gas, policy_id, policy_hash, scope_hash,
-        delegate_identity, trust_tier, amount_wei, sponsor_nonce, sponsor_expiry,
+        target_address, value_tomi, data_hex, gas, policy_id, policy_hash, scope_hash,
+        delegate_identity, trust_tier, amount_tomi, sponsor_nonce, sponsor_expiry,
         status, expires_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(quote_id) DO UPDATE SET
@@ -2122,7 +2122,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         requester_address = excluded.requester_address,
         requester_signer_type = excluded.requester_signer_type,
         target_address = excluded.target_address,
-        value_wei = excluded.value_wei,
+        value_tomi = excluded.value_tomi,
         data_hex = excluded.data_hex,
         gas = excluded.gas,
         policy_id = excluded.policy_id,
@@ -2130,7 +2130,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         scope_hash = excluded.scope_hash,
         delegate_identity = excluded.delegate_identity,
         trust_tier = excluded.trust_tier,
-        amount_wei = excluded.amount_wei,
+        amount_tomi = excluded.amount_tomi,
         sponsor_nonce = excluded.sponsor_nonce,
         sponsor_expiry = excluded.sponsor_expiry,
         status = excluded.status,
@@ -2146,7 +2146,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.requesterAddress,
       record.requesterSignerType,
       record.targetAddress,
-      record.valueWei,
+      record.valueTomi,
       record.dataHex,
       record.gas,
       record.policyId,
@@ -2154,7 +2154,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.scopeHash,
       record.delegateIdentity ?? null,
       record.trustTier,
-      record.amountWei,
+      record.amountTomi,
       record.sponsorNonce,
       record.sponsorExpiry,
       record.status,
@@ -2213,7 +2213,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO paymaster_authorizations (
         authorization_id, quote_id, chain_id, request_key, request_hash, provider_address, sponsor_address, sponsor_signer_type,
-        wallet_address, requester_address, requester_signer_type, target_address, value_wei, data_hex, gas,
+        wallet_address, requester_address, requester_signer_type, target_address, value_tomi, data_hex, gas,
         policy_id, policy_hash, scope_hash, delegate_identity, trust_tier,
         request_nonce, request_expires_at, execution_nonce, sponsor_nonce, sponsor_expiry, reason, payment_id,
         execution_signature_json, sponsor_signature_json, submitted_tx_hash, submitted_receipt_json,
@@ -2231,7 +2231,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         requester_address = excluded.requester_address,
         requester_signer_type = excluded.requester_signer_type,
         target_address = excluded.target_address,
-        value_wei = excluded.value_wei,
+        value_tomi = excluded.value_tomi,
         data_hex = excluded.data_hex,
         gas = excluded.gas,
         policy_id = excluded.policy_id,
@@ -2267,7 +2267,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.requesterAddress,
       record.requesterSignerType,
       record.targetAddress,
-      record.valueWei,
+      record.valueTomi,
       record.dataHex,
       record.gas,
       record.policyId,
@@ -2357,7 +2357,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO storage_quotes (
         quote_id, requester_address, provider_address, cid, bundle_kind, size_bytes,
-        ttl_seconds, amount_wei, status, expires_at, created_at, updated_at
+        ttl_seconds, amount_tomi, status, expires_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(quote_id) DO UPDATE SET
         requester_address = excluded.requester_address,
@@ -2366,7 +2366,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         bundle_kind = excluded.bundle_kind,
         size_bytes = excluded.size_bytes,
         ttl_seconds = excluded.ttl_seconds,
-        amount_wei = excluded.amount_wei,
+        amount_tomi = excluded.amount_tomi,
         status = excluded.status,
         expires_at = excluded.expires_at,
         updated_at = excluded.updated_at`,
@@ -2378,7 +2378,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.bundleKind,
       record.sizeBytes,
       record.ttlSeconds,
-      record.amountWei,
+      record.amountTomi,
       record.status,
       record.expiresAt,
       record.createdAt,
@@ -2414,7 +2414,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
     db.prepare(
       `INSERT INTO storage_leases (
         lease_id, quote_id, cid, bundle_hash, bundle_kind, requester_address,
-        provider_address, provider_base_url, size_bytes, ttl_seconds, amount_wei,
+        provider_address, provider_base_url, size_bytes, ttl_seconds, amount_tomi,
         status, storage_path, request_key, payment_id, receipt_json, receipt_hash,
         anchor_tx_hash, anchor_receipt_json, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -2428,7 +2428,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         provider_base_url = excluded.provider_base_url,
         size_bytes = excluded.size_bytes,
         ttl_seconds = excluded.ttl_seconds,
-        amount_wei = excluded.amount_wei,
+        amount_tomi = excluded.amount_tomi,
         status = excluded.status,
         storage_path = excluded.storage_path,
         request_key = excluded.request_key,
@@ -2449,7 +2449,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.providerBaseUrl ?? null,
       record.sizeBytes,
       record.ttlSeconds,
-      record.amountWei,
+      record.amountTomi,
       record.status,
       record.storagePath,
       record.requestKey,
@@ -2526,7 +2526,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       `INSERT INTO storage_renewals (
         renewal_id, lease_id, cid, requester_address, provider_address,
         provider_base_url, previous_expires_at, renewed_expires_at,
-        added_ttl_seconds, amount_wei, payment_id, receipt_json, receipt_hash,
+        added_ttl_seconds, amount_tomi, payment_id, receipt_json, receipt_hash,
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(renewal_id) DO UPDATE SET
@@ -2538,7 +2538,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         previous_expires_at = excluded.previous_expires_at,
         renewed_expires_at = excluded.renewed_expires_at,
         added_ttl_seconds = excluded.added_ttl_seconds,
-        amount_wei = excluded.amount_wei,
+        amount_tomi = excluded.amount_tomi,
         payment_id = excluded.payment_id,
         receipt_json = excluded.receipt_json,
         receipt_hash = excluded.receipt_hash,
@@ -2553,7 +2553,7 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       record.previousExpiresAt,
       record.renewedExpiresAt,
       record.addedTtlSeconds,
-      record.amountWei,
+      record.amountTomi,
       record.paymentId ?? null,
       JSON.stringify(record.receipt),
       record.receiptHash,
@@ -4317,7 +4317,7 @@ function deserializeBounty(row: any): BountyRecord {
         "deserializeBounty.policy_json",
       ),
     },
-    rewardWei: row.reward_wei,
+    rewardTomi: row.reward_tomi,
     submissionDeadline: row.submission_deadline,
     judgeMode: row.judge_mode,
     status: row.status,
@@ -4333,7 +4333,7 @@ function deserializeCampaign(row: any): CampaignRecord {
     hostAddress: row.host_address,
     title: row.title,
     description: row.description,
-    budgetWei: row.budget_wei,
+    budgetTomi: row.budget_tomi,
     maxOpenBounties: row.max_open_bounties,
     allowedKinds: safeJsonParse(
       row.allowed_kinds_json ?? "[]",
@@ -4570,9 +4570,9 @@ function deserializeOwnerOpportunityAlertRecord(
     suggestedAction: row.suggested_action,
     capability: row.capability ?? null,
     baseUrl: row.base_url ?? null,
-    rewardWei: row.reward_wei ?? null,
-    estimatedCostWei: row.estimated_cost_wei,
-    marginWei: row.margin_wei,
+    rewardTomi: row.reward_tomi ?? null,
+    estimatedCostTomi: row.estimated_cost_tomi,
+    marginTomi: row.margin_tomi,
     marginBps: Number(row.margin_bps || 0),
     strategyScore:
       row.strategy_score == null ? null : Number(row.strategy_score),
@@ -4659,7 +4659,7 @@ function deserializeX402PaymentRecord(row: any): X402PaymentRecord {
     txNonce: row.tx_nonce,
     txHash: row.tx_hash,
     rawTransaction: row.raw_transaction,
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     confirmationPolicy: row.confirmation_policy,
     status: row.status,
     attemptCount: Number(row.attempt_count || 0),
@@ -4688,7 +4688,7 @@ function deserializeSignerQuoteRecord(row: any): SignerQuoteRecord {
     walletAddress: row.wallet_address,
     requesterAddress: row.requester_address,
     targetAddress: row.target_address,
-    valueWei: row.value_wei,
+    valueTomi: row.value_tomi,
     dataHex: row.data_hex,
     gas: row.gas,
     policyId: row.policy_id,
@@ -4696,7 +4696,7 @@ function deserializeSignerQuoteRecord(row: any): SignerQuoteRecord {
     scopeHash: row.scope_hash,
     delegateIdentity: row.delegate_identity ?? null,
     trustTier: row.trust_tier,
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     status: row.status,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
@@ -4714,7 +4714,7 @@ function deserializeSignerExecutionRecord(row: any): SignerExecutionRecord {
     walletAddress: row.wallet_address,
     requesterAddress: row.requester_address,
     targetAddress: row.target_address,
-    valueWei: row.value_wei,
+    valueTomi: row.value_tomi,
     dataHex: row.data_hex,
     gas: row.gas,
     policyId: row.policy_id,
@@ -4753,7 +4753,7 @@ function deserializePaymasterQuoteRecord(row: any): PaymasterQuoteRecord {
     requesterAddress: row.requester_address,
     requesterSignerType: row.requester_signer_type ?? "secp256k1",
     targetAddress: row.target_address,
-    valueWei: row.value_wei,
+    valueTomi: row.value_tomi,
     dataHex: row.data_hex,
     gas: row.gas,
     policyId: row.policy_id,
@@ -4761,7 +4761,7 @@ function deserializePaymasterQuoteRecord(row: any): PaymasterQuoteRecord {
     scopeHash: row.scope_hash,
     delegateIdentity: row.delegate_identity ?? null,
     trustTier: row.trust_tier,
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     sponsorNonce: row.sponsor_nonce,
     sponsorExpiry: Number(row.sponsor_expiry || 0),
     status: row.status,
@@ -4787,7 +4787,7 @@ function deserializePaymasterAuthorizationRecord(
     requesterAddress: row.requester_address,
     requesterSignerType: row.requester_signer_type ?? "secp256k1",
     targetAddress: row.target_address,
-    valueWei: row.value_wei,
+    valueTomi: row.value_tomi,
     dataHex: row.data_hex,
     gas: row.gas,
     policyId: row.policy_id,
@@ -4841,7 +4841,7 @@ function deserializeStorageQuoteRecord(row: any): StorageQuoteRecord {
     bundleKind: row.bundle_kind,
     sizeBytes: Number(row.size_bytes || 0),
     ttlSeconds: Number(row.ttl_seconds || 0),
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     status: row.status,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
@@ -4861,7 +4861,7 @@ function deserializeStorageLeaseRecord(row: any): StorageLeaseRecord {
     providerBaseUrl: row.provider_base_url ?? null,
     sizeBytes: Number(row.size_bytes || 0),
     ttlSeconds: Number(row.ttl_seconds || 0),
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     status: row.status,
     storagePath: row.storage_path,
     requestKey: row.request_key,
@@ -4896,7 +4896,7 @@ function deserializeStorageRenewalRecord(row: any): StorageRenewalRecord {
     previousExpiresAt: row.previous_expires_at,
     renewedExpiresAt: row.renewed_expires_at,
     addedTtlSeconds: Number(row.added_ttl_seconds || 0),
-    amountWei: row.amount_wei,
+    amountTomi: row.amount_tomi,
     paymentId: row.payment_id ?? null,
     receipt: parseJsonSafe(
       row.receipt_json ?? "{}",

@@ -316,8 +316,8 @@ export function buildPublishedAgentDiscoveryConfig(params: {
         description: "Agent Gateway relay capability",
         policy: {
           payment_direction: params.gatewayServerConfig.paymentDirection,
-          session_fee_tos: params.gatewayServerConfig.sessionFeeWei,
-          per_request_fee_tos: params.gatewayServerConfig.perRequestFeeWei,
+          session_fee_tos: params.gatewayServerConfig.sessionFeeTomi,
+          per_request_fee_tos: params.gatewayServerConfig.perRequestFeeTomi,
           max_sessions: params.gatewayServerConfig.maxSessions,
           max_bandwidth_kbps: params.gatewayServerConfig.maxBandwidthKbps,
           max_routes_per_session: params.gatewayServerConfig.maxRoutesPerSession,

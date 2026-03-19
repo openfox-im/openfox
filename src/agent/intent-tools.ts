@@ -41,7 +41,7 @@ export function createIntentTools(): OpenFoxTool[] {
           },
           value: {
             type: "string",
-            description: "Transfer value in wei",
+            description: "Transfer value in tomi",
           },
           terminalClass: {
             type: "string",
@@ -222,7 +222,7 @@ export function createIntentTools(): OpenFoxTool[] {
             if (entry.actorAddress) lines.push(`  Actor: ${entry.actorAddress}`);
             if (entry.sponsorAddress) lines.push(`  Sponsor: ${entry.sponsorAddress}`);
             if (entry.txHash) lines.push(`  Tx: ${entry.txHash}`);
-            if (entry.value) lines.push(`  Value: ${entry.value} wei`);
+            if (entry.value) lines.push(`  Value: ${entry.value} tomi`);
             if (entry.policyDecision) lines.push(`  Policy: ${entry.policyDecision}`);
             lines.push(...formatAuditDetails(entry.details, "  "));
             lines.push("");
@@ -252,7 +252,7 @@ export function createIntentTools(): OpenFoxTool[] {
           },
           value: {
             type: "string",
-            description: "The transaction value in wei",
+            description: "The transaction value in tomi",
           },
           to: {
             type: "string",
@@ -333,7 +333,7 @@ export function createIntentTools(): OpenFoxTool[] {
             `  Biometric: ${caps.hasBiometric}`,
             `  Display approval: ${caps.canDisplayApproval}`,
             `  Receive callbacks: ${caps.canReceiveCallbacks}`,
-            caps.maxTransactionValue ? `  Max transaction: ${caps.maxTransactionValue} wei` : null,
+            caps.maxTransactionValue ? `  Max transaction: ${caps.maxTransactionValue} tomi` : null,
             `  Supported actions: ${caps.supportedActions.join(", ")}`,
           ].filter(Boolean) as string[];
 
@@ -344,8 +344,8 @@ export function createIntentTools(): OpenFoxTool[] {
               `  Enabled: ${policy.enabled}`,
               `  Min trust tier: ${policy.minTrustTier}`,
               `  Requires approval: ${policy.requiresApproval}`,
-              `  Max single value: ${policy.maxSingleValue} wei`,
-              `  Max daily value: ${policy.maxDailyValue} wei`,
+              `  Max single value: ${policy.maxSingleValue} tomi`,
+              `  Max daily value: ${policy.maxDailyValue} tomi`,
               `  Allowed actions: ${policy.allowedActions.join(", ")}`,
             );
           } else {

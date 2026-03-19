@@ -25,7 +25,7 @@ Usage:
   openfox committee list [--kind <evidence|oracle>] [--limit N] [--json]
   openfox committee get --run-id <id> [--json]
   openfox committee summary [--kind <evidence|oracle>] [--limit N] [--json]
-  openfox committee create --kind <evidence|oracle> --title <text> --question <text> --committee-size N --threshold-m N --member <id>... [--payout-total-wei <wei>] [--max-reruns N] [--subject-ref <ref>] [--artifact-id <id>]... [--json]
+  openfox committee create --kind <evidence|oracle> --title <text> --question <text> --committee-size N --threshold-m N --member <id>... [--payout-total-tomi <tomi>] [--max-reruns N] [--subject-ref <ref>] [--artifact-id <id>]... [--json]
   openfox committee vote --run-id <id> --member-id <id> --decision <accept|reject|inconclusive> [--result-hash <0x...>] [--reason-code <code>] [--signature <0x...>] [--payout-address <0x...>] [--metadata-file <path>] [--json]
   openfox committee mark-failed --run-id <id> --member-id <id> --reason <text> [--json]
   openfox committee rerun --run-id <id> [--json]
@@ -94,7 +94,7 @@ Usage:
       const memberIds = collectRepeatedOption(args, "--member");
       if (!createKind || !title || !question || committeeSize <= 0 || thresholdM <= 0 || memberIds.length === 0) {
         throw new Error(
-          "Usage: openfox committee create --kind <evidence|oracle> --title <text> --question <text> --committee-size N --threshold-m N --member <id>... [--payout-total-wei <wei>] [--max-reruns N] [--subject-ref <ref>] [--artifact-id <id>]... [--json]",
+          "Usage: openfox committee create --kind <evidence|oracle> --title <text> --question <text> --committee-size N --threshold-m N --member <id>... [--payout-total-tomi <tomi>] [--max-reruns N] [--subject-ref <ref>] [--artifact-id <id>]... [--json]",
         );
       }
       const item = manager.createRun({
@@ -105,7 +105,7 @@ Usage:
         artifactIds: collectRepeatedOption(args, "--artifact-id"),
         committeeSize,
         thresholdM,
-        payoutTotalWei: readOption(args, "--payout-total-wei") || "0",
+        payoutTotalTomi: readOption(args, "--payout-total-tomi") || "0",
         maxReruns: readNumberOption(args, "--max-reruns", 1),
         members: memberIds.map((memberId) => ({ memberId })),
       });

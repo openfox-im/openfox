@@ -81,7 +81,7 @@ export function createSignerExecutionRetryManager(params: {
         rpcUrl: params.rpcUrl,
         privateKey,
         to: record.targetAddress,
-        amountWei: BigInt(record.valueWei),
+        amountTomi: BigInt(record.valueTomi),
         gas: BigInt(record.gas),
         data: record.dataHex,
         waitForReceipt: params.config.x402Server?.confirmationPolicy === "receipt",

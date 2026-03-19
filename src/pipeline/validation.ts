@@ -21,7 +21,7 @@ export const MAX_PARAM_STRING_LENGTH = 4096;
 /** Maximum nesting depth for intent params. */
 export const MAX_PARAMS_DEPTH = 4;
 
-/** Maximum value in wei (2^256 - 1, the EVM max uint256). */
+/** Maximum value in tomi (2^256 - 1, the EVM max uint256). */
 const MAX_UINT256 = (2n ** 256n) - 1n;
 
 /** Valid terminal class values. */
@@ -46,7 +46,7 @@ export function validateAddress(addr: string): boolean {
 }
 
 /**
- * Validate a wei value string.
+ * Validate a tomi value string.
  * Must be a non-negative integer string that does not exceed uint256 max.
  */
 export function validateValue(value: string): boolean {
@@ -100,7 +100,7 @@ export function validateIntentParams(
   if ("value" in params) {
     const v = params["value"];
     if (typeof v === "string" && !validateValue(v)) {
-      errors.push(`params.value "${v}" is not a valid wei value`);
+      errors.push(`params.value "${v}" is not a valid tomi value`);
     }
   }
 

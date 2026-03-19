@@ -368,7 +368,7 @@ describe("world social: search", () => {
       title: "Quantum entanglement proof",
       taskPrompt: "Prove quantum entanglement for state X",
       referenceOutput: "canonical",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2030-01-02T00:00:00.000Z",
       judgeMode: "local_model",
       status: "open",

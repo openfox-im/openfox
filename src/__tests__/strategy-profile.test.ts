@@ -11,8 +11,8 @@ describe("strategy profile", () => {
     const db = createTestDb();
     const profile = upsertStrategyProfile(db, {
       name: "High margin sponsored work",
-      revenueTargetWei: "100000000000000000",
-      maxSpendPerOpportunityWei: "5000000000000000",
+      revenueTargetTomi: "100000000000000000",
+      maxSpendPerOpportunityTomi: "5000000000000000",
       minMarginBps: 2500,
       enabledOpportunityKinds: ["bounty", "provider"],
       enabledProviderClasses: ["task_market", "sponsored_execution"],
@@ -34,7 +34,7 @@ describe("strategy profile", () => {
     const validation = validateStrategyProfile(profile);
     expect(validation.valid).toBe(true);
     expect(validation.warnings).toContain(
-      "maxSpendPerOpportunityWei is zero, so paid provider opportunities will not match.",
+      "maxSpendPerOpportunityTomi is zero, so paid provider opportunities will not match.",
     );
     db.close();
   });

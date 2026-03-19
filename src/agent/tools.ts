@@ -1455,13 +1455,13 @@ Rate Limit: ${provider.matchedCapability.rate_limit || "n/a"}`,
           ctx.config.walletAddress ||
           deriveAddressFromPrivateKey(privateKey);
         const amount = typeof args.amount === "string" ? args.amount : "0.01";
-        const requestedAmountWei = parseAmount(amount);
+        const requestedAmountTomi = parseAmount(amount);
 
         const result = await requestTestnetFaucet({
           identity: ctx.identity,
           config: ctx.config,
           address,
-          requestedAmountWei,
+          requestedAmountTomi,
           capability:
             typeof args.capability === "string" && args.capability.trim()
               ? args.capability.trim()

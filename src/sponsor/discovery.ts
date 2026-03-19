@@ -146,8 +146,8 @@ function sortSponsors(
 }
 
 function formatTotalCost(fee: string, value: string): string {
-  const feeEth = Number(BigInt(fee)) / 1e18;
-  const valueEth = Number(BigInt(value)) / 1e18;
-  if (feeEth === 0) return `${valueEth.toFixed(4)} TOS (gasless)`;
-  return `${valueEth.toFixed(4)} TOS (+ ${feeEth.toFixed(6)} fee)`;
+  const feeTos = Number(BigInt(fee)) / 1e18;
+  const valueTos = Number(BigInt(value)) / 1e18;
+  if (feeTos === 0) return `${valueTos.toFixed(4)} TOS (gasless)`;
+  return `${valueTos.toFixed(4)} TOS (+ ${feeTos.toFixed(6)} fee)`;
 }

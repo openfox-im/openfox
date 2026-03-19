@@ -139,7 +139,7 @@ function buildPaymentRecord(overrides?: Partial<X402PaymentRecord>): X402Payment
       "0xfb43d57082cdcd5103e2d7593ab60734eeee43e7c023635d644c37105b69c022" as Hex,
     rawTransaction:
       "0xb20d45fcf230c1d4053087f6df71ef5a43960ff5f61d976acb1fcfb4c40d9a10" as Hex,
-    amountWei: "5",
+    amountTomi: "5",
     confirmationPolicy: "receipt",
     status: "confirmed",
     attemptCount: 1,
@@ -274,8 +274,8 @@ afterEach(async () => {
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
         authorizationValiditySeconds: 600,
-        quotePriceWei: "0",
-        authorizePriceWei: "5",
+        quotePriceTomi: "0",
+        authorizePriceTomi: "5",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -289,7 +289,7 @@ afterEach(async () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },
@@ -342,7 +342,7 @@ afterEach(async () => {
       wallet_address: requester.address,
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "7",
+      value_tomi: "7",
       reason: "unit-test",
     });
 
@@ -383,7 +383,7 @@ afterEach(async () => {
       execution_nonce: "9",
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "7",
+      value_tomi: "7",
       gas: String(quote.json.gas),
       data: "0x",
       execution_signature: toJsonSignature(executionSignature),
@@ -439,8 +439,8 @@ afterEach(async () => {
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
         authorizationValiditySeconds: 600,
-        quotePriceWei: "0",
-        authorizePriceWei: "0",
+        quotePriceTomi: "0",
+        authorizePriceTomi: "0",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -453,7 +453,7 @@ afterEach(async () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },
@@ -478,7 +478,7 @@ afterEach(async () => {
       },
       target:
         "0x8888888888888888888888888888888888888888888888888888888888888888",
-      value_wei: "1",
+      value_tomi: "1",
     });
 
     expect(response.status).toBe(400);
@@ -530,8 +530,8 @@ afterEach(async () => {
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
         authorizationValiditySeconds: 600,
-        quotePriceWei: "0",
-        authorizePriceWei: "99",
+        quotePriceTomi: "0",
+        authorizePriceTomi: "99",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -544,7 +544,7 @@ afterEach(async () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },
@@ -569,7 +569,7 @@ afterEach(async () => {
       wallet_address: requester.address,
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "1",
+      value_tomi: "1",
     });
     expect(quote.status).toBe(200);
 
@@ -607,7 +607,7 @@ afterEach(async () => {
         execution_nonce: "1",
         target:
           "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-        value_wei: "1",
+        value_tomi: "1",
         gas: String(quote.json.gas),
         data: "0x",
         execution_signature: toJsonSignature(executionSignature),
@@ -663,8 +663,8 @@ afterEach(async () => {
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
         authorizationValiditySeconds: 600,
-        quotePriceWei: "0",
-        authorizePriceWei: "5",
+        quotePriceTomi: "0",
+        authorizePriceTomi: "5",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -678,7 +678,7 @@ afterEach(async () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },
@@ -730,7 +730,7 @@ afterEach(async () => {
       wallet_address: requester.account.address,
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "7",
+      value_tomi: "7",
       reason: "ed25519-test",
     });
 
@@ -769,7 +769,7 @@ afterEach(async () => {
       execution_nonce: "9",
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "7",
+      value_tomi: "7",
       gas: String(quote.json.gas),
       data: "0x",
       execution_signature: toJsonSignature(executionSignature),
@@ -848,8 +848,8 @@ afterEach(async () => {
           publishToDiscovery: true,
           quoteValiditySeconds: 300,
           authorizationValiditySeconds: 600,
-          quotePriceWei: "0",
-          authorizePriceWei: "5",
+          quotePriceTomi: "0",
+          authorizePriceTomi: "5",
           requestTimeoutMs: 15000,
           maxDataBytes: 2048,
           defaultGas: "21000",
@@ -863,7 +863,7 @@ afterEach(async () => {
               "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
             ],
             allowedFunctionSelectors: [],
-            maxValueWei: "1000",
+            maxValueTomi: "1000",
             allowSystemAction: false,
           },
         },
@@ -911,7 +911,7 @@ afterEach(async () => {
         wallet_address: requester.account.address,
         target:
           "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-        value_wei: "7",
+        value_tomi: "7",
         reason: `${signerType}-test`,
       });
 
@@ -950,7 +950,7 @@ afterEach(async () => {
         execution_nonce: "9",
         target:
           "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-        value_wei: "7",
+        value_tomi: "7",
         gas: String(quote.json.gas),
         data: "0x",
         execution_signature: toJsonSignature(executionSignature),

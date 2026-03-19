@@ -86,7 +86,7 @@ async function handleTransfer(args: string[]): Promise<void> {
         : undefined,
     });
 
-    logger.info(`Executing transfer: ${value} wei to ${to} via ${terminalClass} (trust tier ${trustTier})`);
+    logger.info(`Executing transfer: ${value} tomi to ${to} via ${terminalClass} (trust tier ${trustTier})`);
     if (sponsor) {
       logger.info(`Preferred sponsor: ${sponsor}`);
     }
@@ -272,7 +272,7 @@ async function handleExplain(args: string[]): Promise<void> {
       if (entry.actorAddress) logger.info(`  Actor: ${entry.actorAddress}`);
       if (entry.sponsorAddress) logger.info(`  Sponsor: ${entry.sponsorAddress}`);
       if (entry.txHash) logger.info(`  Tx: ${entry.txHash}`);
-      if (entry.value) logger.info(`  Value: ${entry.value} wei`);
+      if (entry.value) logger.info(`  Value: ${entry.value} tomi`);
       if (entry.policyDecision) logger.info(`  Policy: ${entry.policyDecision}`);
       for (const line of formatAuditDetails(entry.details, "  ")) {
         logger.info(line);
@@ -363,7 +363,7 @@ async function handleQuotes(args: string[]): Promise<void> {
   const db = createDatabase(resolvePath(config.dbPath));
 
   try {
-    logger.info(`Discovering provider and sponsor quotes for "${action}" with value ${value} wei...\n`);
+    logger.info(`Discovering provider and sponsor quotes for "${action}" with value ${value} tomi...\n`);
 
     const preview = await buildIntentQuotePreview({
       action,

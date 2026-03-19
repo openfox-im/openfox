@@ -243,7 +243,7 @@ export class DegradedModeHandler {
           terminalClass,
           fallbackMode: "bounded_preauth",
           maxQueueSize: 50,
-          maxPreauthValue: "1000000000000000000", // 1 ETH equivalent
+          maxPreauthValue: "1000000000000000000", // 1 TOS equivalent
         };
 
       // Card terminals: bounded preauth with lower limits

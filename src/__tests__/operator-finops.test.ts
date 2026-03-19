@@ -29,7 +29,7 @@ describe("operator finops snapshots", () => {
           "0x1000000000000000000000000000000000000000000000000000000000000003",
         rawTransaction:
           "0x1000000000000000000000000000000000000000000000000000000000000004",
-        amountWei: "50",
+        amountTomi: "50",
         confirmationPolicy: "receipt",
         status: "confirmed",
         attemptCount: 1,
@@ -52,7 +52,7 @@ describe("operator finops snapshots", () => {
           "0x2000000000000000000000000000000000000000000000000000000000000003",
         rawTransaction:
           "0x2000000000000000000000000000000000000000000000000000000000000004",
-        amountWei: "20",
+        amountTomi: "20",
         confirmationPolicy: "receipt",
         status: "submitted",
         attemptCount: 1,
@@ -75,7 +75,7 @@ describe("operator finops snapshots", () => {
           "0x3000000000000000000000000000000000000000000000000000000000000003",
         rawTransaction:
           "0x3000000000000000000000000000000000000000000000000000000000000004",
-        amountWei: "5",
+        amountTomi: "5",
         confirmationPolicy: "receipt",
         status: "failed",
         attemptCount: 2,
@@ -164,8 +164,8 @@ describe("operator finops snapshots", () => {
 
       const payments = await buildOperatorPaymentsSnapshot(config, db);
       expect(payments.kind).toBe("payments");
-      expect(payments.totals.confirmedRevenueWei).toBe("50");
-      expect(payments.totals.pendingCostWei).toBe("20");
+      expect(payments.totals.confirmedRevenueTomi).toBe("50");
+      expect(payments.totals.pendingCostTomi).toBe("20");
       expect(payments.totals.failedCount).toBe(1);
       expect(payments.capabilities[0]?.capability).toBe("oracle");
       expect(payments.counterparties[0]?.address).toBe(counterparty);

@@ -175,10 +175,10 @@ export function formatIntentQuotePreview(preview: IntentQuotePreview): string {
   return sections.join("\n");
 }
 
-function formatNativeAmount(wei: bigint): string {
-  if (wei === 0n) return "0 TOS";
-  const negative = wei < 0n;
-  const absolute = negative ? -wei : wei;
+function formatNativeAmount(amount: bigint): string {
+  if (amount === 0n) return "0 TOS";
+  const negative = amount < 0n;
+  const absolute = negative ? -amount : amount;
   const whole = absolute / 1_000_000_000_000_000_000n;
   const fraction = absolute % 1_000_000_000_000_000_000n;
   const fractionText = fraction

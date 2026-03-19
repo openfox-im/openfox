@@ -254,7 +254,7 @@ async function requirePayment(params: {
   res: ServerResponse;
   config: OpenFoxConfig;
   providerAddress: string;
-  amountWei: string;
+  amountTomi: string;
   description: string;
 }): Promise<VerifiedPayment | null> {
   const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
@@ -266,7 +266,7 @@ async function requirePayment(params: {
   const requirement: PaymentRequirement = {
     scheme: "exact",
     network: formatNetwork(chainId),
-    maxAmountRequired: params.amountWei,
+    maxAmountRequired: params.amountTomi,
     payToAddress: normalizeAddress(params.providerAddress),
     asset: "native",
     requiredDeadlineSeconds: 300,
@@ -487,8 +487,8 @@ export async function startAgentDiscoveryStorageServer(
           ok: true,
           putCapability: storageConfig.putCapability,
           getCapability: storageConfig.getCapability,
-          putPriceWei: storageConfig.putPriceWei,
-          getPriceWei: storageConfig.getPriceWei,
+          putPriceTomi: storageConfig.putPriceTomi,
+          getPriceTomi: storageConfig.getPriceTomi,
           defaultTtlSeconds: storageConfig.defaultTtlSeconds,
           maxTtlSeconds: storageConfig.maxTtlSeconds,
           putBackendMode: storageConfig.putBackendMode,
@@ -533,9 +533,9 @@ export async function startAgentDiscoveryStorageServer(
         return;
       }
       if ((putPaths.has(url.pathname) || getPaths.has(url.pathname)) && req.method === "HEAD") {
-        const amountWei = putPaths.has(url.pathname)
-          ? storageConfig.putPriceWei
-          : storageConfig.getPriceWei;
+        const amountTomi = putPaths.has(url.pathname)
+          ? storageConfig.putPriceTomi
+          : storageConfig.getPriceTomi;
         const description = putPaths.has(url.pathname)
           ? "OpenFox storage.put payment"
           : "OpenFox storage.get payment";
@@ -544,7 +544,7 @@ export async function startAgentDiscoveryStorageServer(
           res,
           config,
           providerAddress: address,
-          amountWei,
+          amountTomi,
           description,
         });
         if (paid) {
@@ -609,7 +609,7 @@ export async function startAgentDiscoveryStorageServer(
               status: "ok",
               object_id: existingObject.objectId,
               result_url: buildStorageObjectPath(existingObject.objectId),
-              price_wei: storageConfig.putPriceWei,
+              price_tomi: storageConfig.putPriceTomi,
               idempotent: true,
               stored_at: Math.floor(new Date(existingObject.storedAt).getTime() / 1000),
               ttl_seconds: existingObject.ttlSeconds,
@@ -637,7 +637,7 @@ export async function startAgentDiscoveryStorageServer(
             res,
             config,
             providerAddress: address,
-            amountWei: storageConfig.putPriceWei,
+            amountTomi: storageConfig.putPriceTomi,
             description: "OpenFox storage.put payment",
           });
           if (!paid) {
@@ -677,7 +677,7 @@ export async function startAgentDiscoveryStorageServer(
             status: "ok",
             object_id: objectId,
             result_url: buildStorageObjectPath(objectId),
-            price_wei: storageConfig.putPriceWei,
+            price_tomi: storageConfig.putPriceTomi,
             payment_tx_hash: paid.txHash,
             stored_at: Math.floor(Date.now() / 1000),
             ttl_seconds: object.ttlSeconds,
@@ -770,7 +770,7 @@ export async function startAgentDiscoveryStorageServer(
             res,
             config,
             providerAddress: address,
-            amountWei: storageConfig.getPriceWei,
+            amountTomi: storageConfig.getPriceTomi,
             description: "OpenFox storage.get payment",
           });
           if (!paid) {

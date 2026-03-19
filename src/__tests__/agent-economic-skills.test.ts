@@ -110,7 +110,7 @@ describe("MetaWorld Economic Tools", () => {
         kind: "work",
         title: "Test intent",
         description: "A test intent",
-        budgetWei: "1000000",
+        budgetTomi: "1000000",
         requirements: [{ kind: "capability", capability_name: "coding" }],
       });
 
@@ -129,7 +129,7 @@ describe("MetaWorld Economic Tools", () => {
         publisherAddress: OTHER_ADDRESS,
         kind: "work",
         title: "Need a coder",
-        budgetWei: "5000000",
+        budgetTomi: "5000000",
       });
 
       const ctx = makeToolContext(db);
@@ -138,7 +138,7 @@ describe("MetaWorld Economic Tools", () => {
           action: "respond",
           intent_id: intent.intentId,
           proposal_text: "I can do this work",
-          proposed_amount_wei: "4000000",
+          proposed_amount_tomi: "4000000",
           capability_refs: "coding,testing",
         },
         ctx,
@@ -167,7 +167,7 @@ describe("MetaWorld Economic Tools", () => {
         publisherAddress: OTHER_ADDRESS,
         kind: "work",
         title: "Budget test",
-        budgetWei: "1000",
+        budgetTomi: "1000",
       });
 
       const ctx = makeToolContext(db);
@@ -175,7 +175,7 @@ describe("MetaWorld Economic Tools", () => {
         {
           action: "respond",
           intent_id: intent.intentId,
-          proposed_amount_wei: "5000",
+          proposed_amount_tomi: "5000",
         },
         ctx,
       );
@@ -200,7 +200,7 @@ describe("MetaWorld Economic Tools", () => {
         kind: "work",
         title: "Review me",
         description: "Needs review",
-        budgetWei: "100000",
+        budgetTomi: "100000",
       });
 
       respondToIntent(db, {
@@ -238,7 +238,7 @@ describe("MetaWorld Economic Tools", () => {
         publisherAddress: FOX_ADDRESS,
         kind: "work",
         title: "Approve me",
-        budgetWei: "50000",
+        budgetTomi: "50000",
       });
 
       respondToIntent(db, {
@@ -358,7 +358,7 @@ describe("MetaWorld Economic Tools", () => {
         {
           action: "create_intent",
           opportunity_index: 1,
-          budget_wei: "999999999999",
+          budget_tomi: "999999999999",
         },
         ctx,
       );
@@ -397,7 +397,7 @@ describe("MetaWorld Economic Tools", () => {
 
       // Initialize treasury
       initializeGroupTreasury(db, GROUP_ID, TREASURY_KEY, [
-        { lineName: "operations", capWei: "10000000", period: "monthly" },
+        { lineName: "operations", capTomi: "10000000", period: "monthly" },
       ]);
 
       // Fund treasury
@@ -411,7 +411,7 @@ describe("MetaWorld Economic Tools", () => {
         { action: "list", group_id: GROUP_ID },
         ctx,
       );
-      expect(result).toContain("Balance: 5000000 wei");
+      expect(result).toContain("Balance: 5000000 tomi");
       expect(result).toContain("No approved spend proposals");
     });
 

@@ -76,7 +76,7 @@ async function handleJournal(args: string[]): Promise<void> {
       logger.info(`    ${entry.summary}`);
       if (entry.txHash) logger.info(`    tx=${entry.txHash}`);
       if (entry.sponsorAddress) logger.info(`    sponsor=${entry.sponsorAddress}`);
-      if (entry.value) logger.info(`    value=${entry.value} wei`);
+      if (entry.value) logger.info(`    value=${entry.value} tomi`);
     }
   } finally {
     db.close();
@@ -153,7 +153,7 @@ async function handleReport(args: string[]): Promise<void> {
     }
 
     if (summary.totalValue !== "0") {
-      logger.info(`Total value transacted: ${summary.totalValue} wei`);
+      logger.info(`Total value transacted: ${summary.totalValue} tomi`);
     }
   } finally {
     db.close();

@@ -456,11 +456,11 @@ export function loadConfig(): OpenFoxConfig | null {
                       | "split",
                   }
                 : {}),
-              ...(typeof value.sessionFeeWei === "string"
-                ? { sessionFeeWei: value.sessionFeeWei as string }
+              ...(typeof value.sessionFeeTomi === "string"
+                ? { sessionFeeTomi: value.sessionFeeTomi as string }
                 : {}),
-              ...(typeof value.perRequestFeeWei === "string"
-                ? { perRequestFeeWei: value.perRequestFeeWei as string }
+              ...(typeof value.perRequestFeeTomi === "string"
+                ? { perRequestFeeTomi: value.perRequestFeeTomi as string }
                 : {}),
             }))
         : DEFAULT_AGENT_GATEWAY_CLIENT_CONFIG.gatewayBootnodes,
@@ -511,11 +511,11 @@ export function loadConfig(): OpenFoxConfig | null {
                             | "split",
                         }
                       : {}),
-                    ...(typeof entry.sessionFeeWei === "string"
-                      ? { sessionFeeWei: entry.sessionFeeWei as string }
+                    ...(typeof entry.sessionFeeTomi === "string"
+                      ? { sessionFeeTomi: entry.sessionFeeTomi as string }
                       : {}),
-                    ...(typeof entry.perRequestFeeWei === "string"
-                      ? { perRequestFeeWei: entry.perRequestFeeWei as string }
+                    ...(typeof entry.perRequestFeeTomi === "string"
+                      ? { perRequestFeeTomi: entry.perRequestFeeTomi as string }
                       : {}),
                   }));
                 return {
@@ -822,13 +822,13 @@ export function loadConfig(): OpenFoxConfig | null {
   const walletFunding: WalletFundingConfig = {
     ...DEFAULT_WALLET_FUNDING_CONFIG,
     ...((raw?.walletFunding as JsonRecord | undefined) ?? {}),
-    localDefaultAmountWei:
+    localDefaultAmountTomi:
       typeof raw?.walletFunding === "object" &&
       raw.walletFunding !== null &&
-      typeof (raw.walletFunding as JsonRecord).localDefaultAmountWei === "string" &&
-      ((raw.walletFunding as JsonRecord).localDefaultAmountWei as string).trim()
-        ? ((raw.walletFunding as JsonRecord).localDefaultAmountWei as string).trim()
-        : DEFAULT_WALLET_FUNDING_CONFIG.localDefaultAmountWei,
+      typeof (raw.walletFunding as JsonRecord).localDefaultAmountTomi === "string" &&
+      ((raw.walletFunding as JsonRecord).localDefaultAmountTomi as string).trim()
+        ? ((raw.walletFunding as JsonRecord).localDefaultAmountTomi as string).trim()
+        : DEFAULT_WALLET_FUNDING_CONFIG.localDefaultAmountTomi,
     localFunderAddress:
       typeof raw?.walletFunding === "object" &&
       raw.walletFunding !== null &&
@@ -842,13 +842,13 @@ export function loadConfig(): OpenFoxConfig | null {
       typeof (raw.walletFunding as JsonRecord).localFunderPassword === "string"
         ? ((raw.walletFunding as JsonRecord).localFunderPassword as string)
         : undefined,
-    testnetDefaultAmountWei:
+    testnetDefaultAmountTomi:
       typeof raw?.walletFunding === "object" &&
       raw.walletFunding !== null &&
-      typeof (raw.walletFunding as JsonRecord).testnetDefaultAmountWei === "string" &&
-      ((raw.walletFunding as JsonRecord).testnetDefaultAmountWei as string).trim()
-        ? ((raw.walletFunding as JsonRecord).testnetDefaultAmountWei as string).trim()
-        : DEFAULT_WALLET_FUNDING_CONFIG.testnetDefaultAmountWei,
+      typeof (raw.walletFunding as JsonRecord).testnetDefaultAmountTomi === "string" &&
+      ((raw.walletFunding as JsonRecord).testnetDefaultAmountTomi as string).trim()
+        ? ((raw.walletFunding as JsonRecord).testnetDefaultAmountTomi as string).trim()
+        : DEFAULT_WALLET_FUNDING_CONFIG.testnetDefaultAmountTomi,
     testnetFaucetUrl:
       (typeof process.env.OPENFOX_TESTNET_FAUCET_URL === "string" &&
         process.env.OPENFOX_TESTNET_FAUCET_URL.trim()) ||

@@ -37,7 +37,7 @@ function buildPaymentRecord(overrides?: Partial<X402PaymentRecord>): X402Payment
       "0xfb43d57082cdcd5103e2d7593ab60734eeee43e7c023635d644c37105b69c022" as Hex,
     rawTransaction:
       "0xb20d45fcf230c1d4053087f6df71ef5a43960ff5f61d976acb1fcfb4c40d9a10" as Hex,
-    amountWei: "5",
+    amountTomi: "5",
     confirmationPolicy: "receipt",
     status: "confirmed",
     attemptCount: 1,
@@ -78,8 +78,8 @@ describe("signer provider", () => {
         capabilityPrefix: "signer",
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
-        quotePriceWei: "0",
-        submitPriceWei: "5",
+        quotePriceTomi: "0",
+        submitPriceTomi: "5",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -91,7 +91,7 @@ describe("signer provider", () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01" as `0x${string}`,
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },
@@ -139,7 +139,7 @@ describe("signer provider", () => {
       },
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "7",
+      value_tomi: "7",
       reason: "unit-test",
     });
     expect(quote.status).toBe(200);
@@ -159,7 +159,7 @@ describe("signer provider", () => {
       request_expires_at: Math.floor(Date.now() / 1000) + 300,
       target:
         "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
-      value_wei: "7",
+      value_tomi: "7",
       reason: "unit-test",
     };
     const first = await postJson(`${provider.url}/submit`, payload);
@@ -195,8 +195,8 @@ describe("signer provider", () => {
         capabilityPrefix: "signer",
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
-        quotePriceWei: "0",
-        submitPriceWei: "0",
+        quotePriceTomi: "0",
+        submitPriceTomi: "0",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -207,7 +207,7 @@ describe("signer provider", () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01" as `0x${string}`,
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },
@@ -232,7 +232,7 @@ describe("signer provider", () => {
       },
       target:
         "0x8888888888888888888888888888888888888888888888888888888888888888",
-      value_wei: "1",
+      value_tomi: "1",
     });
     expect(response.status).toBe(400);
     expect(response.json.status).toBe("rejected");
@@ -256,8 +256,8 @@ describe("signer provider", () => {
         capabilityPrefix: "signer",
         publishToDiscovery: true,
         quoteValiditySeconds: 300,
-        quotePriceWei: "0",
-        submitPriceWei: "99",
+        quotePriceTomi: "0",
+        submitPriceTomi: "99",
         requestTimeoutMs: 15000,
         maxDataBytes: 2048,
         defaultGas: "21000",
@@ -268,7 +268,7 @@ describe("signer provider", () => {
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01" as `0x${string}`,
           ],
           allowedFunctionSelectors: [],
-          maxValueWei: "1000",
+          maxValueTomi: "1000",
           allowSystemAction: false,
         },
       },

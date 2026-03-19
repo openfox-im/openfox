@@ -141,8 +141,8 @@ function makeProviderConfig(): OpenFoxConfig {
         port: 0,
         path: "/agent-discovery/faucet",
         capability: "sponsor.topup.testnet",
-        payoutAmountWei: "10000000000000000",
-        maxAmountWei: "10000000000000000",
+        payoutAmountTomi: "10000000000000000",
+        maxAmountTomi: "10000000000000000",
         cooldownSeconds: 60,
         requireNativeIdentity: true,
       },
@@ -170,13 +170,13 @@ function makeGatewayConfig(
     maxRoutesPerSession: 8,
     maxRequestBodyBytes: 131072,
     relayPaymentEnabled: false,
-    relayPriceWei: "1000000000000000",
+    relayPriceTomi: "1000000000000000",
     relayPaymentDescription: "OpenFox gateway relay payment",
     relayPaymentRequiredDeadlineSeconds: 300,
     registerCapabilityOnStartup: false,
     paymentDirection: "requester_pays",
-    sessionFeeWei: "0",
-    perRequestFeeWei: "0",
+    sessionFeeTomi: "0",
+    perRequestFeeTomi: "0",
     maxSessions: 200,
     maxBandwidthKbps: 10000,
     supportedTransports: ["wss"],
@@ -219,8 +219,8 @@ async function signGatewayBootnodeList(params: {
     url: string;
     payToAddress?: `0x${string}`;
     paymentDirection?: "provider_pays" | "requester_pays" | "split";
-    sessionFeeWei?: string;
-    perRequestFeeWei?: string;
+    sessionFeeTomi?: string;
+    perRequestFeeTomi?: string;
   }>;
   issuedAt?: number;
 }) {
@@ -774,7 +774,7 @@ describe("agent gateway", () => {
       db: makeDb(),
       gatewayConfig: makeGatewayConfig({
         paymentDirection: "requester_pays",
-        perRequestFeeWei: "12345",
+        perRequestFeeTomi: "12345",
       }),
     });
 
@@ -1124,8 +1124,8 @@ describe("agent gateway", () => {
       db: makeDb(),
       gatewayConfig: makeGatewayConfig({
         paymentDirection: "provider_pays",
-        sessionFeeWei: "777",
-        perRequestFeeWei: "0",
+        sessionFeeTomi: "777",
+        perRequestFeeTomi: "0",
       }),
     });
 
@@ -1138,8 +1138,8 @@ describe("agent gateway", () => {
           url: gatewayServer.sessionUrl,
           payToAddress: providerConfig.walletAddress!,
           paymentDirection: "provider_pays",
-          sessionFeeWei: "777",
-          perRequestFeeWei: "0",
+          sessionFeeTomi: "777",
+          perRequestFeeTomi: "0",
         },
       ],
     };
@@ -1210,8 +1210,8 @@ describe("agent gateway", () => {
       db: makeDb(),
       gatewayConfig: makeGatewayConfig({
         paymentDirection: "split",
-        sessionFeeWei: "777",
-        perRequestFeeWei: "12345",
+        sessionFeeTomi: "777",
+        perRequestFeeTomi: "12345",
       }),
     });
 
@@ -1224,8 +1224,8 @@ describe("agent gateway", () => {
           url: gatewayServer.sessionUrl,
           payToAddress: providerConfig.walletAddress!,
           paymentDirection: "split",
-          sessionFeeWei: "777",
-          perRequestFeeWei: "12345",
+          sessionFeeTomi: "777",
+          perRequestFeeTomi: "12345",
         },
       ],
     };

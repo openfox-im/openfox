@@ -22,7 +22,7 @@ test("binds direct execution trails from signer and paymaster records by tx hash
         "0xc9b7083ed72ae7501f0f76c6fa2737ea3643ce0a7c85b2d81f4a2d030aea04ed",
       targetAddress:
         "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      valueWei: "0",
+      valueTomi: "0",
       dataHex: "0x",
       gas: "21000",
       policyId: "policy-1",
@@ -60,7 +60,7 @@ test("binds direct execution trails from signer and paymaster records by tx hash
       requesterSignerType: "secp256k1",
       targetAddress:
         "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      valueWei: "0",
+      valueTomi: "0",
       dataHex: "0x",
       gas: "21000",
       policyId: "policy-2",

@@ -83,7 +83,7 @@ export interface StorageQuoteResponse {
   bundle_kind: string;
   size_bytes: number;
   ttl_seconds: number;
-  amount_wei: string;
+  amount_tomi: string;
   expires_at: string;
 }
 
@@ -95,7 +95,7 @@ export interface StorageLeaseResponse {
   provider_address: Address;
   size_bytes: number;
   ttl_seconds: number;
-  amount_wei: string;
+  amount_tomi: string;
   issued_at: string;
   expires_at: string;
   receipt_id: string;
@@ -175,8 +175,8 @@ function computeStoragePrice(params: {
   const ttlUnits = BigInt(
     Math.max(1, Math.ceil(params.ttlSeconds / params.config.defaultTtlSeconds)),
   );
-  const perMiB = BigInt(params.config.pricePerMiBWei);
-  const minimum = BigInt(params.config.minimumPriceWei);
+  const perMiB = BigInt(params.config.pricePerMiBTomi);
+  const minimum = BigInt(params.config.minimumPriceTomi);
   const computed = sizeUnits * ttlUnits * perMiB;
   return (computed > minimum ? computed : minimum).toString();
 }
@@ -342,7 +342,7 @@ function quoteToResponse(record: StorageQuoteRecord): StorageQuoteResponse {
     bundle_kind: record.bundleKind,
     size_bytes: record.sizeBytes,
     ttl_seconds: record.ttlSeconds,
-    amount_wei: record.amountWei,
+    amount_tomi: record.amountTomi,
     expires_at: record.expiresAt,
   };
 }
@@ -356,7 +356,7 @@ function leaseToResponse(baseUrl: string, lease: StorageLeaseRecord): StorageLea
     provider_address: lease.providerAddress,
     size_bytes: lease.sizeBytes,
     ttl_seconds: lease.ttlSeconds,
-    amount_wei: lease.amountWei,
+    amount_tomi: lease.amountTomi,
     issued_at: lease.receipt.issuedAt,
     expires_at: lease.receipt.expiresAt,
     receipt_id: lease.receipt.receiptId,
@@ -472,7 +472,7 @@ export async function startStorageProviderServer(params: {
           bundleKind: request.bundle_kind,
           sizeBytes: request.size_bytes,
           ttlSeconds: request.ttl_seconds,
-          amountWei: computeStoragePrice({
+          amountTomi: computeStoragePrice({
             config: params.storageConfig,
             sizeBytes: request.size_bytes,
             ttlSeconds: request.ttl_seconds,
@@ -621,8 +621,8 @@ export async function startStorageProviderServer(params: {
           nonce,
         });
 
-        const amountWei =
-          quote?.amountWei ??
+        const amountTomi =
+          quote?.amountTomi ??
           computeStoragePrice({
             config: params.storageConfig,
             sizeBytes: bytes.byteLength,
@@ -638,7 +638,7 @@ export async function startStorageProviderServer(params: {
           providerAddress: params.address,
           requestKey,
           requestHash,
-          amountWei,
+          amountTomi,
           description: "OpenFox storage.put payment",
         });
         if (payment.state === "required") {
@@ -675,6 +675,7 @@ export async function startStorageProviderServer(params: {
           expiresAt: body.request_expires_at,
         });
 
+        // Build StorageReceipt for tosdk
         const receipt = {
           version: 1 as const,
           receiptId: `storage:${leaseId}`,
@@ -686,7 +687,7 @@ export async function startStorageProviderServer(params: {
           requesterAddress,
           sizeBytes: bytes.byteLength,
           ttlSeconds,
-          amountWei,
+          amountTomi: amountTomi,
           status: "active" as const,
           issuedAt,
           expiresAt,
@@ -704,7 +705,7 @@ export async function startStorageProviderServer(params: {
           providerBaseUrl: currentBaseUrl,
           sizeBytes: bytes.byteLength,
           ttlSeconds,
-          amountWei,
+          amountTomi,
           status: "active",
           storagePath,
           requestKey,
@@ -810,7 +811,7 @@ export async function startStorageProviderServer(params: {
         if (!paymentManager) {
           throw new Error("x402 payment manager is unavailable; configure rpcUrl");
         }
-        const amountWei = computeStoragePrice({
+        const amountTomi = computeStoragePrice({
           config: params.storageConfig,
           sizeBytes: lease.sizeBytes,
           ttlSeconds: addedTtlSeconds,
@@ -821,7 +822,7 @@ export async function startStorageProviderServer(params: {
           providerAddress: params.address,
           requestKey,
           requestHash,
-          amountWei,
+          amountTomi,
           description: "OpenFox storage.renew payment",
         });
         if (payment.state === "required") {
@@ -846,8 +847,8 @@ export async function startStorageProviderServer(params: {
           effectiveStartMs + addedTtlSeconds * 1000,
         ).toISOString();
         const renewalId = `${leaseId}:renew:${nonce}`;
-        const nextAmountWei = (
-          BigInt(lease.amountWei || "0") + BigInt(amountWei)
+        const nextAmountTomi = (
+          BigInt(lease.amountTomi || "0") + BigInt(amountTomi)
         ).toString();
         const nextTtlSeconds = lease.ttlSeconds + addedTtlSeconds;
         recordRequestNonce({
@@ -859,10 +860,11 @@ export async function startStorageProviderServer(params: {
           expiresAt: body.request_expires_at,
         });
 
+        // Build StorageReceipt for tosdk
         const receipt = {
           ...lease.receipt,
           ttlSeconds: nextTtlSeconds,
-          amountWei: nextAmountWei,
+          amountTomi: nextAmountTomi,
           issuedAt: nowIso,
           expiresAt: renewedExpiresAt,
           paymentTxHash: payment.payment.txHash,
@@ -880,7 +882,7 @@ export async function startStorageProviderServer(params: {
           ...lease,
           providerBaseUrl: lease.providerBaseUrl ?? currentBaseUrl,
           ttlSeconds: nextTtlSeconds,
-          amountWei: nextAmountWei,
+          amountTomi: nextAmountTomi,
           paymentId: payment.payment.paymentId,
           receipt,
           receiptHash: hashStorageReceipt(receipt),
@@ -896,7 +898,7 @@ export async function startStorageProviderServer(params: {
           previousExpiresAt,
           renewedExpiresAt,
           addedTtlSeconds,
-          amountWei,
+          amountTomi,
           paymentId: payment.payment.paymentId,
           receipt,
           receiptHash: hashStorageReceipt(receipt),

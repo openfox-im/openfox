@@ -257,7 +257,7 @@ export function buildGroupPageHtml(
   const treasuryCampaignItems = snapshot.treasury.campaigns
     .slice(0, 8)
     .map(
-      (campaign) => `<li><strong>${escapeHtml(campaign.title)}</strong><span>${escapeHtml(campaign.status)} · budget ${escapeHtml(campaign.budgetWei)} wei · remaining ${escapeHtml(campaign.remainingWei)} wei</span></li>`,
+      (campaign) => `<li><strong>${escapeHtml(campaign.title)}</strong><span>${escapeHtml(campaign.status)} · budget ${escapeHtml(campaign.budgetTomi)} tomi · remaining ${escapeHtml(campaign.remainingTomi)} tomi</span></li>`,
     )
     .join("");
   const treasurySettlementItems = snapshot.treasury.recentSettlements
@@ -349,14 +349,14 @@ export function buildGroupPageHtml(
         <p class="lede">${escapeHtml(snapshot.treasury.summary)}</p>
         <div class="list-grid">
           <article class="list-card">
-            <div class="meta-row"><span>Total budget</span><span>${escapeHtml(snapshot.treasury.totals.totalBudgetWei)} wei</span></div>
-            <div class="meta-row"><span>Allocated</span><span>${escapeHtml(snapshot.treasury.totals.allocatedBudgetWei)} wei</span></div>
-            <div class="meta-row"><span>Remaining</span><span>${escapeHtml(snapshot.treasury.totals.remainingBudgetWei)} wei</span></div>
+            <div class="meta-row"><span>Total budget</span><span>${escapeHtml(snapshot.treasury.totals.totalBudgetTomi)} tomi</span></div>
+            <div class="meta-row"><span>Allocated</span><span>${escapeHtml(snapshot.treasury.totals.allocatedBudgetTomi)} tomi</span></div>
+            <div class="meta-row"><span>Remaining</span><span>${escapeHtml(snapshot.treasury.totals.remainingBudgetTomi)} tomi</span></div>
           </article>
           <article class="list-card">
-            <div class="meta-row"><span>Pending payables</span><span>${escapeHtml(snapshot.treasury.totals.pendingPayablesWei)} wei</span></div>
-            <div class="meta-row"><span>Pending receivables</span><span>${escapeHtml(snapshot.treasury.totals.pendingReceivablesWei)} wei</span></div>
-            <div class="meta-row"><span>Realized host payouts</span><span>${escapeHtml(snapshot.treasury.totals.realizedHostPayoutsWei)} wei</span></div>
+            <div class="meta-row"><span>Pending payables</span><span>${escapeHtml(snapshot.treasury.totals.pendingPayablesTomi)} tomi</span></div>
+            <div class="meta-row"><span>Pending receivables</span><span>${escapeHtml(snapshot.treasury.totals.pendingReceivablesTomi)} tomi</span></div>
+            <div class="meta-row"><span>Realized host payouts</span><span>${escapeHtml(snapshot.treasury.totals.realizedHostPayoutsTomi)} tomi</span></div>
           </article>
         </div>
       </section>

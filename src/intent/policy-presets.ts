@@ -13,20 +13,20 @@ export interface PolicyPreset {
   description: string;
   terminalClass: TerminalClass;
   trustTier: TrustTier;
-  /** Maximum value for a single transaction (wei string). */
+  /** Maximum value for a single transaction (tomi string). */
   maxSingleValue: string;
-  /** Maximum aggregate value per 24-hour window (wei string). */
+  /** Maximum aggregate value per 24-hour window (tomi string). */
   maxDailyValue: string;
   /** Whether human approval is required before execution. */
   requiresApproval: boolean;
-  /** Value threshold above which approval is always required (wei string). */
+  /** Value threshold above which approval is always required (tomi string). */
   approvalThreshold: string;
   /** List of action names permitted under this preset. */
   allowedActions: string[];
 }
 
-/** Compare two wei strings numerically. Returns negative if a < b, 0 if equal, positive if a > b. */
-function compareWei(a: string, b: string): number {
+/** Compare two tomi strings numerically. Returns negative if a < b, 0 if equal, positive if a > b. */
+function compareTomi(a: string, b: string): number {
   const aBig = BigInt(a || "0");
   const bBig = BigInt(b || "0");
   if (aBig < bBig) return -1;
@@ -146,18 +146,18 @@ export function simulatePolicy(
   }
 
   // Check single-transaction value limit
-  if (compareWei(value, preset.maxSingleValue) > 0) {
+  if (compareTomi(value, preset.maxSingleValue) > 0) {
     return {
       allowed: false,
-      reason: `Value exceeds single-transaction limit of ${preset.maxSingleValue} wei under the "${preset.name}" policy.`,
+      reason: `Value exceeds single-transaction limit of ${preset.maxSingleValue} tomi under the "${preset.name}" policy.`,
     };
   }
 
   // Check if the value exceeds the daily limit (single-tx cannot exceed daily)
-  if (compareWei(value, preset.maxDailyValue) > 0) {
+  if (compareTomi(value, preset.maxDailyValue) > 0) {
     return {
       allowed: false,
-      reason: `Value exceeds daily limit of ${preset.maxDailyValue} wei under the "${preset.name}" policy.`,
+      reason: `Value exceeds daily limit of ${preset.maxDailyValue} tomi under the "${preset.name}" policy.`,
     };
   }
 
@@ -170,15 +170,15 @@ export function simulatePolicy(
   }
 
   // Check if value exceeds the approval threshold
-  if (compareWei(value, preset.approvalThreshold) > 0) {
+  if (compareTomi(value, preset.approvalThreshold) > 0) {
     return {
       allowed: true,
-      reason: `Action "${action}" is allowed but exceeds approval threshold of ${preset.approvalThreshold} wei; approval required.`,
+      reason: `Action "${action}" is allowed but exceeds approval threshold of ${preset.approvalThreshold} tomi; approval required.`,
     };
   }
 
   return {
     allowed: true,
-    reason: `Action "${action}" with value ${value} wei is permitted under the "${preset.name}" policy without approval.`,
+    reason: `Action "${action}" with value ${value} tomi is permitted under the "${preset.name}" policy without approval.`,
   };
 }

@@ -136,10 +136,10 @@ Usage:
   openfox group treasury init --group <group-id> --private-key <hex> [--json]
   openfox group treasury show --group <group-id> [--json]
   openfox group treasury budget list --group <group-id> [--json]
-  openfox group treasury budget set --group <group-id> --name <line> --cap <wei> [--period <period>] [--supermajority] [--json]
+  openfox group treasury budget set --group <group-id> --name <line> --cap <tomi> [--period <period>] [--supermajority] [--json]
   openfox group treasury log --group <group-id> [--limit N] [--json]
   openfox group treasury freeze --group <group-id> [--json]
-  openfox group treasury deposit --group <group-id> --amount <wei> [--from <addr>] [--memo "<text>"] [--json]
+  openfox group treasury deposit --group <group-id> --amount <tomi> [--from <addr>] [--memo "<text>"] [--json]
   openfox group propose --group <group-id> --type <spend|policy_change|member_action|config_change|treasury_config|external_action> --title "<text>" [--description "<text>"] [--params '{}'] [--duration-hours N] [--json]
   openfox group vote --proposal <proposal-id> --vote <approve|reject> [--reason "<text>"] [--json]
   openfox group proposals --group <group-id> [--status active|approved|rejected|expired|executed] [--json]
@@ -1020,7 +1020,7 @@ Usage:
         } else {
           logger.info(`=== TREASURY: ${groupId} ===`);
           logger.info(`  Address:  ${treasury.treasuryAddress}`);
-          logger.info(`  Balance:  ${treasury.balanceWei} wei`);
+          logger.info(`  Balance:  ${treasury.balanceTomi} tomi`);
           logger.info(`  Status:   ${treasury.status}`);
           logger.info(`  Updated:  ${treasury.updatedAt}`);
         }
@@ -1044,7 +1044,7 @@ Usage:
               logger.info("No budget lines.");
             }
             for (const line of lines) {
-              logger.info(`  ${line.lineName}: cap=${line.capWei} spent=${line.spentWei} period=${line.period} supermajority=${line.requiresSupermajority}`);
+              logger.info(`  ${line.lineName}: cap=${line.capTomi} spent=${line.spentTomi} period=${line.period} supermajority=${line.requiresSupermajority}`);
             }
           }
           return;
@@ -1053,13 +1053,13 @@ Usage:
         if (budgetCmd === "set") {
           const groupId = readGroupIdArg(args, 3);
           const lineName = readOption(args, "--name");
-          const capWei = readOption(args, "--cap");
-          if (!groupId || !lineName || !capWei) {
-            throw new Error("Usage: openfox group treasury budget set --group <group-id> --name <line> --cap <wei> [--period <period>]");
+          const capTomi = readOption(args, "--cap");
+          if (!groupId || !lineName || !capTomi) {
+            throw new Error("Usage: openfox group treasury budget set --group <group-id> --name <line> --cap <tomi> [--period <period>]");
           }
           const period = (readOption(args, "--period") || "monthly") as "daily" | "weekly" | "monthly" | "epoch";
           const supermajority = args.includes("--supermajority");
-          const result = setBudgetLine(db, groupId, lineName, capWei, period, supermajority);
+          const result = setBudgetLine(db, groupId, lineName, capTomi, period, supermajority);
           logger.info(JSON.stringify(result, null, 2));
           return;
         }
@@ -1081,7 +1081,7 @@ Usage:
             logger.info("No log entries.");
           }
           for (const entry of log) {
-            logger.info(`  ${entry.createdAt}  ${entry.direction}  ${entry.amountWei} wei  ${entry.counterparty ?? ""}`);
+            logger.info(`  ${entry.createdAt}  ${entry.direction}  ${entry.amountTomi} tomi  ${entry.counterparty ?? ""}`);
           }
         }
         return;
@@ -1101,7 +1101,7 @@ Usage:
         const groupId = readGroupIdArg(args, 2);
         const amount = readOption(args, "--amount");
         if (!groupId || !amount) {
-          throw new Error("Usage: openfox group treasury deposit --group <group-id> --amount <wei> [--from <addr>] [--memo <text>]");
+          throw new Error("Usage: openfox group treasury deposit --group <group-id> --amount <tomi> [--from <addr>] [--memo <text>]");
         }
         const result = recordTreasuryInflow(
           db,
@@ -1309,8 +1309,8 @@ Usage:
           if (latest.eventsMerkleRoot) {
             logger.info(`  Events Root: ${latest.eventsMerkleRoot}`);
           }
-          if (latest.treasuryBalanceWei) {
-            logger.info(`  Treasury:    ${latest.treasuryBalanceWei} wei`);
+          if (latest.treasuryBalanceTomi) {
+            logger.info(`  Treasury:    ${latest.treasuryBalanceTomi} tomi`);
           }
           logger.info(`  Created:     ${latest.createdAt}`);
         }

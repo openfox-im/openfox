@@ -153,13 +153,13 @@ export const REACTOR_TASKS: Record<string, HeartbeatTaskFn> = {
       // Find all groups with active treasury
       const treasuryRows = taskCtx.db.raw
         .prepare(
-          `SELECT group_id, treasury_address, balance_wei
+          `SELECT group_id, treasury_address, balance_tomi
            FROM group_treasury WHERE status = 'active'`,
         )
         .all() as Array<{
         group_id: string;
         treasury_address: string;
-        balance_wei: string;
+        balance_tomi: string;
       }>;
 
       if (treasuryRows.length === 0) {
@@ -174,21 +174,21 @@ export const REACTOR_TASKS: Record<string, HeartbeatTaskFn> = {
           const onChainBalance = await client.getBalance(
             row.treasury_address as any,
           );
-          const onChainWei = onChainBalance.toString();
+          const onChainTomi = onChainBalance.toString();
 
-          if (onChainWei !== row.balance_wei) {
+          if (onChainTomi !== row.balance_tomi) {
             const now = new Date().toISOString();
             taskCtx.db.raw
               .prepare(
                 `UPDATE group_treasury
-                 SET balance_wei = ?, last_synced_at = ?, updated_at = ?
+                 SET balance_tomi = ?, last_synced_at = ?, updated_at = ?
                  WHERE group_id = ?`,
               )
-              .run(onChainWei, now, now, row.group_id);
+              .run(onChainTomi, now, now, row.group_id);
 
             // If on-chain balance is higher, record an inflow
-            const previousBig = BigInt(row.balance_wei);
-            const currentBig = BigInt(onChainWei);
+            const previousBig = BigInt(row.balance_tomi);
+            const currentBig = BigInt(onChainTomi);
             if (currentBig > previousBig) {
               const { recordTreasuryInflow } = await import(
                 "../group/treasury.js"
@@ -210,7 +210,7 @@ export const REACTOR_TASKS: Record<string, HeartbeatTaskFn> = {
 
             synced++;
             logger.info(
-              `synced treasury balance for ${row.group_id}: ${row.balance_wei} -> ${onChainWei}`,
+              `synced treasury balance for ${row.group_id}: ${row.balance_tomi} -> ${onChainTomi}`,
             );
           }
         } catch (err) {

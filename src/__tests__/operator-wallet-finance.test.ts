@@ -38,7 +38,7 @@ describe("operator wallet and finance snapshots", () => {
         title: "Open bounty",
         taskPrompt: "Open bounty task",
         referenceOutput: "ref",
-        rewardWei: "100",
+        rewardTomi: "100",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         judgeMode: "local_model",
         status: "open",
@@ -54,7 +54,7 @@ describe("operator wallet and finance snapshots", () => {
         title: "Approved bounty",
         taskPrompt: "Approved bounty task",
         referenceOutput: "ref",
-        rewardWei: "50",
+        rewardTomi: "50",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         judgeMode: "local_model",
         status: "approved",
@@ -70,7 +70,7 @@ describe("operator wallet and finance snapshots", () => {
         title: "Solver reward",
         taskPrompt: "Solver reward task",
         referenceOutput: "ref",
-        rewardWei: "70",
+        rewardTomi: "70",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         judgeMode: "local_model",
         status: "approved",
@@ -104,7 +104,7 @@ describe("operator wallet and finance snapshots", () => {
         title: "Solver paid",
         taskPrompt: "Solver paid task",
         referenceOutput: "ref",
-        rewardWei: "110",
+        rewardTomi: "110",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         judgeMode: "local_model",
         status: "paid",
@@ -140,7 +140,7 @@ describe("operator wallet and finance snapshots", () => {
         title: "Host paid",
         taskPrompt: "Host paid task",
         referenceOutput: "ref",
-        rewardWei: "90",
+        rewardTomi: "90",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         judgeMode: "local_model",
         status: "paid",
@@ -183,7 +183,7 @@ describe("operator wallet and finance snapshots", () => {
           "0x3000000000000000000000000000000000000000000000000000000000000002",
         rawTransaction:
           "0x3000000000000000000000000000000000000000000000000000000000000003",
-        amountWei: "30",
+        amountTomi: "30",
         confirmationPolicy: "receipt",
         status: "verified",
         attemptCount: 0,
@@ -206,7 +206,7 @@ describe("operator wallet and finance snapshots", () => {
           "0x4000000000000000000000000000000000000000000000000000000000000002",
         rawTransaction:
           "0x4000000000000000000000000000000000000000000000000000000000000003",
-        amountWei: "20",
+        amountTomi: "20",
         confirmationPolicy: "receipt",
         status: "submitted",
         attemptCount: 1,
@@ -229,7 +229,7 @@ describe("operator wallet and finance snapshots", () => {
           "0x5000000000000000000000000000000000000000000000000000000000000002",
         rawTransaction:
           "0x5000000000000000000000000000000000000000000000000000000000000003",
-        amountWei: "40",
+        amountTomi: "40",
         confirmationPolicy: "receipt",
         status: "confirmed",
         attemptCount: 1,
@@ -252,7 +252,7 @@ describe("operator wallet and finance snapshots", () => {
           "0x6000000000000000000000000000000000000000000000000000000000000002",
         rawTransaction:
           "0x6000000000000000000000000000000000000000000000000000000000000003",
-        amountWei: "25",
+        amountTomi: "25",
         confirmationPolicy: "receipt",
         status: "confirmed",
         attemptCount: 1,
@@ -275,7 +275,7 @@ describe("operator wallet and finance snapshots", () => {
           "0x7000000000000000000000000000000000000000000000000000000000000002",
         rawTransaction:
           "0x7000000000000000000000000000000000000000000000000000000000000003",
-        amountWei: "15",
+        amountTomi: "15",
         confirmationPolicy: "receipt",
         status: "failed",
         attemptCount: 2,
@@ -376,9 +376,9 @@ describe("operator wallet and finance snapshots", () => {
       const wallet = await buildOperatorWalletSnapshot(config, db, now);
       expect(wallet.kind).toBe("wallet");
       expect(wallet.rpcReachable).toBe(false);
-      expect(wallet.reservedBalanceWei).toBe("150");
-      expect(wallet.pendingReceivablesWei).toBe("100");
-      expect(wallet.pendingPayablesWei).toBe("70");
+      expect(wallet.reservedBalanceTomi).toBe("150");
+      expect(wallet.pendingReceivablesTomi).toBe("100");
+      expect(wallet.pendingPayablesTomi).toBe("70");
       expect(wallet.retryableFailedItems).toBe(3);
       expect(wallet.pendingOnchainTransactions).toBe(1);
       expect(wallet.failedOnchainTransactions).toBe(1);
@@ -386,17 +386,17 @@ describe("operator wallet and finance snapshots", () => {
 
       const finance = await buildOperatorFinanceSnapshot(config, db, now);
       expect(finance.kind).toBe("finance");
-      expect(finance.periods.today.revenueWei).toBe("150");
-      expect(finance.periods.today.costWei).toBe("115");
-      expect(finance.periods.today.netWei).toBe("35");
+      expect(finance.periods.today.revenueTomi).toBe("150");
+      expect(finance.periods.today.costTomi).toBe("115");
+      expect(finance.periods.today.netTomi).toBe("35");
       expect(finance.periods.today.operatingCostCents).toBe(375);
-      expect(finance.pendingReceivablesWei).toBe("100");
-      expect(finance.pendingPayablesWei).toBe("70");
+      expect(finance.pendingReceivablesTomi).toBe("100");
+      expect(finance.pendingPayablesTomi).toBe("70");
       expect(finance.retryableFailedItems).toBe(3);
-      expect(finance.revenueSources.x402ConfirmedWei30d).toBe("40");
-      expect(finance.revenueSources.bountySolverRewardsWei30d).toBe("110");
-      expect(finance.costSources.x402ConfirmedWei30d).toBe("25");
-      expect(finance.costSources.bountyHostPayoutsWei30d).toBe("90");
+      expect(finance.revenueSources.x402ConfirmedTomi30d).toBe("40");
+      expect(finance.revenueSources.bountySolverRewardsTomi30d).toBe("110");
+      expect(finance.costSources.x402ConfirmedTomi30d).toBe("25");
+      expect(finance.costSources.bountyHostPayoutsTomi30d).toBe("90");
       const report = buildOperatorFinanceReport(finance);
       expect(report).toContain("Trailing 30d:");
       expect(report).toContain("Operating cost: $3.75");

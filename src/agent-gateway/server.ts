@@ -70,7 +70,7 @@ interface PendingForward {
   reject(error: Error): void;
 }
 
-function parsePositiveWei(value: string | undefined): bigint {
+function parsePositiveTomi(value: string | undefined): bigint {
   if (!value || !/^\d+$/.test(value.trim())) {
     return 0n;
   }
@@ -264,12 +264,12 @@ function relayPaymentAmount(gatewayConfig: AgentGatewayServerConfig): bigint {
   if (
     (gatewayConfig.paymentDirection === "requester_pays" ||
       gatewayConfig.paymentDirection === "split") &&
-    parsePositiveWei(gatewayConfig.perRequestFeeWei) > 0n
+    parsePositiveTomi(gatewayConfig.perRequestFeeTomi) > 0n
   ) {
-    return parsePositiveWei(gatewayConfig.perRequestFeeWei);
+    return parsePositiveTomi(gatewayConfig.perRequestFeeTomi);
   }
   if (gatewayConfig.relayPaymentEnabled) {
-    return parsePositiveWei(gatewayConfig.relayPriceWei);
+    return parsePositiveTomi(gatewayConfig.relayPriceTomi);
   }
   return 0n;
 }
@@ -278,9 +278,9 @@ function sessionPaymentAmount(gatewayConfig: AgentGatewayServerConfig): bigint {
   if (
     (gatewayConfig.paymentDirection === "provider_pays" ||
       gatewayConfig.paymentDirection === "split") &&
-    parsePositiveWei(gatewayConfig.sessionFeeWei) > 0n
+    parsePositiveTomi(gatewayConfig.sessionFeeTomi) > 0n
   ) {
-    return parsePositiveWei(gatewayConfig.sessionFeeWei);
+    return parsePositiveTomi(gatewayConfig.sessionFeeTomi);
   }
   return 0n;
 }
@@ -292,8 +292,8 @@ async function enforceRelayPayment(params: {
   gatewayAddress: string;
   gatewayConfig: AgentGatewayServerConfig;
 }): Promise<boolean> {
-  const relayPriceWei = relayPaymentAmount(params.gatewayConfig);
-  if (relayPriceWei === 0n) {
+  const relayPriceTomi = relayPaymentAmount(params.gatewayConfig);
+  if (relayPriceTomi === 0n) {
     return true;
   }
   const rpcUrl = params.config?.rpcUrl || process.env.TOS_RPC_URL;
@@ -307,7 +307,7 @@ async function enforceRelayPayment(params: {
   const requirement = {
     scheme: "exact" as const,
     network: formatNetwork(chainId),
-    maxAmountRequired: relayPriceWei.toString(),
+    maxAmountRequired: relayPriceTomi.toString(),
     payToAddress: normalizeAddress(params.gatewayAddress),
     asset: "native",
     requiredDeadlineSeconds:
@@ -332,8 +332,8 @@ async function enforceSessionPayment(params: {
   gatewayConfig: AgentGatewayServerConfig;
   payment?: PaymentEnvelope;
 }): Promise<void> {
-  const sessionFeeWei = sessionPaymentAmount(params.gatewayConfig);
-  if (sessionFeeWei === 0n) {
+  const sessionFeeTomi = sessionPaymentAmount(params.gatewayConfig);
+  if (sessionFeeTomi === 0n) {
     return;
   }
   if (!params.payment) {
@@ -350,7 +350,7 @@ async function enforceSessionPayment(params: {
   const requirement = {
     scheme: "exact" as const,
     network: formatNetwork(chainId),
-    maxAmountRequired: sessionFeeWei.toString(),
+    maxAmountRequired: sessionFeeTomi.toString(),
     payToAddress: normalizeAddress(params.gatewayAddress),
     asset: "native",
     requiredDeadlineSeconds:

@@ -135,7 +135,7 @@ describe("reactor federation — outbound broadcasting", () => {
       payloadJson: JSON.stringify({
         settlement_id: settlementId,
         parties: [PUBLISHER, SOLVER],
-        amount_wei: "10000",
+        amount_tomi: "10000",
         completed_at: now,
       }),
       receivedAt: now,

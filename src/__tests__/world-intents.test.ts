@@ -118,14 +118,14 @@ describe("world intents", () => {
       intentId: intent.intentId,
       solverAddress: SOLVER_A,
       proposalText: "I can help!",
-      proposedAmountWei: "5000",
+      proposedAmountTomi: "5000",
     });
 
     expect(response.responseId).toBeTruthy();
     expect(response.intentId).toBe(intent.intentId);
     expect(response.solverAddress).toBe(SOLVER_A);
     expect(response.proposalText).toBe("I can help!");
-    expect(response.proposedAmountWei).toBe("5000");
+    expect(response.proposedAmountTomi).toBe("5000");
     expect(response.status).toBe("pending");
   });
 
@@ -262,7 +262,7 @@ describe("world intents", () => {
       publisherAddress: PUBLISHER,
       kind: "work",
       title: "Complete me",
-      budgetWei: "10000",
+      budgetTomi: "10000",
     });
     respondToIntent(db, {
       intentId: intent.intentId,
@@ -403,7 +403,7 @@ describe("world intents", () => {
       kind: "work",
       title: "Full lifecycle test",
       description: "End-to-end intent lifecycle",
-      budgetWei: "50000",
+      budgetTomi: "50000",
       requirements: [
         { kind: "capability", capability_name: "coding" },
       ],
@@ -416,7 +416,7 @@ describe("world intents", () => {
       intentId: intent.intentId,
       solverAddress: SOLVER_A,
       proposalText: "I'll do it for 40000",
-      proposedAmountWei: "40000",
+      proposedAmountTomi: "40000",
       capabilityRefs: ["coding", "testing"],
     });
     expect(response.status).toBe("pending");

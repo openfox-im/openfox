@@ -51,7 +51,7 @@ export interface PaymasterQuoteRequest {
   };
   wallet_address?: ChainAddress;
   target: ChainAddress;
-  value_wei?: string;
+  value_tomi?: string;
   data?: Hex;
   gas?: string;
   reason?: string;
@@ -70,7 +70,7 @@ export interface PaymasterAuthorizeRequest {
   request_expires_at: number;
   execution_nonce: string;
   target: ChainAddress;
-  value_wei?: string;
+  value_tomi?: string;
   data?: Hex;
   gas?: string;
   execution_signature: Signature | Record<string, unknown>;
@@ -96,7 +96,7 @@ export interface StartPaymasterProviderServerParams {
       providerAddress: string;
       requestKey: string;
       requestHash: Hex;
-      amountWei: string;
+      amountTomi: string;
       description: string;
     }): Promise<X402ServerPaymentResult>;
     bindPayment(binding: {
@@ -166,7 +166,7 @@ function buildQuoteId(params: {
   sponsorAddress: ChainAddress;
   walletAddress: ChainAddress;
   targetAddress: ChainAddress;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyHash: Hex;
@@ -180,7 +180,7 @@ function buildQuoteId(params: {
         params.sponsorAddress.toLowerCase(),
         params.walletAddress.toLowerCase(),
         params.targetAddress.toLowerCase(),
-        params.valueWei,
+        params.valueTomi,
         params.dataHex.toLowerCase(),
         params.gas,
         params.policyHash.toLowerCase(),
@@ -393,7 +393,7 @@ export async function startPaymasterProviderServer(
   const paymentManager =
     params.paymentManager !== undefined
       ? params.paymentManager
-      : config.x402Server?.enabled && rpcUrl && BigInt(paymasterConfig.authorizePriceWei) > 0n
+      : config.x402Server?.enabled && rpcUrl && BigInt(paymasterConfig.authorizePriceTomi) > 0n
         ? createX402PaymentManager({
             db,
             rpcUrl,
@@ -412,7 +412,7 @@ export async function startPaymasterProviderServer(
           provider_address: address,
           sponsor_address: paymasterConfig.policy.sponsorAddress || address,
           rpc_url: rpcUrl || null,
-          authorize_price_wei: paymasterConfig.authorizePriceWei,
+          authorize_price_tomi: paymasterConfig.authorizePriceTomi,
         });
         return;
       }
@@ -470,7 +470,7 @@ export async function startPaymasterProviderServer(
           config: paymasterConfig,
           walletAddress,
           targetAddress: body.target,
-          valueWei: body.value_wei || "0",
+          valueTomi: body.value_tomi || "0",
           dataHex: body.data,
           gas: body.gas,
         });
@@ -509,7 +509,7 @@ export async function startPaymasterProviderServer(
             sponsorAddress: scope.sponsorAddress,
             walletAddress,
             targetAddress: scope.targetAddress,
-            valueWei: scope.valueWei,
+            valueTomi: scope.valueTomi,
             dataHex: scope.dataHex,
             gas: scope.gas,
             policyHash: scope.policyHash,
@@ -523,7 +523,7 @@ export async function startPaymasterProviderServer(
           requesterAddress,
           requesterSignerType: requesterSigner.type,
           targetAddress: scope.targetAddress,
-          valueWei: scope.valueWei,
+          valueTomi: scope.valueTomi,
           dataHex: scope.dataHex,
           gas: scope.gas,
           policyId: paymasterConfig.policy.policyId,
@@ -531,7 +531,7 @@ export async function startPaymasterProviderServer(
           scopeHash: scope.scopeHash,
           delegateIdentity: paymasterConfig.policy.delegateIdentity || null,
           trustTier: paymasterConfig.policy.trustTier,
-          amountWei: paymasterConfig.authorizePriceWei,
+          amountTomi: paymasterConfig.authorizePriceTomi,
           sponsorNonce: sponsorNonce.toString(),
           sponsorExpiry:
             Math.floor(Date.now() / 1000) + paymasterConfig.authorizationValiditySeconds,
@@ -550,14 +550,14 @@ export async function startPaymasterProviderServer(
           wallet_address: quote.walletAddress,
           requester_address: quote.requesterAddress,
           target_address: quote.targetAddress,
-          value_wei: quote.valueWei,
+          value_tomi: quote.valueTomi,
           data_hex: quote.dataHex,
           gas: quote.gas,
           policy_id: quote.policyId,
           policy_hash: quote.policyHash,
           scope_hash: quote.scopeHash,
           trust_tier: quote.trustTier,
-          amount_wei: quote.amountWei,
+          amount_tomi: quote.amountTomi,
           sponsor_nonce: quote.sponsorNonce,
           sponsor_expiry: quote.sponsorExpiry,
           requester_signer_type: quote.requesterSignerType,
@@ -597,7 +597,7 @@ export async function startPaymasterProviderServer(
         }
         if (
           normalizeAddress(body.target) !== quote.targetAddress ||
-          String(body.value_wei || "0") !== quote.valueWei ||
+          String(body.value_tomi || "0") !== quote.valueTomi ||
           ((body.data || "0x").toLowerCase() as Hex) !== quote.dataHex ||
           String(body.gas || quote.gas) !== quote.gas
         ) {
@@ -637,7 +637,7 @@ export async function startPaymasterProviderServer(
           nonce: executionNonce,
           gas: BigInt(quote.gas),
           to: quote.targetAddress,
-          value: BigInt(quote.valueWei),
+          value: BigInt(quote.valueTomi),
           data: quote.dataHex,
           from: quote.walletAddress,
           signerType: quote.requesterSignerType,
@@ -667,7 +667,7 @@ export async function startPaymasterProviderServer(
           requester_address: requesterAddress,
           wallet_address: quote.walletAddress,
           target_address: quote.targetAddress,
-          value_wei: quote.valueWei,
+          value_tomi: quote.valueTomi,
           data_hex: quote.dataHex,
           gas: quote.gas,
           execution_nonce: executionNonce.toString(),
@@ -677,14 +677,14 @@ export async function startPaymasterProviderServer(
           scope_hash: quote.scopeHash,
         });
         let paymentState: X402ServerPaymentResult | undefined;
-        if (paymentManager && BigInt(paymasterConfig.authorizePriceWei) > 0n) {
+        if (paymentManager && BigInt(paymasterConfig.authorizePriceTomi) > 0n) {
           paymentState = await paymentManager.requirePayment({
             req,
             serviceKind: "paymaster",
             providerAddress: address,
             requestKey,
             requestHash,
-            amountWei: paymasterConfig.authorizePriceWei,
+            amountTomi: paymasterConfig.authorizePriceTomi,
             description: `OpenFox paymaster authorization ${quote.quoteId}`,
           });
           if (paymentState.state === "required") {
@@ -693,7 +693,7 @@ export async function startPaymasterProviderServer(
               (await buildX402ServerRequirement({
                 rpcUrl,
                 providerAddress: address,
-                amountWei: paymasterConfig.authorizePriceWei,
+                amountTomi: paymasterConfig.authorizePriceTomi,
                 description: `OpenFox paymaster authorization ${quote.quoteId}`,
               }));
             writeX402RequirementResponse({ res, requirement });
@@ -719,7 +719,7 @@ export async function startPaymasterProviderServer(
           requesterAddress,
           requesterSignerType: quote.requesterSignerType,
           targetAddress: quote.targetAddress,
-          valueWei: quote.valueWei,
+          valueTomi: quote.valueTomi,
           dataHex: quote.dataHex,
           gas: quote.gas,
           policyId: quote.policyId,

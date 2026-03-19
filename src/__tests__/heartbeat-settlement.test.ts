@@ -107,7 +107,7 @@ describe("heartbeat settlement retry task", () => {
             bounty: {
               enabled: false,
               gas: "220000",
-              valueWei: "0",
+              valueTomi: "0",
               waitForReceipt: true,
               receiptTimeoutMs: 60000,
               payloadMode: "canonical_receipt",
@@ -116,7 +116,7 @@ describe("heartbeat settlement retry task", () => {
             observation: {
               enabled: false,
               gas: "220000",
-              valueWei: "0",
+              valueTomi: "0",
               waitForReceipt: true,
               receiptTimeoutMs: 60000,
               payloadMode: "canonical_receipt",
@@ -125,7 +125,7 @@ describe("heartbeat settlement retry task", () => {
             oracle: {
               enabled: true,
               gas: "220000",
-              valueWei: "0",
+              valueTomi: "0",
               waitForReceipt: true,
               receiptTimeoutMs: 60000,
               payloadMode: "canonical_receipt",

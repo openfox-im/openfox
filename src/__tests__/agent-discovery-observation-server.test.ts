@@ -45,7 +45,7 @@ function makeConfig(): OpenFoxConfig {
         port: 0,
         path: "/agent-discovery/observe-once",
         capability: "observation.once",
-        priceWei: "1000000000000000",
+        priceTomi: "1000000000000000",
         requestTimeoutMs: 5000,
         maxResponseBytes: 65536,
         allowPrivateTargets: true,

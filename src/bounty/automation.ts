@@ -159,7 +159,7 @@ export async function ensureAutoQuestionBountyOpen(params: {
     title: draft.title,
     taskPrompt: draft.taskPrompt,
     referenceOutput: draft.referenceOutput,
-    rewardWei: params.bountyConfig.rewardWei,
+    rewardTomi: params.bountyConfig.rewardTomi,
     submissionDeadline: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
     skillName: resolveBountySkillName(params.bountyConfig),
   });

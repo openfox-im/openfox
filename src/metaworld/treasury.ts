@@ -16,9 +16,9 @@ export interface GroupTreasuryCampaignSummary {
   campaignId: string;
   title: string;
   status: string;
-  budgetWei: string;
-  allocatedWei: string;
-  remainingWei: string;
+  budgetTomi: string;
+  allocatedTomi: string;
+  remainingTomi: string;
   bountyCount: number;
   openBountyCount: number;
   paidBountyCount: number;
@@ -31,7 +31,7 @@ export interface GroupTreasuryBountySummary {
   campaignId: string | null;
   title: string;
   status: string;
-  rewardWei: string;
+  rewardTomi: string;
   relation: string;
   payoutTxHash: string | null;
   updatedAt: string;
@@ -64,15 +64,15 @@ export interface GroupTreasurySnapshot {
     settlementCount: number;
   };
   totals: {
-    totalBudgetWei: string;
-    allocatedBudgetWei: string;
-    remainingBudgetWei: string;
-    openCommitmentsWei: string;
-    approvedUnpaidWei: string;
-    pendingPayablesWei: string;
-    pendingReceivablesWei: string;
-    realizedHostPayoutsWei: string;
-    realizedSolverEarningsWei: string;
+    totalBudgetTomi: string;
+    allocatedBudgetTomi: string;
+    remainingBudgetTomi: string;
+    openCommitmentsTomi: string;
+    approvedUnpaidTomi: string;
+    pendingPayablesTomi: string;
+    pendingReceivablesTomi: string;
+    realizedHostPayoutsTomi: string;
+    realizedSolverEarningsTomi: string;
   };
   campaigns: GroupTreasuryCampaignSummary[];
   recentBounties: GroupTreasuryBountySummary[];
@@ -111,8 +111,8 @@ function collectCampaignProgress(
   db: OpenFoxDatabase,
   campaignId: string,
 ): {
-  allocatedWei: bigint;
-  remainingWei: bigint;
+  allocatedTomi: bigint;
+  remainingTomi: bigint;
   bountyCount: number;
   openBountyCount: number;
   paidBountyCount: number;
@@ -121,8 +121,8 @@ function collectCampaignProgress(
   const campaign = db.getCampaignById(campaignId);
   if (!campaign) {
     return {
-      allocatedWei: 0n,
-      remainingWei: 0n,
+      allocatedTomi: 0n,
+      remainingTomi: 0n,
       bountyCount: 0,
       openBountyCount: 0,
       paidBountyCount: 0,
@@ -130,18 +130,18 @@ function collectCampaignProgress(
     };
   }
   const bounties = db.listBountiesByCampaign(campaignId);
-  const allocatedWei = bounties.reduce(
-    (sum, bounty) => sum + toBigInt(bounty.rewardWei),
+  const allocatedTomi = bounties.reduce(
+    (sum, bounty) => sum + toBigInt(bounty.rewardTomi),
     0n,
   );
   const submissionCount = bounties.reduce(
     (sum, bounty) => sum + db.listBountySubmissions(bounty.bountyId).length,
     0,
   );
-  const totalBudgetWei = toBigInt(campaign.budgetWei);
+  const totalBudgetTomi = toBigInt(campaign.budgetTomi);
   return {
-    allocatedWei,
-    remainingWei: totalBudgetWei > allocatedWei ? totalBudgetWei - allocatedWei : 0n,
+    allocatedTomi,
+    remainingTomi: totalBudgetTomi > allocatedTomi ? totalBudgetTomi - allocatedTomi : 0n,
     bountyCount: bounties.length,
     openBountyCount: bounties.filter((item) => item.status === "open").length,
     paidBountyCount: bounties.filter((item) => item.status === "paid").length,
@@ -178,22 +178,22 @@ export function buildGroupTreasurySnapshot(
     .listCampaigns()
     .filter((campaign) => activeMemberAddresses.has(campaign.hostAddress.toLowerCase()));
 
-  let totalBudgetWei = 0n;
-  let allocatedBudgetWei = 0n;
-  let remainingBudgetWei = 0n;
+  let totalBudgetTomi = 0n;
+  let allocatedBudgetTomi = 0n;
+  let remainingBudgetTomi = 0n;
   const campaignSummaries = campaigns
     .map((campaign) => {
       const progress = collectCampaignProgress(db, campaign.campaignId);
-      totalBudgetWei += toBigInt(campaign.budgetWei);
-      allocatedBudgetWei += progress.allocatedWei;
-      remainingBudgetWei += progress.remainingWei;
+      totalBudgetTomi += toBigInt(campaign.budgetTomi);
+      allocatedBudgetTomi += progress.allocatedTomi;
+      remainingBudgetTomi += progress.remainingTomi;
       return {
         campaignId: campaign.campaignId,
         title: campaign.title,
         status: campaign.status,
-        budgetWei: campaign.budgetWei,
-        allocatedWei: progress.allocatedWei.toString(),
-        remainingWei: progress.remainingWei.toString(),
+        budgetTomi: campaign.budgetTomi,
+        allocatedTomi: progress.allocatedTomi.toString(),
+        remainingTomi: progress.remainingTomi.toString(),
         bountyCount: progress.bountyCount,
         openBountyCount: progress.openBountyCount,
         paidBountyCount: progress.paidBountyCount,
@@ -204,12 +204,12 @@ export function buildGroupTreasurySnapshot(
     .sort(compareDescByUpdatedAt)
     .slice(0, campaignLimit);
 
-  let openCommitmentsWei = 0n;
-  let approvedUnpaidWei = 0n;
-  let pendingPayablesWei = 0n;
-  let pendingReceivablesWei = 0n;
-  let realizedHostPayoutsWei = 0n;
-  let realizedSolverEarningsWei = 0n;
+  let openCommitmentsTomi = 0n;
+  let approvedUnpaidTomi = 0n;
+  let pendingPayablesTomi = 0n;
+  let pendingReceivablesTomi = 0n;
+  let realizedHostPayoutsTomi = 0n;
+  let realizedSolverEarningsTomi = 0n;
   let openHostedBountyCount = 0;
   let approvedUnpaidBountyCount = 0;
 
@@ -220,7 +220,7 @@ export function buildGroupTreasurySnapshot(
       campaignId: string | null;
       title: string;
       status: string;
-      rewardWei: string;
+      rewardTomi: string;
       roles: Set<GroupTreasuryAttributionRole>;
       payoutTxHash: string | null;
       updatedAt: string;
@@ -236,13 +236,13 @@ export function buildGroupTreasurySnapshot(
         campaignId: bounty.campaignId ?? null,
         title: bounty.title,
         status: bounty.status,
-        rewardWei: bounty.rewardWei,
+        rewardTomi: bounty.rewardTomi,
         roles: new Set<GroupTreasuryAttributionRole>(),
         payoutTxHash: null,
         updatedAt: bounty.updatedAt,
       };
 
-    const rewardWei = toBigInt(bounty.rewardWei);
+    const rewardTomi = toBigInt(bounty.rewardTomi);
     if (activeMemberAddresses.has(bounty.hostAddress.toLowerCase())) {
       relation.roles.add("host");
       if (
@@ -250,12 +250,12 @@ export function buildGroupTreasurySnapshot(
         bounty.status === "submitted" ||
         bounty.status === "under_review"
       ) {
-        openCommitmentsWei += rewardWei;
+        openCommitmentsTomi += rewardTomi;
         openHostedBountyCount += 1;
       }
       if (bounty.status === "approved") {
-        approvedUnpaidWei += rewardWei;
-        pendingPayablesWei += rewardWei;
+        approvedUnpaidTomi += rewardTomi;
+        pendingPayablesTomi += rewardTomi;
         approvedUnpaidBountyCount += 1;
       }
     }
@@ -269,13 +269,13 @@ export function buildGroupTreasurySnapshot(
       ) {
         relation.roles.add("solver");
         if (result.payoutTxHash) {
-          realizedSolverEarningsWei += rewardWei;
+          realizedSolverEarningsTomi += rewardTomi;
         } else if (result.decision === "accepted") {
-          pendingReceivablesWei += rewardWei;
+          pendingReceivablesTomi += rewardTomi;
         }
       }
       if (result.payoutTxHash && activeMemberAddresses.has(bounty.hostAddress.toLowerCase())) {
-        realizedHostPayoutsWei += rewardWei;
+        realizedHostPayoutsTomi += rewardTomi;
       }
       relation.payoutTxHash = result.payoutTxHash ?? null;
       if (result.updatedAt) {
@@ -296,7 +296,7 @@ export function buildGroupTreasurySnapshot(
       campaignId: item.campaignId,
       title: item.title,
       status: item.status,
-      rewardWei: item.rewardWei,
+      rewardTomi: item.rewardTomi,
       relation: Array.from(item.roles).sort().join("+"),
       payoutTxHash: item.payoutTxHash,
       updatedAt: item.updatedAt,
@@ -335,7 +335,7 @@ export function buildGroupTreasurySnapshot(
     groupId: options.groupId,
     groupName: group.name,
     attributionSummary: `Derived from ${activeMembers.length} active member(s) and their hosted campaigns, bounty commitments, solver wins, and attributed bounty settlement receipts.`,
-    summary: `${campaigns.length} campaign(s), ${formatTOS(totalBudgetWei)} total budget, ${formatTOS(remainingBudgetWei)} remaining, ${formatTOS(pendingPayablesWei)} pending payables, ${formatTOS(pendingReceivablesWei)} pending receivables.`,
+    summary: `${campaigns.length} campaign(s), ${formatTOS(totalBudgetTomi)} total budget, ${formatTOS(remainingBudgetTomi)} remaining, ${formatTOS(pendingPayablesTomi)} pending payables, ${formatTOS(pendingReceivablesTomi)} pending receivables.`,
     counts: {
       activeMemberCount: activeMembers.length,
       campaignCount: campaigns.length,
@@ -346,15 +346,15 @@ export function buildGroupTreasurySnapshot(
       settlementCount: recentSettlements.length,
     },
     totals: {
-      totalBudgetWei: totalBudgetWei.toString(),
-      allocatedBudgetWei: allocatedBudgetWei.toString(),
-      remainingBudgetWei: remainingBudgetWei.toString(),
-      openCommitmentsWei: openCommitmentsWei.toString(),
-      approvedUnpaidWei: approvedUnpaidWei.toString(),
-      pendingPayablesWei: pendingPayablesWei.toString(),
-      pendingReceivablesWei: pendingReceivablesWei.toString(),
-      realizedHostPayoutsWei: realizedHostPayoutsWei.toString(),
-      realizedSolverEarningsWei: realizedSolverEarningsWei.toString(),
+      totalBudgetTomi: totalBudgetTomi.toString(),
+      allocatedBudgetTomi: allocatedBudgetTomi.toString(),
+      remainingBudgetTomi: remainingBudgetTomi.toString(),
+      openCommitmentsTomi: openCommitmentsTomi.toString(),
+      approvedUnpaidTomi: approvedUnpaidTomi.toString(),
+      pendingPayablesTomi: pendingPayablesTomi.toString(),
+      pendingReceivablesTomi: pendingReceivablesTomi.toString(),
+      realizedHostPayoutsTomi: realizedHostPayoutsTomi.toString(),
+      realizedSolverEarningsTomi: realizedSolverEarningsTomi.toString(),
     },
     campaigns: campaignSummaries,
     recentBounties,
@@ -374,12 +374,12 @@ export function buildGroupTreasuryHtml(
 ): string {
   const campaignItems = snapshot.campaigns
     .map(
-      (campaign) => `<li><strong>${escapeHtml(campaign.title)}</strong><span>${escapeHtml(campaign.status)} · budget ${escapeHtml(formatTOS(campaign.budgetWei))} · remaining ${escapeHtml(formatTOS(campaign.remainingWei))}</span></li>`,
+      (campaign) => `<li><strong>${escapeHtml(campaign.title)}</strong><span>${escapeHtml(campaign.status)} · budget ${escapeHtml(formatTOS(campaign.budgetTomi))} · remaining ${escapeHtml(formatTOS(campaign.remainingTomi))}</span></li>`,
     )
     .join("");
   const bountyItems = snapshot.recentBounties
     .map(
-      (bounty) => `<li><strong>${escapeHtml(bounty.title)}</strong><span>${escapeHtml(bounty.relation)} · ${escapeHtml(bounty.status)} · reward ${escapeHtml(formatTOS(bounty.rewardWei))}</span></li>`,
+      (bounty) => `<li><strong>${escapeHtml(bounty.title)}</strong><span>${escapeHtml(bounty.relation)} · ${escapeHtml(bounty.status)} · reward ${escapeHtml(formatTOS(bounty.rewardTomi))}</span></li>`,
     )
     .join("");
   const settlementItems = snapshot.recentSettlements
@@ -396,9 +396,9 @@ export function buildGroupTreasuryHtml(
     generatedAt: snapshot.generatedAt,
     metrics: [
       { label: "Campaigns", value: snapshot.counts.campaignCount },
-      { label: "Total budget", value: formatTOS(snapshot.totals.totalBudgetWei) },
-      { label: "Remaining", value: formatTOS(snapshot.totals.remainingBudgetWei) },
-      { label: "Pending payables", value: formatTOS(snapshot.totals.pendingPayablesWei) },
+      { label: "Total budget", value: formatTOS(snapshot.totals.totalBudgetTomi) },
+      { label: "Remaining", value: formatTOS(snapshot.totals.remainingBudgetTomi) },
+      { label: "Pending payables", value: formatTOS(snapshot.totals.pendingPayablesTomi) },
     ],
     navLinks: [
       { label: "World Shell", href: options?.homeHref ?? "/" },
@@ -416,19 +416,19 @@ export function buildGroupTreasuryHtml(
           </div>
           <div class="list-grid">
             <article class="list-card">
-              <div class="meta-row"><span>Total budget</span><span>${escapeHtml(formatTOS(snapshot.totals.totalBudgetWei))}</span></div>
-              <div class="meta-row"><span>Allocated</span><span>${escapeHtml(formatTOS(snapshot.totals.allocatedBudgetWei))}</span></div>
-              <div class="meta-row"><span>Remaining</span><span>${escapeHtml(formatTOS(snapshot.totals.remainingBudgetWei))}</span></div>
+              <div class="meta-row"><span>Total budget</span><span>${escapeHtml(formatTOS(snapshot.totals.totalBudgetTomi))}</span></div>
+              <div class="meta-row"><span>Allocated</span><span>${escapeHtml(formatTOS(snapshot.totals.allocatedBudgetTomi))}</span></div>
+              <div class="meta-row"><span>Remaining</span><span>${escapeHtml(formatTOS(snapshot.totals.remainingBudgetTomi))}</span></div>
             </article>
             <article class="list-card">
-              <div class="meta-row"><span>Open commitments</span><span>${escapeHtml(formatTOS(snapshot.totals.openCommitmentsWei))}</span></div>
-              <div class="meta-row"><span>Approved unpaid</span><span>${escapeHtml(formatTOS(snapshot.totals.approvedUnpaidWei))}</span></div>
-              <div class="meta-row"><span>Pending payables</span><span>${escapeHtml(formatTOS(snapshot.totals.pendingPayablesWei))}</span></div>
+              <div class="meta-row"><span>Open commitments</span><span>${escapeHtml(formatTOS(snapshot.totals.openCommitmentsTomi))}</span></div>
+              <div class="meta-row"><span>Approved unpaid</span><span>${escapeHtml(formatTOS(snapshot.totals.approvedUnpaidTomi))}</span></div>
+              <div class="meta-row"><span>Pending payables</span><span>${escapeHtml(formatTOS(snapshot.totals.pendingPayablesTomi))}</span></div>
             </article>
             <article class="list-card">
-              <div class="meta-row"><span>Pending receivables</span><span>${escapeHtml(formatTOS(snapshot.totals.pendingReceivablesWei))}</span></div>
-              <div class="meta-row"><span>Realized host payouts</span><span>${escapeHtml(formatTOS(snapshot.totals.realizedHostPayoutsWei))}</span></div>
-              <div class="meta-row"><span>Realized solver earnings</span><span>${escapeHtml(formatTOS(snapshot.totals.realizedSolverEarningsWei))}</span></div>
+              <div class="meta-row"><span>Pending receivables</span><span>${escapeHtml(formatTOS(snapshot.totals.pendingReceivablesTomi))}</span></div>
+              <div class="meta-row"><span>Realized host payouts</span><span>${escapeHtml(formatTOS(snapshot.totals.realizedHostPayoutsTomi))}</span></div>
+              <div class="meta-row"><span>Realized solver earnings</span><span>${escapeHtml(formatTOS(snapshot.totals.realizedSolverEarningsTomi))}</span></div>
             </article>
           </div>
         </section>

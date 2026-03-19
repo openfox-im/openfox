@@ -45,7 +45,7 @@ describe("campaign engine", () => {
     const campaign = engine.createCampaign({
       title: "March Growth Push",
       description: "Run a translation and social proof campaign.",
-      budgetWei: "5000",
+      budgetTomi: "5000",
       maxOpenBounties: 2,
       allowedKinds: ["translation", "social_proof"],
     });
@@ -56,7 +56,7 @@ describe("campaign engine", () => {
       title: "Translate one sentence",
       taskPrompt: "Translate 'hello world' into Chinese.",
       referenceOutput: "你好，世界",
-      rewardWei: "2000",
+      rewardTomi: "2000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -66,7 +66,7 @@ describe("campaign engine", () => {
       title: "Reply on X",
       taskPrompt: "Reply with the exact phrase.",
       referenceOutput: "openfox rocks",
-      rewardWei: "3000",
+      rewardTomi: "3000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -76,8 +76,8 @@ describe("campaign engine", () => {
       second.bountyId,
       first.bountyId,
     ]);
-    expect(details?.progress.allocatedWei).toBe("5000");
-    expect(details?.progress.remainingWei).toBe("0");
+    expect(details?.progress.allocatedTomi).toBe("5000");
+    expect(details?.progress.remainingTomi).toBe("0");
     expect(details?.campaign.status).toBe("exhausted");
   });
 
@@ -97,7 +97,7 @@ describe("campaign engine", () => {
     const campaign = engine.createCampaign({
       title: "Small Budget",
       description: "One translation only.",
-      budgetWei: "1000",
+      budgetTomi: "1000",
       maxOpenBounties: 1,
       allowedKinds: ["translation"],
     });
@@ -109,7 +109,7 @@ describe("campaign engine", () => {
         title: "Wrong kind",
         taskPrompt: "2+2=?",
         referenceOutput: "4",
-        rewardWei: "1000",
+        rewardTomi: "1000",
         submissionDeadline: "2027-03-09T01:00:00.000Z",
       }),
     ).toThrow("campaign does not allow bounty kind");
@@ -120,7 +120,7 @@ describe("campaign engine", () => {
       title: "Translate one word",
       taskPrompt: "Translate 'fox' into Chinese.",
       referenceOutput: "狐狸",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 
@@ -131,7 +131,7 @@ describe("campaign engine", () => {
         title: "Second translation",
         taskPrompt: "Translate 'wolf' into Chinese.",
         referenceOutput: "狼",
-        rewardWei: "1",
+        rewardTomi: "1",
         submissionDeadline: "2027-03-09T01:00:00.000Z",
       }),
     ).toThrow(/maximum open bounty count|budget is exhausted|campaign is not open: exhausted/);

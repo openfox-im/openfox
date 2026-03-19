@@ -245,7 +245,7 @@ describe("group chain anchor", () => {
       expect(callArgs.payload.epoch).toBe(1);
       expect(callArgs.payload.members_root).toBe("0xroot1");
       expect(callArgs.payload.events_merkle_root).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(callArgs.payload.treasury_balance_wei).toBe("0");
+      expect(callArgs.payload.treasury_balance_tomi).toBe("0");
 
       expect(result.txHash).toBe("0x" + "ab".repeat(32));
       expect(result.commitmentId).toBeTruthy();
@@ -261,7 +261,7 @@ describe("group chain anchor", () => {
       const now = new Date().toISOString();
       db.raw
         .prepare(
-          `INSERT INTO group_treasury (group_id, treasury_address, balance_wei, status, created_at, updated_at)
+          `INSERT INTO group_treasury (group_id, treasury_address, balance_tomi, status, created_at, updated_at)
            VALUES (?, '0xtreas1', '1000000', 'active', ?, ?)`,
         )
         .run(GROUP_ID, now, now);
@@ -277,10 +277,10 @@ describe("group chain anchor", () => {
       });
 
       const callArgs = sendSpy.mock.calls[0][0];
-      expect(callArgs.payload.treasury_balance_wei).toBe("1000000");
+      expect(callArgs.payload.treasury_balance_tomi).toBe("1000000");
 
       const commitment = getLatestChainCommitment(db, GROUP_ID);
-      expect(commitment!.treasuryBalanceWei).toBe("1000000");
+      expect(commitment!.treasuryBalanceTomi).toBe("1000000");
     });
   });
 

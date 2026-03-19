@@ -56,7 +56,7 @@ function makeConfig(): OpenFoxConfig {
         port: 0,
         path: "/agent-discovery/news-fetch",
         capability: "news.fetch",
-        priceWei: "3000000000000000",
+        priceTomi: "3000000000000000",
         maxSourceUrlChars: 2048,
         requestTimeoutMs: 5000,
         maxResponseBytes: 65536,

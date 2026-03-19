@@ -37,47 +37,47 @@ export const DEFAULT_DASHBOARD_ENDPOINTS: FleetEndpoint[] = [
 interface FleetFinanceNodeSummary {
   name: string;
   role: string | null;
-  revenueWei30d: string;
-  costWei30d: string;
-  netWei30d: string;
-  pendingReceivablesWei: string;
-  pendingPayablesWei: string;
+  revenueTomi30d: string;
+  costTomi30d: string;
+  netTomi30d: string;
+  pendingReceivablesTomi: string;
+  pendingPayablesTomi: string;
   negativeMargin: boolean;
 }
 
 interface FleetFinanceRoleSummary {
   role: string;
   nodes: number;
-  revenueWei30d: string;
-  costWei30d: string;
-  netWei30d: string;
+  revenueTomi30d: string;
+  costTomi30d: string;
+  netTomi30d: string;
 }
 
 interface FleetCapabilitySummary {
   capability: string;
-  confirmedRevenueWei: string;
-  confirmedCostWei: string;
-  pendingRevenueWei: string;
-  pendingCostWei: string;
+  confirmedRevenueTomi: string;
+  confirmedCostTomi: string;
+  pendingRevenueTomi: string;
+  pendingCostTomi: string;
 }
 
 interface FleetCustomerSummary {
   address: string;
   kind: "customer" | "provider";
-  confirmedRevenueWei: string;
-  confirmedCostWei: string;
-  pendingRevenueWei: string;
-  pendingCostWei: string;
+  confirmedRevenueTomi: string;
+  confirmedCostTomi: string;
+  pendingRevenueTomi: string;
+  pendingCostTomi: string;
   interactions: number;
 }
 
 export interface FleetFinanceSummary {
   totals: {
-    revenueWei30d: string;
-    costWei30d: string;
-    netWei30d: string;
-    pendingReceivablesWei: string;
-    pendingPayablesWei: string;
+    revenueTomi30d: string;
+    costTomi30d: string;
+    netTomi30d: string;
+    pendingReceivablesTomi: string;
+    pendingPayablesTomi: string;
   };
   roles: FleetFinanceRoleSummary[];
   nodes: FleetFinanceNodeSummary[];
@@ -275,16 +275,16 @@ function formatTOS(value: bigint): string {
 function buildFleetFinanceSummary(
   snapshots: Record<FleetEndpoint, FleetSnapshot>,
 ): FleetFinanceSummary {
-  const roleMap = new Map<string, { nodes: number; revenueWei30d: bigint; costWei30d: bigint; netWei30d: bigint }>();
-  const capabilityMap = new Map<string, { confirmedRevenueWei: bigint; confirmedCostWei: bigint; pendingRevenueWei: bigint; pendingCostWei: bigint }>();
-  const customerMap = new Map<string, { address: string; kind: "customer" | "provider"; confirmedRevenueWei: bigint; confirmedCostWei: bigint; pendingRevenueWei: bigint; pendingCostWei: bigint; interactions: number }>();
+  const roleMap = new Map<string, { nodes: number; revenueTomi30d: bigint; costTomi30d: bigint; netTomi30d: bigint }>();
+  const capabilityMap = new Map<string, { confirmedRevenueTomi: bigint; confirmedCostTomi: bigint; pendingRevenueTomi: bigint; pendingCostTomi: bigint }>();
+  const customerMap = new Map<string, { address: string; kind: "customer" | "provider"; confirmedRevenueTomi: bigint; confirmedCostTomi: bigint; pendingRevenueTomi: bigint; pendingCostTomi: bigint; interactions: number }>();
   const nodeSummaries: FleetFinanceNodeSummary[] = [];
   const warnings: string[] = [];
-  let revenueWei30d = 0n;
-  let costWei30d = 0n;
-  let netWei30d = 0n;
-  let pendingReceivablesWei = 0n;
-  let pendingPayablesWei = 0n;
+  let revenueTomi30d = 0n;
+  let costTomi30d = 0n;
+  let netTomi30d = 0n;
+  let pendingReceivablesTomi = 0n;
+  let pendingPayablesTomi = 0n;
   let settlementPending = 0;
   let settlementFailed = 0;
   let marketPending = 0;
@@ -293,42 +293,42 @@ function buildFleetFinanceSummary(
   for (const node of snapshots.finance?.nodes ?? []) {
     if (!node.ok || typeof node.payload !== "object" || node.payload === null) continue;
     const payload = node.payload as {
-      periods?: { trailing30d?: { revenueWei?: string; costWei?: string; netWei?: string } };
-      pendingReceivablesWei?: string;
-      pendingPayablesWei?: string;
+      periods?: { trailing30d?: { revenueTomi?: string; costTomi?: string; netTomi?: string } };
+      pendingReceivablesTomi?: string;
+      pendingPayablesTomi?: string;
     };
     const period = payload.periods?.trailing30d;
-    const nodeRevenue = toBigInt(period?.revenueWei);
-    const nodeCost = toBigInt(period?.costWei);
-    const nodeNet = toBigInt(period?.netWei);
-    const nodeReceivables = toBigInt(payload.pendingReceivablesWei);
-    const nodePayables = toBigInt(payload.pendingPayablesWei);
-    revenueWei30d += nodeRevenue;
-    costWei30d += nodeCost;
-    netWei30d += nodeNet;
-    pendingReceivablesWei += nodeReceivables;
-    pendingPayablesWei += nodePayables;
+    const nodeRevenue = toBigInt(period?.revenueTomi);
+    const nodeCost = toBigInt(period?.costTomi);
+    const nodeNet = toBigInt(period?.netTomi);
+    const nodeReceivables = toBigInt(payload.pendingReceivablesTomi);
+    const nodePayables = toBigInt(payload.pendingPayablesTomi);
+    revenueTomi30d += nodeRevenue;
+    costTomi30d += nodeCost;
+    netTomi30d += nodeNet;
+    pendingReceivablesTomi += nodeReceivables;
+    pendingPayablesTomi += nodePayables;
     nodeSummaries.push({
       name: node.name,
       role: node.role,
-      revenueWei30d: nodeRevenue.toString(),
-      costWei30d: nodeCost.toString(),
-      netWei30d: nodeNet.toString(),
-      pendingReceivablesWei: nodeReceivables.toString(),
-      pendingPayablesWei: nodePayables.toString(),
+      revenueTomi30d: nodeRevenue.toString(),
+      costTomi30d: nodeCost.toString(),
+      netTomi30d: nodeNet.toString(),
+      pendingReceivablesTomi: nodeReceivables.toString(),
+      pendingPayablesTomi: nodePayables.toString(),
       negativeMargin: nodeNet < 0n,
     });
     const roleKey = node.role || "unspecified";
     const roleEntry = roleMap.get(roleKey) ?? {
       nodes: 0,
-      revenueWei30d: 0n,
-      costWei30d: 0n,
-      netWei30d: 0n,
+      revenueTomi30d: 0n,
+      costTomi30d: 0n,
+      netTomi30d: 0n,
     };
     roleEntry.nodes += 1;
-    roleEntry.revenueWei30d += nodeRevenue;
-    roleEntry.costWei30d += nodeCost;
-    roleEntry.netWei30d += nodeNet;
+    roleEntry.revenueTomi30d += nodeRevenue;
+    roleEntry.costTomi30d += nodeCost;
+    roleEntry.netTomi30d += nodeNet;
     roleMap.set(roleKey, roleEntry);
     if (nodeNet < 0n) {
       warnings.push(`${node.name}${node.role ? ` [${node.role}]` : ""} has negative 30d margin.`);
@@ -340,33 +340,33 @@ function buildFleetFinanceSummary(
     const payload = node.payload as {
       capabilities?: Array<{
         capability: string;
-        confirmedRevenueWei: string;
-        confirmedCostWei: string;
-        pendingRevenueWei: string;
-        pendingCostWei: string;
+        confirmedRevenueTomi: string;
+        confirmedCostTomi: string;
+        pendingRevenueTomi: string;
+        pendingCostTomi: string;
       }>;
       counterparties?: Array<{
         address: string;
         kind: "customer" | "provider";
-        confirmedRevenueWei: string;
-        confirmedCostWei: string;
-        pendingRevenueWei: string;
-        pendingCostWei: string;
+        confirmedRevenueTomi: string;
+        confirmedCostTomi: string;
+        pendingRevenueTomi: string;
+        pendingCostTomi: string;
         confirmedCount: number;
         pendingCount: number;
       }>;
     };
     for (const entry of payload.capabilities ?? []) {
       const current = capabilityMap.get(entry.capability) ?? {
-        confirmedRevenueWei: 0n,
-        confirmedCostWei: 0n,
-        pendingRevenueWei: 0n,
-        pendingCostWei: 0n,
+        confirmedRevenueTomi: 0n,
+        confirmedCostTomi: 0n,
+        pendingRevenueTomi: 0n,
+        pendingCostTomi: 0n,
       };
-      current.confirmedRevenueWei += toBigInt(entry.confirmedRevenueWei);
-      current.confirmedCostWei += toBigInt(entry.confirmedCostWei);
-      current.pendingRevenueWei += toBigInt(entry.pendingRevenueWei);
-      current.pendingCostWei += toBigInt(entry.pendingCostWei);
+      current.confirmedRevenueTomi += toBigInt(entry.confirmedRevenueTomi);
+      current.confirmedCostTomi += toBigInt(entry.confirmedCostTomi);
+      current.pendingRevenueTomi += toBigInt(entry.pendingRevenueTomi);
+      current.pendingCostTomi += toBigInt(entry.pendingCostTomi);
       capabilityMap.set(entry.capability, current);
     }
     for (const entry of payload.counterparties ?? []) {
@@ -374,16 +374,16 @@ function buildFleetFinanceSummary(
       const current = customerMap.get(key) ?? {
         address: entry.address,
         kind: entry.kind,
-        confirmedRevenueWei: 0n,
-        confirmedCostWei: 0n,
-        pendingRevenueWei: 0n,
-        pendingCostWei: 0n,
+        confirmedRevenueTomi: 0n,
+        confirmedCostTomi: 0n,
+        pendingRevenueTomi: 0n,
+        pendingCostTomi: 0n,
         interactions: 0,
       };
-      current.confirmedRevenueWei += toBigInt(entry.confirmedRevenueWei);
-      current.confirmedCostWei += toBigInt(entry.confirmedCostWei);
-      current.pendingRevenueWei += toBigInt(entry.pendingRevenueWei);
-      current.pendingCostWei += toBigInt(entry.pendingCostWei);
+      current.confirmedRevenueTomi += toBigInt(entry.confirmedRevenueTomi);
+      current.confirmedCostTomi += toBigInt(entry.confirmedCostTomi);
+      current.pendingRevenueTomi += toBigInt(entry.pendingRevenueTomi);
+      current.pendingCostTomi += toBigInt(entry.pendingCostTomi);
       current.interactions += (entry.confirmedCount ?? 0) + (entry.pendingCount ?? 0);
       customerMap.set(key, current);
     }
@@ -410,33 +410,33 @@ function buildFleetFinanceSummary(
 
   return {
     totals: {
-      revenueWei30d: revenueWei30d.toString(),
-      costWei30d: costWei30d.toString(),
-      netWei30d: netWei30d.toString(),
-      pendingReceivablesWei: pendingReceivablesWei.toString(),
-      pendingPayablesWei: pendingPayablesWei.toString(),
+      revenueTomi30d: revenueTomi30d.toString(),
+      costTomi30d: costTomi30d.toString(),
+      netTomi30d: netTomi30d.toString(),
+      pendingReceivablesTomi: pendingReceivablesTomi.toString(),
+      pendingPayablesTomi: pendingPayablesTomi.toString(),
     },
     roles: Array.from(roleMap.entries())
       .map(([role, entry]) => ({
         role,
         nodes: entry.nodes,
-        revenueWei30d: entry.revenueWei30d.toString(),
-        costWei30d: entry.costWei30d.toString(),
-        netWei30d: entry.netWei30d.toString(),
+        revenueTomi30d: entry.revenueTomi30d.toString(),
+        costTomi30d: entry.costTomi30d.toString(),
+        netTomi30d: entry.netTomi30d.toString(),
       }))
-      .sort((a, b) => (toBigInt(b.netWei30d) > toBigInt(a.netWei30d) ? 1 : -1)),
-    nodes: nodeSummaries.sort((a, b) => (toBigInt(b.netWei30d) > toBigInt(a.netWei30d) ? 1 : -1)),
+      .sort((a, b) => (toBigInt(b.netTomi30d) > toBigInt(a.netTomi30d) ? 1 : -1)),
+    nodes: nodeSummaries.sort((a, b) => (toBigInt(b.netTomi30d) > toBigInt(a.netTomi30d) ? 1 : -1)),
     capabilities: Array.from(capabilityMap.entries())
       .map(([capability, entry]) => ({
         capability,
-        confirmedRevenueWei: entry.confirmedRevenueWei.toString(),
-        confirmedCostWei: entry.confirmedCostWei.toString(),
-        pendingRevenueWei: entry.pendingRevenueWei.toString(),
-        pendingCostWei: entry.pendingCostWei.toString(),
+        confirmedRevenueTomi: entry.confirmedRevenueTomi.toString(),
+        confirmedCostTomi: entry.confirmedCostTomi.toString(),
+        pendingRevenueTomi: entry.pendingRevenueTomi.toString(),
+        pendingCostTomi: entry.pendingCostTomi.toString(),
       }))
       .sort((a, b) =>
-        toBigInt(b.confirmedRevenueWei) + toBigInt(b.pendingRevenueWei) >
-        toBigInt(a.confirmedRevenueWei) + toBigInt(a.pendingRevenueWei)
+        toBigInt(b.confirmedRevenueTomi) + toBigInt(b.pendingRevenueTomi) >
+        toBigInt(a.confirmedRevenueTomi) + toBigInt(a.pendingRevenueTomi)
           ? 1
           : -1,
       )
@@ -445,15 +445,15 @@ function buildFleetFinanceSummary(
       .map((entry) => ({
         address: entry.address,
         kind: entry.kind,
-        confirmedRevenueWei: entry.confirmedRevenueWei.toString(),
-        confirmedCostWei: entry.confirmedCostWei.toString(),
-        pendingRevenueWei: entry.pendingRevenueWei.toString(),
-        pendingCostWei: entry.pendingCostWei.toString(),
+        confirmedRevenueTomi: entry.confirmedRevenueTomi.toString(),
+        confirmedCostTomi: entry.confirmedCostTomi.toString(),
+        pendingRevenueTomi: entry.pendingRevenueTomi.toString(),
+        pendingCostTomi: entry.pendingCostTomi.toString(),
         interactions: entry.interactions,
       }))
       .sort((a, b) =>
-        toBigInt(b.confirmedRevenueWei) + toBigInt(b.pendingRevenueWei) + toBigInt(b.confirmedCostWei) + toBigInt(b.pendingCostWei) >
-        toBigInt(a.confirmedRevenueWei) + toBigInt(a.pendingRevenueWei) + toBigInt(a.confirmedCostWei) + toBigInt(a.pendingCostWei)
+        toBigInt(b.confirmedRevenueTomi) + toBigInt(b.pendingRevenueTomi) + toBigInt(b.confirmedCostTomi) + toBigInt(b.pendingCostTomi) >
+        toBigInt(a.confirmedRevenueTomi) + toBigInt(a.pendingRevenueTomi) + toBigInt(a.confirmedCostTomi) + toBigInt(a.pendingCostTomi)
           ? 1
           : -1,
       )
@@ -537,7 +537,7 @@ export function buildFleetDashboardReport(
   }
   lines.push("");
   lines.push(
-    `Fleet finance: 30d revenue=${formatTOS(toBigInt(snapshot.financeSummary.totals.revenueWei30d))}, cost=${formatTOS(toBigInt(snapshot.financeSummary.totals.costWei30d))}, net=${formatTOS(toBigInt(snapshot.financeSummary.totals.netWei30d))}`,
+    `Fleet finance: 30d revenue=${formatTOS(toBigInt(snapshot.financeSummary.totals.revenueTomi30d))}, cost=${formatTOS(toBigInt(snapshot.financeSummary.totals.costTomi30d))}, net=${formatTOS(toBigInt(snapshot.financeSummary.totals.netTomi30d))}`,
   );
   if (snapshot.financeSummary.warnings.length) {
     lines.push("Warnings:");
@@ -570,19 +570,19 @@ export function buildFleetDashboardHtml(
   const financeRows = snapshot.financeSummary.roles
     .map(
       (entry) =>
-        `<tr><td>${escapeHtml(entry.role)}</td><td>${entry.nodes}</td><td>${escapeHtml(formatTOS(toBigInt(entry.revenueWei30d)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.costWei30d)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.netWei30d)))}</td></tr>`,
+        `<tr><td>${escapeHtml(entry.role)}</td><td>${entry.nodes}</td><td>${escapeHtml(formatTOS(toBigInt(entry.revenueTomi30d)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.costTomi30d)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.netTomi30d)))}</td></tr>`,
     )
     .join("");
   const capabilityRows = snapshot.financeSummary.capabilities
     .map(
       (entry) =>
-        `<tr><td>${escapeHtml(entry.capability)}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedRevenueWei)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedCostWei)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.pendingRevenueWei)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.pendingCostWei)))}</td></tr>`,
+        `<tr><td>${escapeHtml(entry.capability)}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedRevenueTomi)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedCostTomi)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.pendingRevenueTomi)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.pendingCostTomi)))}</td></tr>`,
     )
     .join("");
   const customerRows = snapshot.financeSummary.customers
     .map(
       (entry) =>
-        `<tr><td>${escapeHtml(entry.kind)}</td><td>${escapeHtml(entry.address)}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedRevenueWei)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedCostWei)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.pendingRevenueWei) + toBigInt(entry.pendingCostWei)))}</td><td>${entry.interactions}</td></tr>`,
+        `<tr><td>${escapeHtml(entry.kind)}</td><td>${escapeHtml(entry.address)}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedRevenueTomi)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.confirmedCostTomi)))}</td><td>${escapeHtml(formatTOS(toBigInt(entry.pendingRevenueTomi) + toBigInt(entry.pendingCostTomi)))}</td><td>${entry.interactions}</td></tr>`,
     )
     .join("");
   const warningItems = snapshot.financeSummary.warnings
@@ -663,11 +663,11 @@ export function buildFleetDashboardHtml(
       <table>
         <thead><tr><th>30d Revenue</th><th>30d Cost</th><th>30d Net</th><th>Pending Receivables</th><th>Pending Payables</th></tr></thead>
         <tbody><tr>
-          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.revenueWei30d)))}</td>
-          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.costWei30d)))}</td>
-          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.netWei30d)))}</td>
-          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.pendingReceivablesWei)))}</td>
-          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.pendingPayablesWei)))}</td>
+          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.revenueTomi30d)))}</td>
+          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.costTomi30d)))}</td>
+          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.netTomi30d)))}</td>
+          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.pendingReceivablesTomi)))}</td>
+          <td>${escapeHtml(formatTOS(toBigInt(snapshot.financeSummary.totals.pendingPayablesTomi)))}</td>
         </tr></tbody>
       </table>
       <div><strong>Delayed queues:</strong> settlement pending=${snapshot.financeSummary.delayedQueues.settlementPending}, settlement failed=${snapshot.financeSummary.delayedQueues.settlementFailed}, market pending=${snapshot.financeSummary.delayedQueues.marketPending}, market failed=${snapshot.financeSummary.delayedQueues.marketFailed}</div>

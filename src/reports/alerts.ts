@@ -53,8 +53,8 @@ function buildSuggestedAction(item: OpportunityItem): string {
 }
 
 function buildSummary(item: OpportunityItem): string {
-  const reward = item.rewardWei ? `reward=${item.rewardWei}` : "reward=n/a";
-  const margin = `margin=${item.marginWei}`;
+  const reward = item.rewardTomi ? `reward=${item.rewardTomi}` : "reward=n/a";
+  const margin = `margin=${item.marginTomi}`;
   const score =
     item.strategyScore == null ? "score=n/a" : `score=${item.strategyScore}`;
   const trust = `trust=${item.trustTier}`;
@@ -208,9 +208,9 @@ export async function generateOwnerOpportunityAlerts(params: {
       suggestedAction: buildSuggestedAction(item),
       capability: item.capability ?? null,
       baseUrl: item.baseUrl ?? null,
-      rewardWei: item.rewardWei ?? null,
-      estimatedCostWei: item.estimatedCostWei,
-      marginWei: item.marginWei,
+      rewardTomi: item.rewardTomi ?? null,
+      estimatedCostTomi: item.estimatedCostTomi,
+      marginTomi: item.marginTomi,
       marginBps: item.marginBps,
       strategyScore: item.strategyScore ?? null,
       strategyMatched: item.strategyMatched === true,

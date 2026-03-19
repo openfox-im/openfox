@@ -77,7 +77,7 @@ function driveIntentToCompletion(
     publisherAddress: string;
     solverAddress: string;
     groupId?: string;
-    budgetWei?: string;
+    budgetTomi?: string;
   },
 ) {
   const intent = createIntent(db, {
@@ -86,7 +86,7 @@ function driveIntentToCompletion(
     kind: "work",
     title: "Test intent for reactor",
     description: "An intent that will be completed",
-    budgetWei: options.budgetWei,
+    budgetTomi: options.budgetTomi,
   });
 
   respondToIntent(db, {
@@ -150,7 +150,7 @@ describe("reactor consequences — cross-module wiring", () => {
     const result = driveIntentToCompletion(db, {
       publisherAddress: PUBLISHER,
       solverAddress: SOLVER,
-      budgetWei: "10000",
+      budgetTomi: "10000",
     });
 
     expect(result.intent.status).toBe("completed");
@@ -177,7 +177,7 @@ describe("reactor consequences — cross-module wiring", () => {
     const groupId = created.group.groupId;
 
     initializeGroupTreasury(db, groupId, TREASURY_KEY, [
-      { lineName: "bounties", capWei: "100000" },
+      { lineName: "bounties", capTomi: "100000" },
     ]);
     recordTreasuryInflow(db, groupId, "500000");
 
@@ -186,7 +186,7 @@ describe("reactor consequences — cross-module wiring", () => {
       publisherAddress: PUBLISHER,
       solverAddress: SOLVER,
       groupId,
-      budgetWei: "10000",
+      budgetTomi: "10000",
     });
 
     expect(completionResult.intent.status).toBe("completed");
@@ -203,7 +203,7 @@ describe("reactor consequences — cross-module wiring", () => {
       params: {
         intentId: completionResult.intent.intentId,
         recipient: SOLVER,
-        amountWei: "10000",
+        amountTomi: "10000",
         budgetLine: "bounties",
       },
       proposerAddress: account.address,
@@ -211,7 +211,7 @@ describe("reactor consequences — cross-module wiring", () => {
 
     expect(proposal.proposalType).toBe("spend");
     expect(proposal.params.recipient).toBe(SOLVER);
-    expect(proposal.params.amountWei).toBe("10000");
+    expect(proposal.params.amountTomi).toBe("10000");
     expect(proposal.status).toBe("active");
   });
 
@@ -219,7 +219,7 @@ describe("reactor consequences — cross-module wiring", () => {
     const result = driveIntentToCompletion(db, {
       publisherAddress: PUBLISHER,
       solverAddress: SOLVER,
-      budgetWei: "5000",
+      budgetTomi: "5000",
     });
 
     expect(result.intent.status).toBe("completed");
@@ -292,7 +292,7 @@ describe("reactor consequences — cross-module wiring", () => {
   it("treasury spend executed emits economic reputation event", () => {
     const groupId = "econ-rep-group";
     initializeGroupTreasury(db, groupId, TREASURY_KEY, [
-      { lineName: "bounties", capWei: "50000" },
+      { lineName: "bounties", capTomi: "50000" },
     ]);
     recordTreasuryInflow(db, groupId, "100000");
 
@@ -428,7 +428,7 @@ describe("reactor consequences — cross-module wiring", () => {
     db.raw
       .prepare(
         `INSERT INTO group_chain_commitments
-         (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_wei, tx_hash, block_number, created_at)
+         (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_tomi, tx_hash, block_number, created_at)
          VALUES (?, ?, 'state_commit', 0, 'root1', ?, '0', '0xpendingtx', NULL, ?)`,
       )
       .run(commitmentId, groupId, null, now);
@@ -451,11 +451,11 @@ describe("reactor consequences — cross-module wiring", () => {
       publisherAddress: PUBLISHER,
       kind: "work",
       title: "Orchestration test",
-      budgetWei: "15000",
+      budgetTomi: "15000",
     });
 
     expect(intent.status).toBe("open");
-    expect(intent.budgetWei).toBe("15000");
+    expect(intent.budgetTomi).toBe("15000");
 
     respondToIntent(db, {
       intentId: intent.intentId,

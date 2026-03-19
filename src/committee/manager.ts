@@ -37,7 +37,7 @@ export interface CommitteeVoteRecord {
 export interface CommitteePayoutAllocation {
   memberId: string;
   payoutAddress: string;
-  amountWei: string;
+  amountTomi: string;
   reason: string;
 }
 
@@ -64,7 +64,7 @@ export interface CommitteeRunRecord {
   artifactIds: string[];
   committeeSize: number;
   thresholdM: number;
-  payoutTotalWei: string;
+  payoutTotalTomi: string;
   status: CommitteeRunStatus;
   maxReruns: number;
   rerunCount: number;
@@ -81,7 +81,7 @@ export interface CommitteeSummarySnapshot {
   paid: number;
   disagreements: number;
   verificationModes: Record<string, number>;
-  totalPayoutWei: string;
+  totalPayoutTomi: string;
   latestRunId: string | null;
   latestUpdatedAt: string | null;
   items: CommitteeRunRecord[];
@@ -152,12 +152,12 @@ function chooseWinningResultHash(
 }
 
 function distributePayouts(params: {
-  totalWei: string;
+  totalTomi: string;
   members: CommitteeMemberRecord[];
   votes: CommitteeVoteRecord[];
   winningResultHash?: `0x${string}` | null;
 }): CommitteePayoutAllocation[] {
-  if (!/^[0-9]+$/.test(params.totalWei)) return [];
+  if (!/^[0-9]+$/.test(params.totalTomi)) return [];
   const eligible = params.votes
     .filter(
       (vote) =>
@@ -167,7 +167,7 @@ function distributePayouts(params: {
     )
     .sort((a, b) => a.memberId.localeCompare(b.memberId));
   if (eligible.length === 0) return [];
-  const total = BigInt(params.totalWei);
+  const total = BigInt(params.totalTomi);
   const each = total / BigInt(eligible.length);
   let remainder = total % BigInt(eligible.length);
   return eligible.map((vote) => {
@@ -179,7 +179,7 @@ function distributePayouts(params: {
     return {
       memberId: vote.memberId,
       payoutAddress: vote.payoutAddress!,
-      amountWei: amount.toString(),
+      amountTomi: amount.toString(),
       reason: params.winningResultHash
         ? `accepted:${params.winningResultHash}`
         : "accepted",
@@ -221,7 +221,7 @@ function buildTally(run: CommitteeRunRecord, votes: CommitteeVoteRecord[]): Comm
     disagreement,
     winningResultHash,
     payoutAllocations: distributePayouts({
-      totalWei: run.payoutTotalWei,
+      totalTomi: run.payoutTotalTomi,
       members: run.members,
       votes,
       winningResultHash,
@@ -239,7 +239,7 @@ export interface CommitteeManager {
     artifactIds?: string[];
     committeeSize: number;
     thresholdM: number;
-    payoutTotalWei?: string;
+    payoutTotalTomi?: string;
     maxReruns?: number;
     members: Array<{
       memberId: string;
@@ -319,7 +319,7 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
         artifactIds: input.artifactIds ?? [],
         committeeSize: input.committeeSize,
         thresholdM: input.thresholdM,
-        payoutTotalWei: input.payoutTotalWei ?? "0",
+        payoutTotalTomi: input.payoutTotalTomi ?? "0",
         status: "open",
         maxReruns: input.maxReruns ?? 1,
         rerunCount: 0,
@@ -465,10 +465,10 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
         if (mode) acc[mode] = (acc[mode] || 0) + 1;
         return acc;
       }, {});
-      const totalPayoutWei = items
+      const totalPayoutTomi = items
         .reduce((acc, item) => {
           const allocations = item.tally?.payoutAllocations ?? [];
-          const subtotal = allocations.reduce((inner, allocation) => inner + BigInt(allocation.amountWei), 0n);
+          const subtotal = allocations.reduce((inner, allocation) => inner + BigInt(allocation.amountTomi), 0n);
           return acc + subtotal;
         }, 0n)
         .toString();
@@ -479,7 +479,7 @@ export function createCommitteeManager(db: OpenFoxDatabase): CommitteeManager {
         paid,
         disagreements,
         verificationModes,
-        totalPayoutWei,
+        totalPayoutTomi,
         latestRunId: latest?.runId ?? null,
         latestUpdatedAt: latest?.updatedAt ?? null,
         items,
@@ -511,7 +511,7 @@ export function buildCommitteeSummaryReport(
             .map(([mode, count]) => `${mode}=${count}`)
             .join(", ")
     }`,
-    `Total payout:    ${snapshot.totalPayoutWei} wei`,
+    `Total payout:    ${snapshot.totalPayoutTomi} tomi`,
     `Latest run:      ${snapshot.latestRunId || "(none)"}`,
     `Latest updated:  ${snapshot.latestUpdatedAt || "(none)"}`,
     "",

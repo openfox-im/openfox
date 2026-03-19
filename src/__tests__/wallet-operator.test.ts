@@ -76,8 +76,8 @@ describe("wallet operator", () => {
 
     const config = createTestConfig({
       walletFunding: {
-        localDefaultAmountWei: "5000000000000000000",
-        testnetDefaultAmountWei: "10000000000000000",
+        localDefaultAmountTomi: "5000000000000000000",
+        testnetDefaultAmountTomi: "10000000000000000",
         testnetFaucetUrl: "https://faucet.test/fund",
         testnetReason: "bootstrap openfox wallet",
       },
@@ -120,7 +120,7 @@ describe("wallet operator", () => {
     });
     const result = await fundWalletFromLocalDevnet({
       config,
-      amountWei: 1_000_000_000_000_000n,
+      amountTomi: 1_000_000_000_000_000n,
       waitForReceipt: false,
     });
 

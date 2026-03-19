@@ -106,7 +106,7 @@ describe("bounty http server", () => {
         body: JSON.stringify({
           title: "Spring Sprint",
           description: "Group several translation tasks.",
-          budget_wei: "10000",
+          budget_tomi: "10000",
           max_open_bounties: 2,
           allowed_kinds: ["question", "translation"],
         }),
@@ -129,7 +129,7 @@ describe("bounty http server", () => {
           campaign_id: campaign.campaignId,
           question: "Capital of France?",
           reference_answer: "Paris",
-          reward_wei: "2000",
+          reward_tomi: "2000",
           submission_ttl_seconds: 3600,
         }),
       });
@@ -166,11 +166,11 @@ describe("bounty http server", () => {
       const campaignStatus = await fetch(`${server.url}/campaigns/${campaign.campaignId}`);
       const campaignDetails = (await campaignStatus.json()) as {
         campaign: { campaignId: string };
-        progress: { allocatedWei: string };
+        progress: { allocatedTomi: string };
         bounties: Array<{ bountyId: string }>;
       };
       expect(campaignDetails.campaign.campaignId).toBe(campaign.campaignId);
-      expect(campaignDetails.progress.allocatedWei).toBe("2000");
+      expect(campaignDetails.progress.allocatedTomi).toBe("2000");
       expect(campaignDetails.bounties.some((item) => item.bountyId === bounty.bountyId)).toBe(true);
 
       const createTranslation = await fetch(`${server.url}/bounties`, {
@@ -181,7 +181,7 @@ describe("bounty http server", () => {
           title: "Translate hello",
           task_prompt: "Translate 'hello' into Chinese.",
           reference_output: "你好",
-          reward_wei: "2000",
+          reward_tomi: "2000",
           submission_ttl_seconds: 3600,
         }),
       });

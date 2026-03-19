@@ -91,13 +91,13 @@ function collectAttributionEntries(params: {
     if (payment.status !== "confirmed") continue;
     const updatedMs = toMs(payment.updatedAt);
     if (updatedMs < params.sinceMs || updatedMs >= params.untilMs) continue;
-    const amountWei = toBigInt(payment.amountWei);
+    const amountTomi = toBigInt(payment.amountTomi);
     if (payment.providerAddress.toLowerCase() === address) {
       gains.push({
         attributionId: payment.paymentId,
         kind: "x402_revenue",
         title: `x402 ${payment.serviceKind} payment`,
-        amountWei: amountWei.toString(),
+        amountTomi: amountTomi.toString(),
         sourceId: payment.paymentId,
         sourceKind: payment.serviceKind,
         counterparty: payment.payerAddress,
@@ -113,7 +113,7 @@ function collectAttributionEntries(params: {
         attributionId: payment.paymentId,
         kind: "x402_cost",
         title: `x402 ${payment.serviceKind} payment`,
-        amountWei: amountWei.toString(),
+        amountTomi: amountTomi.toString(),
         sourceId: payment.paymentId,
         sourceKind: payment.serviceKind,
         counterparty: payment.providerAddress,
@@ -131,7 +131,7 @@ function collectAttributionEntries(params: {
     if (!result?.payoutTxHash) continue;
     const updatedMs = toMs(result.updatedAt);
     if (updatedMs < params.sinceMs || updatedMs >= params.untilMs) continue;
-    const rewardWei = toBigInt(bounty.rewardWei);
+    const rewardTomi = toBigInt(bounty.rewardTomi);
     const winningSubmission = result.winningSubmissionId
       ? params.db.getBountySubmission(result.winningSubmissionId)
       : undefined;
@@ -143,7 +143,7 @@ function collectAttributionEntries(params: {
         attributionId: `bounty-reward:${bounty.bountyId}`,
         kind: "bounty_reward",
         title: bounty.title,
-        amountWei: rewardWei.toString(),
+        amountTomi: rewardTomi.toString(),
         sourceId: bounty.bountyId,
         sourceKind: "bounty",
         counterparty: bounty.hostAddress,
@@ -158,7 +158,7 @@ function collectAttributionEntries(params: {
         attributionId: `bounty-payout:${bounty.bountyId}`,
         kind: "bounty_payout",
         title: bounty.title,
-        amountWei: rewardWei.toString(),
+        amountTomi: rewardTomi.toString(),
         sourceId: bounty.bountyId,
         sourceKind: "bounty",
         counterparty: winningSubmission?.solverAddress ?? null,
@@ -183,7 +183,7 @@ function collectAttributionEntries(params: {
         params.periodKind === "daily"
           ? "Operating cost for today"
           : "Operating cost for trailing 7d",
-      amountWei: "0",
+      amountTomi: "0",
       amountCents: operatingCostCents,
       sourceKind: "operating_cost",
       metadata: {
@@ -203,28 +203,28 @@ function collectAttributionEntries(params: {
       `${params.financeSnapshot.retryableFailedItems} retryable failed item(s) are still pending reconciliation.`,
     );
   }
-  if (toBigInt(params.financeSnapshot.pendingPayablesWei) > 0n) {
+  if (toBigInt(params.financeSnapshot.pendingPayablesTomi) > 0n) {
     anomalies.push(
       `Pending payables remain open: ${formatTOS(
-        toBigInt(params.financeSnapshot.pendingPayablesWei),
+        toBigInt(params.financeSnapshot.pendingPayablesTomi),
       )}.`,
     );
   }
-  if (toBigInt(period.netWei) < 0n) {
+  if (toBigInt(period.netTomi) < 0n) {
     anomalies.push(
       `${params.periodKind} realized net is negative: ${formatTOS(
-        toBigInt(period.netWei),
+        toBigInt(period.netTomi),
       )}.`,
     );
   }
 
   gains.sort((left, right) =>
-    Number(toBigInt(right.amountWei) - toBigInt(left.amountWei)),
+    Number(toBigInt(right.amountTomi) - toBigInt(left.amountTomi)),
   );
   losses.sort((left, right) => {
     const rightValue =
-      toBigInt(right.amountWei) || BigInt(right.amountCents ?? 0);
-    const leftValue = toBigInt(left.amountWei) || BigInt(left.amountCents ?? 0);
+      toBigInt(right.amountTomi) || BigInt(right.amountCents ?? 0);
+    const leftValue = toBigInt(left.amountTomi) || BigInt(left.amountCents ?? 0);
     return Number(rightValue - leftValue);
   });
 
@@ -272,14 +272,14 @@ export async function buildOwnerFinanceSnapshot(params: {
     periodEnd,
     generatedAt: new Date(nowMs).toISOString(),
     address: params.config.walletAddress,
-    realizedRevenueWei: period.revenueWei,
-    realizedCostWei: period.costWei,
-    realizedNetWei: period.netWei,
-    pendingReceivablesWei: financeSnapshot.pendingReceivablesWei,
-    pendingPayablesWei: financeSnapshot.pendingPayablesWei,
-    pendingNetWei: (
-      toBigInt(financeSnapshot.pendingReceivablesWei) -
-      toBigInt(financeSnapshot.pendingPayablesWei)
+    realizedRevenueTomi: period.revenueTomi,
+    realizedCostTomi: period.costTomi,
+    realizedNetTomi: period.netTomi,
+    pendingReceivablesTomi: financeSnapshot.pendingReceivablesTomi,
+    pendingPayablesTomi: financeSnapshot.pendingPayablesTomi,
+    pendingNetTomi: (
+      toBigInt(financeSnapshot.pendingReceivablesTomi) -
+      toBigInt(financeSnapshot.pendingPayablesTomi)
     ).toString(),
     revenueEvents: period.revenueEvents,
     costEvents: period.costEvents,
@@ -290,21 +290,21 @@ export async function buildOwnerFinanceSnapshot(params: {
     pendingOnchainTransactions: financeSnapshot.pendingOnchainTransactions,
     failedOnchainTransactions: financeSnapshot.failedOnchainTransactions,
     majorCategories: {
-      x402RevenueWei: financeSnapshot.revenueSources.x402ConfirmedWei30d,
-      bountySolverRewardsWei: financeSnapshot.revenueSources.bountySolverRewardsWei30d,
-      x402CostWei: financeSnapshot.costSources.x402ConfirmedWei30d,
-      bountyHostPayoutsWei: financeSnapshot.costSources.bountyHostPayoutsWei30d,
+      x402RevenueTomi: financeSnapshot.revenueSources.x402ConfirmedTomi30d,
+      bountySolverRewardsTomi: financeSnapshot.revenueSources.bountySolverRewardsTomi30d,
+      x402CostTomi: financeSnapshot.costSources.x402ConfirmedTomi30d,
+      bountyHostPayoutsTomi: financeSnapshot.costSources.bountyHostPayoutsTomi30d,
     },
     topGains: attribution.topGains,
     topLosses: attribution.topLosses,
     anomalies: attribution.anomalies,
     summary: `${periodKind} realized revenue=${formatTOS(
-      toBigInt(period.revenueWei),
-    )}, cost=${formatTOS(toBigInt(period.costWei))}, net=${formatTOS(
-      toBigInt(period.netWei),
+      toBigInt(period.revenueTomi),
+    )}, cost=${formatTOS(toBigInt(period.costTomi))}, net=${formatTOS(
+      toBigInt(period.netTomi),
     )}, pending=${formatTOS(
-      toBigInt(financeSnapshot.pendingReceivablesWei) -
-        toBigInt(financeSnapshot.pendingPayablesWei),
+      toBigInt(financeSnapshot.pendingReceivablesTomi) -
+        toBigInt(financeSnapshot.pendingPayablesTomi),
     )}`,
   };
 }
@@ -336,10 +336,10 @@ export function buildOwnerFinanceSnapshotReport(
     "=== OPENFOX OWNER FINANCE SNAPSHOT ===",
     `Period:    ${snapshot.periodKind}`,
     `Range:     ${snapshot.periodStart} -> ${snapshot.periodEnd}`,
-    `Revenue:   ${formatTOS(toBigInt(snapshot.realizedRevenueWei))}`,
-    `Cost:      ${formatTOS(toBigInt(snapshot.realizedCostWei))}`,
-    `Net:       ${formatTOS(toBigInt(snapshot.realizedNetWei))}`,
-    `Pending:   ${formatTOS(toBigInt(snapshot.pendingNetWei))}`,
+    `Revenue:   ${formatTOS(toBigInt(snapshot.realizedRevenueTomi))}`,
+    `Cost:      ${formatTOS(toBigInt(snapshot.realizedCostTomi))}`,
+    `Net:       ${formatTOS(toBigInt(snapshot.realizedNetTomi))}`,
+    `Pending:   ${formatTOS(toBigInt(snapshot.pendingNetTomi))}`,
     `Events:    revenue=${snapshot.revenueEvents}, cost=${snapshot.costEvents}`,
     `Ops cost:  $${(snapshot.operatingCostCents / 100).toFixed(2)} (inference=$${(
       snapshot.inferenceCostCents / 100
@@ -349,7 +349,7 @@ export function buildOwnerFinanceSnapshotReport(
     ...(snapshot.topGains.length
       ? snapshot.topGains.map(
           (entry) =>
-            `  - ${entry.title}: ${formatTOS(toBigInt(entry.amountWei))}`,
+            `  - ${entry.title}: ${formatTOS(toBigInt(entry.amountTomi))}`,
         )
       : ["  (none)"]),
     "",
@@ -357,8 +357,8 @@ export function buildOwnerFinanceSnapshotReport(
     ...(snapshot.topLosses.length
       ? snapshot.topLosses.map((entry) => {
           const lineValue =
-            entry.amountWei !== "0"
-              ? formatTOS(toBigInt(entry.amountWei))
+            entry.amountTomi !== "0"
+              ? formatTOS(toBigInt(entry.amountTomi))
               : `$${((entry.amountCents ?? 0) / 100).toFixed(2)}`;
           return `  - ${entry.title}: ${lineValue}`;
         })

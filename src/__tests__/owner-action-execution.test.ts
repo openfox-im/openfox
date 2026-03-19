@@ -51,9 +51,9 @@ function createQueuedPursueAction(params: {
     suggestedAction: "Pursue this bounty.",
     capability: "task.submit",
     baseUrl: params.baseUrl,
-    rewardWei: "1000",
-    estimatedCostWei: "10",
-    marginWei: "990",
+    rewardTomi: "1000",
+    estimatedCostTomi: "10",
+    marginTomi: "990",
     marginBps: 9900,
     strategyScore: 1200,
     strategyMatched: true,
@@ -132,7 +132,7 @@ describe("owner action execution", () => {
       const bounty = hostEngine.openQuestionBounty({
         question: "Capital of Italy?",
         referenceAnswer: "Rome",
-        rewardWei: "1000",
+        rewardTomi: "1000",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
       });
       const bountyServer = await startBountyHttpServer({
@@ -258,21 +258,21 @@ describe("owner action execution", () => {
       const campaign = hostEngine.createCampaign({
         title: "Macro campaign",
         description: "Solve one bounded bounty at a time.",
-        budgetWei: "5000",
+        budgetTomi: "5000",
         maxOpenBounties: 4,
         allowedKinds: ["question"],
       });
       const bountyOne = hostEngine.openQuestionBounty({
         question: "Capital of Italy?",
         referenceAnswer: "Rome",
-        rewardWei: "1000",
+        rewardTomi: "1000",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         campaignId: campaign.campaignId,
       });
       const bountyTwo = hostEngine.openQuestionBounty({
         question: "Capital of Spain?",
         referenceAnswer: "Madrid",
-        rewardWei: "900",
+        rewardTomi: "900",
         submissionDeadline: "2027-03-12T00:00:00.000Z",
         campaignId: campaign.campaignId,
       });
@@ -333,8 +333,8 @@ describe("owner action execution", () => {
           progress: {
             openBountyCount: 2,
             totalBountyCount: 2,
-            allocatedWei: "1900",
-            remainingWei: "3100",
+            allocatedTomi: "1900",
+            remainingTomi: "3100",
           },
           bounties: [bountyOne, bountyTwo],
         });

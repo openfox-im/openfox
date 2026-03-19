@@ -240,7 +240,7 @@ export async function onIntentCompleted(
     publisherAddress: string;
     solverAddress: string;
     groupId?: string;
-    budgetWei?: string;
+    budgetTomi?: string;
   },
 ): Promise<void> {
   logger.info(`reactor: intent ${params.intentId} completed`);
@@ -280,18 +280,18 @@ export async function onIntentCompleted(
   });
 
   // 3. If there is a budget and a group, create a settlement spend proposal
-  if (params.budgetWei && params.groupId) {
+  if (params.budgetTomi && params.groupId) {
     try {
       const proposal = await createGovernanceProposal(ctx.db, {
         account: ctx.account,
         groupId: params.groupId,
         proposalType: "spend",
         title: `Settlement: intent ${params.intentId}`,
-        description: `Automated settlement spend proposal for completed intent ${params.intentId}. Solver: ${params.solverAddress}. Amount: ${params.budgetWei} wei.`,
+        description: `Automated settlement spend proposal for completed intent ${params.intentId}. Solver: ${params.solverAddress}. Amount: ${params.budgetTomi} tomi.`,
         params: {
           intentId: params.intentId,
           recipient: params.solverAddress,
-          amountWei: params.budgetWei,
+          amountTomi: params.budgetTomi,
           action: "settlement_spend",
         },
         proposerAddress: params.publisherAddress,
@@ -324,13 +324,13 @@ export function onTreasurySpendExecuted(
   params: {
     groupId: string;
     recipient: string;
-    amountWei: string;
+    amountTomi: string;
     txHash?: string;
     proposalId?: string;
   },
 ): void {
   logger.info(
-    `reactor: treasury spend executed in ${params.groupId} -> ${params.recipient} (${params.amountWei} wei)`,
+    `reactor: treasury spend executed in ${params.groupId} -> ${params.recipient} (${params.amountTomi} tomi)`,
   );
 
   // 1. Emit economic reputation event for recipient
@@ -351,7 +351,7 @@ export function onTreasurySpendExecuted(
   publishEvent(ctx.eventBus, "treasury.update", {
     groupId: params.groupId,
     recipient: params.recipient,
-    amountWei: params.amountWei,
+    amountTomi: params.amountTomi,
   });
 
   // 3. Publish reputation update event
@@ -492,7 +492,7 @@ export async function reactorApproveIntentCompletion(
     publisherAddress: result.intent.publisherAddress,
     solverAddress: result.intent.matchedSolverAddress!,
     groupId: result.intent.groupId ?? undefined,
-    budgetWei: result.intent.budgetWei ?? undefined,
+    budgetTomi: result.intent.budgetTomi ?? undefined,
   });
 
   return result;
@@ -506,7 +506,7 @@ export function reactorExecuteTreasurySpend(
   ctx: ReactorContext,
   params: {
     groupId: string;
-    amountWei: string;
+    amountTomi: string;
     recipient: string;
     budgetLine: string;
     proposalId?: string;
@@ -517,7 +517,7 @@ export function reactorExecuteTreasurySpend(
   const logRecord = recordTreasuryOutflow(
     ctx.db,
     params.groupId,
-    params.amountWei,
+    params.amountTomi,
     params.recipient,
     params.budgetLine,
     params.proposalId,
@@ -528,7 +528,7 @@ export function reactorExecuteTreasurySpend(
   onTreasurySpendExecuted(ctx, {
     groupId: params.groupId,
     recipient: params.recipient,
-    amountWei: params.amountWei,
+    amountTomi: params.amountTomi,
     txHash: params.txHash,
     proposalId: params.proposalId,
   });
@@ -549,7 +549,7 @@ export function reactorCreateIntent(
     title: string;
     description?: string;
     requirements?: IntentRequirement[];
-    budgetWei?: string;
+    budgetTomi?: string;
     budgetLine?: string;
     expiresInHours?: number;
   },
@@ -561,7 +561,7 @@ export function reactorCreateIntent(
     title: params.title,
     description: params.description,
     requirements: params.requirements,
-    budgetWei: params.budgetWei,
+    budgetTomi: params.budgetTomi,
     budgetLine: params.budgetLine,
     expiresInHours: params.expiresInHours,
   });
@@ -586,7 +586,7 @@ export function reactorRespondToIntent(
     intentId: string;
     solverAddress: string;
     proposalText?: string;
-    proposedAmountWei?: string;
+    proposedAmountTomi?: string;
     capabilityRefs?: string[];
   },
 ): IntentResponseRecord {
@@ -599,7 +599,7 @@ export function reactorRespondToIntent(
     intentId: params.intentId,
     solverAddress: params.solverAddress,
     proposalText: params.proposalText,
-    proposedAmountWei: params.proposedAmountWei,
+    proposedAmountTomi: params.proposedAmountTomi,
     capabilityRefs: params.capabilityRefs,
   });
 

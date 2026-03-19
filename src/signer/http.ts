@@ -39,7 +39,7 @@ export interface SignerQuoteRequest {
     };
   };
   target: ChainAddress;
-  value_wei?: string;
+  value_tomi?: string;
   data?: Hex;
   gas?: string;
   reason?: string;
@@ -56,7 +56,7 @@ export interface SignerExecutionSubmitRequest {
   request_nonce: string;
   request_expires_at: number;
   target: ChainAddress;
-  value_wei?: string;
+  value_tomi?: string;
   data?: Hex;
   gas?: string;
   reason?: string;
@@ -81,7 +81,7 @@ export interface StartSignerProviderServerParams {
       providerAddress: string;
       requestKey: string;
       requestHash: Hex;
-      amountWei: string;
+      amountTomi: string;
       description: string;
     }): Promise<X402ServerPaymentResult>;
     bindPayment(binding: {
@@ -95,7 +95,7 @@ export interface StartSignerProviderServerParams {
     rpcUrl: string;
     privateKey: Hex;
     to: ChainAddress;
-    amountWei: bigint;
+    amountTomi: bigint;
     gas?: bigint;
     data?: Hex;
     waitForReceipt?: boolean;
@@ -140,7 +140,7 @@ function buildQuoteId(params: {
   providerAddress: ChainAddress;
   walletAddress: ChainAddress;
   targetAddress: ChainAddress;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyHash: Hex;
@@ -152,7 +152,7 @@ function buildQuoteId(params: {
         params.providerAddress.toLowerCase(),
         params.walletAddress.toLowerCase(),
         params.targetAddress.toLowerCase(),
-        params.valueWei,
+        params.valueTomi,
         params.dataHex.toLowerCase(),
         params.gas,
         params.policyHash.toLowerCase(),
@@ -245,7 +245,7 @@ export async function startSignerProviderServer(
   const paymentManager =
     params.paymentManager !== undefined
       ? params.paymentManager
-      : config.x402Server?.enabled && rpcUrl && BigInt(signerConfig.submitPriceWei) > 0n
+      : config.x402Server?.enabled && rpcUrl && BigInt(signerConfig.submitPriceTomi) > 0n
         ? createX402PaymentManager({
             db,
             rpcUrl,
@@ -297,7 +297,7 @@ export async function startSignerProviderServer(
       }
 
       if (req.method === "HEAD" && url.pathname === submitPath) {
-        if (!rpcUrl || BigInt(signerConfig.submitPriceWei) <= 0n) {
+        if (!rpcUrl || BigInt(signerConfig.submitPriceTomi) <= 0n) {
           res.statusCode = 204;
           res.end();
           return;
@@ -306,7 +306,7 @@ export async function startSignerProviderServer(
           rpcUrl,
           chainId: config.chainId,
           providerAddress: address,
-          amountWei: signerConfig.submitPriceWei,
+          amountTomi: signerConfig.submitPriceTomi,
           description: "OpenFox signer.submit payment",
         });
         writeX402RequirementResponse({ res, requirement });
@@ -320,7 +320,7 @@ export async function startSignerProviderServer(
           providerAddress: address,
           config: signerConfig,
           targetAddress: body.target,
-          valueWei: body.value_wei || "0",
+          valueTomi: body.value_tomi || "0",
           dataHex: body.data,
           gas: body.gas,
         });
@@ -330,7 +330,7 @@ export async function startSignerProviderServer(
           providerAddress: address,
           walletAddress: validated.walletAddress,
           targetAddress: validated.targetAddress,
-          valueWei: validated.valueWei,
+          valueTomi: validated.valueTomi,
           dataHex: validated.dataHex,
           gas: validated.gas,
           policyHash: validated.policyHash,
@@ -344,7 +344,7 @@ export async function startSignerProviderServer(
           walletAddress: validated.walletAddress,
           requesterAddress,
           targetAddress: validated.targetAddress,
-          valueWei: validated.valueWei,
+          valueTomi: validated.valueTomi,
           dataHex: validated.dataHex,
           gas: validated.gas,
           policyId: signerConfig.policy.policyId,
@@ -352,7 +352,7 @@ export async function startSignerProviderServer(
           scopeHash: validated.scopeHash,
           delegateIdentity: signerConfig.policy.delegateIdentity ?? null,
           trustTier: signerConfig.policy.trustTier,
-          amountWei: signerConfig.submitPriceWei,
+          amountTomi: signerConfig.submitPriceTomi,
           status: "quoted",
           expiresAt,
           createdAt: nowIso,
@@ -365,14 +365,14 @@ export async function startSignerProviderServer(
           wallet_address: record.walletAddress,
           requester_address: record.requesterAddress,
           target_address: record.targetAddress,
-          value_wei: record.valueWei,
+          value_tomi: record.valueTomi,
           data_hex: record.dataHex,
           gas: record.gas,
           policy_id: record.policyId,
           policy_hash: record.policyHash,
           scope_hash: record.scopeHash,
           trust_tier: record.trustTier,
-          amount_wei: record.amountWei,
+          amount_tomi: record.amountTomi,
           expires_at: record.expiresAt,
         });
         return;
@@ -406,13 +406,13 @@ export async function startSignerProviderServer(
         providerAddress: address,
         config: signerConfig,
         targetAddress: body.target,
-        valueWei: body.value_wei || "0",
+        valueTomi: body.value_tomi || "0",
         dataHex: body.data,
         gas: body.gas,
       });
       if (
         validated.targetAddress !== quote.targetAddress ||
-        validated.valueWei !== quote.valueWei ||
+        validated.valueTomi !== quote.valueTomi ||
         validated.dataHex !== quote.dataHex ||
         validated.gas !== quote.gas ||
         validated.policyHash !== quote.policyHash
@@ -435,7 +435,7 @@ export async function startSignerProviderServer(
         requester_address: requesterAddress.toLowerCase(),
         wallet_address: quote.walletAddress.toLowerCase(),
         target_address: validated.targetAddress.toLowerCase(),
-        value_wei: validated.valueWei,
+        value_tomi: validated.valueTomi,
         data_hex: validated.dataHex.toLowerCase(),
         gas: validated.gas,
         reason: body.reason ?? "",
@@ -472,14 +472,14 @@ export async function startSignerProviderServer(
       });
 
       let paymentState: X402ServerPaymentResult | undefined;
-      if (paymentManager && BigInt(signerConfig.submitPriceWei) > 0n) {
+      if (paymentManager && BigInt(signerConfig.submitPriceTomi) > 0n) {
         paymentState = await paymentManager.requirePayment({
           req,
           serviceKind: "signer",
           providerAddress: address,
           requestKey,
           requestHash,
-          amountWei: signerConfig.submitPriceWei,
+          amountTomi: signerConfig.submitPriceTomi,
           description: "OpenFox signer.submit payment",
         });
         if (paymentState.state === "required") {
@@ -505,7 +505,7 @@ export async function startSignerProviderServer(
         rpcUrl,
         privateKey,
         to: validated.targetAddress,
-        amountWei: BigInt(validated.valueWei),
+        amountTomi: BigInt(validated.valueTomi),
         gas: BigInt(validated.gas),
         data: validated.dataHex,
         waitForReceipt: config.x402Server?.confirmationPolicy === "receipt",
@@ -523,7 +523,7 @@ export async function startSignerProviderServer(
         walletAddress: quote.walletAddress,
         requesterAddress,
         targetAddress: validated.targetAddress,
-        valueWei: validated.valueWei,
+        valueTomi: validated.valueTomi,
         dataHex: validated.dataHex,
         gas: validated.gas,
         policyId: quote.policyId,

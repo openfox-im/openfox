@@ -15,27 +15,27 @@ export interface OperatorWalletSnapshot {
   signerDefaulted: boolean | null;
   rpcReachable: boolean;
   rpcError: string | null;
-  balanceWei: string | null;
+  balanceTomi: string | null;
   nonce: string | null;
-  openCommitmentsWei: string;
-  approvedUnpaidWei: string;
-  reservedBalanceWei: string;
-  availableBalanceWei: string | null;
-  pendingReceivablesWei: string;
-  pendingPayablesWei: string;
+  openCommitmentsTomi: string;
+  approvedUnpaidTomi: string;
+  reservedBalanceTomi: string;
+  availableBalanceTomi: string | null;
+  pendingReceivablesTomi: string;
+  pendingPayablesTomi: string;
   retryableFailedItems: number;
   pendingOnchainTransactions: number;
   failedOnchainTransactions: number;
-  averageDailyNativeCostWei30d: string;
+  averageDailyNativeCostTomi30d: string;
   runwayDays: number | null;
   summary: string;
 }
 
 export interface OperatorFinancePeriodSnapshot {
   label: "today" | "7d" | "30d";
-  revenueWei: string;
-  costWei: string;
-  netWei: string;
+  revenueTomi: string;
+  costTomi: string;
+  netTomi: string;
   revenueEvents: number;
   costEvents: number;
   inferenceCostCents: number;
@@ -52,18 +52,18 @@ export interface OperatorFinanceSnapshot {
     trailing7d: OperatorFinancePeriodSnapshot;
     trailing30d: OperatorFinancePeriodSnapshot;
   };
-  pendingReceivablesWei: string;
-  pendingPayablesWei: string;
+  pendingReceivablesTomi: string;
+  pendingPayablesTomi: string;
   retryableFailedItems: number;
   pendingOnchainTransactions: number;
   failedOnchainTransactions: number;
   revenueSources: {
-    x402ConfirmedWei30d: string;
-    bountySolverRewardsWei30d: string;
+    x402ConfirmedTomi30d: string;
+    bountySolverRewardsTomi30d: string;
   };
   costSources: {
-    x402ConfirmedWei30d: string;
-    bountyHostPayoutsWei30d: string;
+    x402ConfirmedTomi30d: string;
+    bountyHostPayoutsTomi30d: string;
   };
   summary: string;
 }
@@ -208,18 +208,18 @@ function buildFinancialContext(
 }
 
 function collectBountyWalletFlows(context: FinancialContext, db: OpenFoxDatabase): {
-  openCommitmentsWei: bigint;
-  approvedUnpaidWei: bigint;
-  pendingReceivableRewardsWei: bigint;
-  pendingPayableRewardsWei: bigint;
+  openCommitmentsTomi: bigint;
+  approvedUnpaidTomi: bigint;
+  pendingReceivableRewardsTomi: bigint;
+  pendingPayableRewardsTomi: bigint;
 } {
-  let openCommitmentsWei = 0n;
-  let approvedUnpaidWei = 0n;
-  let pendingReceivableRewardsWei = 0n;
-  let pendingPayableRewardsWei = 0n;
+  let openCommitmentsTomi = 0n;
+  let approvedUnpaidTomi = 0n;
+  let pendingReceivableRewardsTomi = 0n;
+  let pendingPayableRewardsTomi = 0n;
 
   for (const bounty of context.bounties) {
-    const rewardWei = toBigInt(bounty.rewardWei);
+    const rewardTomi = toBigInt(bounty.rewardTomi);
     const hostOwnsBounty = bounty.hostAddress.toLowerCase() === context.address;
     if (
       hostOwnsBounty &&
@@ -227,12 +227,12 @@ function collectBountyWalletFlows(context: FinancialContext, db: OpenFoxDatabase
         bounty.status === "submitted" ||
         bounty.status === "under_review")
     ) {
-      openCommitmentsWei += rewardWei;
+      openCommitmentsTomi += rewardTomi;
     }
 
     if (hostOwnsBounty && bounty.status === "approved") {
-      approvedUnpaidWei += rewardWei;
-      pendingPayableRewardsWei += rewardWei;
+      approvedUnpaidTomi += rewardTomi;
+      pendingPayableRewardsTomi += rewardTomi;
     }
 
     const result = db.getBountyResult(bounty.bountyId);
@@ -241,41 +241,41 @@ function collectBountyWalletFlows(context: FinancialContext, db: OpenFoxDatabase
     if (!winningSubmission) continue;
     const solverWon = winningSubmission.solverAddress.toLowerCase() === context.address;
     if (solverWon && !result.payoutTxHash) {
-      pendingReceivableRewardsWei += rewardWei;
+      pendingReceivableRewardsTomi += rewardTomi;
     }
   }
 
   return {
-    openCommitmentsWei,
-    approvedUnpaidWei,
-    pendingReceivableRewardsWei,
-    pendingPayableRewardsWei,
+    openCommitmentsTomi,
+    approvedUnpaidTomi,
+    pendingReceivableRewardsTomi,
+    pendingPayableRewardsTomi,
   };
 }
 
 function collectPendingX402Flows(context: FinancialContext): {
-  pendingIncomingWei: bigint;
-  pendingOutgoingWei: bigint;
+  pendingIncomingTomi: bigint;
+  pendingOutgoingTomi: bigint;
 } {
-  let pendingIncomingWei = 0n;
-  let pendingOutgoingWei = 0n;
+  let pendingIncomingTomi = 0n;
+  let pendingOutgoingTomi = 0n;
   for (const row of context.x402Payments) {
     const status = String(row.status || "");
     if (status !== "verified" && status !== "submitted") continue;
-    const amountWei = toBigInt(String(row.amount_wei ?? row.amountWei ?? "0"));
+    const amountTomi = toBigInt(String(row.amount_tomi ?? row.amountTomi ?? "0"));
     const payer = String(row.payer_address ?? row.payerAddress ?? "").toLowerCase();
     const provider = String(
       row.provider_address ?? row.providerAddress ?? "",
     ).toLowerCase();
-    if (provider === context.address) pendingIncomingWei += amountWei;
-    if (payer === context.address) pendingOutgoingWei += amountWei;
+    if (provider === context.address) pendingIncomingTomi += amountTomi;
+    if (payer === context.address) pendingOutgoingTomi += amountTomi;
   }
-  return { pendingIncomingWei, pendingOutgoingWei };
+  return { pendingIncomingTomi, pendingOutgoingTomi };
 }
 
-function computeRunwayDays(balanceWei: bigint, avgDailyCostWei: bigint): number | null {
-  if (avgDailyCostWei <= 0n) return null;
-  return Number(balanceWei) / Number(avgDailyCostWei);
+function computeRunwayDays(balanceTomi: bigint, avgDailyCostTomi: bigint): number | null {
+  if (avgDailyCostTomi <= 0n) return null;
+  return Number(balanceTomi) / Number(avgDailyCostTomi);
 }
 
 function buildPeriodSnapshot(params: {
@@ -285,32 +285,32 @@ function buildPeriodSnapshot(params: {
   db: OpenFoxDatabase;
 }): {
   period: OperatorFinancePeriodSnapshot;
-  x402RevenueWei: bigint;
-  x402CostWei: bigint;
-  bountyRevenueWei: bigint;
-  bountyCostWei: bigint;
+  x402RevenueTomi: bigint;
+  x402CostTomi: bigint;
+  bountyRevenueTomi: bigint;
+  bountyCostTomi: bigint;
 } {
-  let x402RevenueWei = 0n;
-  let x402CostWei = 0n;
+  let x402RevenueTomi = 0n;
+  let x402CostTomi = 0n;
   for (const row of params.context.x402Payments) {
     const updatedAt = toMs(String(row.updated_at ?? row.updatedAt ?? ""));
     if (updatedAt < params.sinceMs) continue;
     if (String(row.status || "") !== "confirmed") continue;
-    const amountWei = toBigInt(String(row.amount_wei ?? row.amountWei ?? "0"));
+    const amountTomi = toBigInt(String(row.amount_tomi ?? row.amountTomi ?? "0"));
     const payer = String(row.payer_address ?? row.payerAddress ?? "").toLowerCase();
     const provider = String(
       row.provider_address ?? row.providerAddress ?? "",
     ).toLowerCase();
-    if (provider === params.context.address) x402RevenueWei += amountWei;
-    if (payer === params.context.address) x402CostWei += amountWei;
+    if (provider === params.context.address) x402RevenueTomi += amountTomi;
+    if (payer === params.context.address) x402CostTomi += amountTomi;
   }
 
-  let bountyRevenueWei = 0n;
-  let bountyCostWei = 0n;
+  let bountyRevenueTomi = 0n;
+  let bountyCostTomi = 0n;
   let revenueEvents = 0;
   let costEvents = 0;
   for (const bounty of params.context.bounties) {
-    const rewardWei = toBigInt(bounty.rewardWei);
+    const rewardTomi = toBigInt(bounty.rewardTomi);
     const result = params.db.getBountyResult(bounty.bountyId);
     if (!result || !result.payoutTxHash) continue;
     const updatedAt = toMs(result.updatedAt);
@@ -322,25 +322,25 @@ function buildPeriodSnapshot(params: {
       winningSubmission &&
       winningSubmission.solverAddress.toLowerCase() === params.context.address
     ) {
-      bountyRevenueWei += rewardWei;
+      bountyRevenueTomi += rewardTomi;
       revenueEvents += 1;
     }
     if (bounty.hostAddress.toLowerCase() === params.context.address) {
-      bountyCostWei += rewardWei;
+      bountyCostTomi += rewardTomi;
       costEvents += 1;
     }
   }
 
-  const revenueWei = x402RevenueWei + bountyRevenueWei;
-  const costWei = x402CostWei + bountyCostWei;
+  const revenueTomi = x402RevenueTomi + bountyRevenueTomi;
+  const costTomi = x402CostTomi + bountyCostTomi;
   const inferenceCostCents = getInferenceCostSince(params.db, params.sinceMs);
   const spendCostCents = getSpendCostSince(params.db, params.sinceMs);
   return {
     period: {
       label: params.label,
-      revenueWei: revenueWei.toString(),
-      costWei: costWei.toString(),
-      netWei: (revenueWei - costWei).toString(),
+      revenueTomi: revenueTomi.toString(),
+      costTomi: costTomi.toString(),
+      netTomi: (revenueTomi - costTomi).toString(),
       revenueEvents:
         revenueEvents +
         params.context.x402Payments.filter((row) => {
@@ -367,10 +367,10 @@ function buildPeriodSnapshot(params: {
       spendCostCents,
       operatingCostCents: inferenceCostCents + spendCostCents,
     },
-    x402RevenueWei,
-    x402CostWei,
-    bountyRevenueWei,
-    bountyCostWei,
+    x402RevenueTomi,
+    x402CostTomi,
+    bountyRevenueTomi,
+    bountyCostTomi,
   };
 }
 
@@ -383,7 +383,7 @@ export async function buildOperatorWalletSnapshot(
   const bountyFlows = collectBountyWalletFlows(context, db);
   const x402Flows = collectPendingX402Flows(context);
 
-  let balanceWei: bigint | null = null;
+  let balanceTomi: bigint | null = null;
   let nonce: bigint | null = null;
   let chainId: bigint | null = null;
   let signerType: string | null = null;
@@ -393,45 +393,45 @@ export async function buildOperatorWalletSnapshot(
   let rpcError: string | null = null;
   try {
     const snapshot = await buildWalletStatusSnapshot(config);
-    balanceWei = snapshot.balanceWei ?? null;
+    balanceTomi = snapshot.balanceTomi ?? null;
     nonce = snapshot.nonce ?? null;
     chainId = snapshot.chainId ?? null;
     signerType = snapshot.signer?.type ?? null;
     signerValue = snapshot.signer?.value ?? null;
     signerDefaulted = snapshot.signer?.defaulted ?? null;
-    rpcReachable = Boolean(snapshot.rpcUrl && snapshot.balanceWei !== undefined);
+    rpcReachable = Boolean(snapshot.rpcUrl && snapshot.balanceTomi !== undefined);
   } catch (error) {
     rpcError = error instanceof Error ? error.message : String(error);
   }
 
-  const pendingReceivablesWei =
-    bountyFlows.pendingReceivableRewardsWei + x402Flows.pendingIncomingWei;
-  const pendingPayablesWei =
-    bountyFlows.pendingPayableRewardsWei + x402Flows.pendingOutgoingWei;
-  const reservedBalanceWei =
-    bountyFlows.openCommitmentsWei + bountyFlows.approvedUnpaidWei;
-  const availableBalanceWei =
-    balanceWei === null ? null : balanceWei > reservedBalanceWei ? balanceWei - reservedBalanceWei : 0n;
+  const pendingReceivablesTomi =
+    bountyFlows.pendingReceivableRewardsTomi + x402Flows.pendingIncomingTomi;
+  const pendingPayablesTomi =
+    bountyFlows.pendingPayableRewardsTomi + x402Flows.pendingOutgoingTomi;
+  const reservedBalanceTomi =
+    bountyFlows.openCommitmentsTomi + bountyFlows.approvedUnpaidTomi;
+  const availableBalanceTomi =
+    balanceTomi === null ? null : balanceTomi > reservedBalanceTomi ? balanceTomi - reservedBalanceTomi : 0n;
   const period30 = buildPeriodSnapshot({
     label: "30d",
     sinceMs: nowMs - 30 * MS_PER_DAY,
     context,
     db,
   }).period;
-  const averageDailyNativeCostWei30d = toBigInt(period30.costWei) / 30n;
+  const averageDailyNativeCostTomi30d = toBigInt(period30.costTomi) / 30n;
   const runwayDays =
-    availableBalanceWei === null
+    availableBalanceTomi === null
       ? null
-      : computeRunwayDays(availableBalanceWei, averageDailyNativeCostWei30d);
+      : computeRunwayDays(availableBalanceTomi, averageDailyNativeCostTomi30d);
   const retryableFailedItems =
     getRetryableFailedCount(db, "x402_payments") +
     context.retryableSettlementFailures +
     context.retryableMarketFailures;
 
   const summaryBalance =
-    balanceWei === null
+    balanceTomi === null
       ? "rpc unavailable"
-      : `balance=${formatTOS(balanceWei)} reserved=${formatTOS(reservedBalanceWei)} available=${formatTOS(availableBalanceWei ?? 0n)}`;
+      : `balance=${formatTOS(balanceTomi)} reserved=${formatTOS(reservedBalanceTomi)} available=${formatTOS(availableBalanceTomi ?? 0n)}`;
   const runwaySummary =
     runwayDays === null
       ? "runway=infinite"
@@ -448,22 +448,22 @@ export async function buildOperatorWalletSnapshot(
     signerDefaulted,
     rpcReachable,
     rpcError,
-    balanceWei: balanceWei?.toString() ?? null,
+    balanceTomi: balanceTomi?.toString() ?? null,
     nonce: nonce?.toString() ?? null,
-    openCommitmentsWei: bountyFlows.openCommitmentsWei.toString(),
-    approvedUnpaidWei: bountyFlows.approvedUnpaidWei.toString(),
-    reservedBalanceWei: reservedBalanceWei.toString(),
-    availableBalanceWei: availableBalanceWei?.toString() ?? null,
-    pendingReceivablesWei: pendingReceivablesWei.toString(),
-    pendingPayablesWei: pendingPayablesWei.toString(),
+    openCommitmentsTomi: bountyFlows.openCommitmentsTomi.toString(),
+    approvedUnpaidTomi: bountyFlows.approvedUnpaidTomi.toString(),
+    reservedBalanceTomi: reservedBalanceTomi.toString(),
+    availableBalanceTomi: availableBalanceTomi?.toString() ?? null,
+    pendingReceivablesTomi: pendingReceivablesTomi.toString(),
+    pendingPayablesTomi: pendingPayablesTomi.toString(),
     retryableFailedItems,
     pendingOnchainTransactions: context.pendingOnchainTransactions,
     failedOnchainTransactions: context.failedOnchainTransactions,
-    averageDailyNativeCostWei30d: averageDailyNativeCostWei30d.toString(),
+    averageDailyNativeCostTomi30d: averageDailyNativeCostTomi30d.toString(),
     runwayDays,
     summary: `${summaryBalance}, receivable=${formatTOS(
-      pendingReceivablesWei,
-    )}, payable=${formatTOS(pendingPayablesWei)}, ${runwaySummary}`,
+      pendingReceivablesTomi,
+    )}, payable=${formatTOS(pendingPayablesTomi)}, ${runwaySummary}`,
   };
 }
 
@@ -493,10 +493,10 @@ export async function buildOperatorFinanceSnapshot(
     context,
     db,
   });
-  const pendingReceivablesWei =
-    bountyFlows.pendingReceivableRewardsWei + x402Flows.pendingIncomingWei;
-  const pendingPayablesWei =
-    bountyFlows.pendingPayableRewardsWei + x402Flows.pendingOutgoingWei;
+  const pendingReceivablesTomi =
+    bountyFlows.pendingReceivableRewardsTomi + x402Flows.pendingIncomingTomi;
+  const pendingPayablesTomi =
+    bountyFlows.pendingPayableRewardsTomi + x402Flows.pendingOutgoingTomi;
   const retryableFailedItems =
     getRetryableFailedCount(db, "x402_payments") +
     context.retryableSettlementFailures +
@@ -511,23 +511,23 @@ export async function buildOperatorFinanceSnapshot(
       trailing7d: trailing7d.period,
       trailing30d: trailing30d.period,
     },
-    pendingReceivablesWei: pendingReceivablesWei.toString(),
-    pendingPayablesWei: pendingPayablesWei.toString(),
+    pendingReceivablesTomi: pendingReceivablesTomi.toString(),
+    pendingPayablesTomi: pendingPayablesTomi.toString(),
     retryableFailedItems,
     pendingOnchainTransactions: context.pendingOnchainTransactions,
     failedOnchainTransactions: context.failedOnchainTransactions,
     revenueSources: {
-      x402ConfirmedWei30d: trailing30d.x402RevenueWei.toString(),
-      bountySolverRewardsWei30d: trailing30d.bountyRevenueWei.toString(),
+      x402ConfirmedTomi30d: trailing30d.x402RevenueTomi.toString(),
+      bountySolverRewardsTomi30d: trailing30d.bountyRevenueTomi.toString(),
     },
     costSources: {
-      x402ConfirmedWei30d: trailing30d.x402CostWei.toString(),
-      bountyHostPayoutsWei30d: trailing30d.bountyCostWei.toString(),
+      x402ConfirmedTomi30d: trailing30d.x402CostTomi.toString(),
+      bountyHostPayoutsTomi30d: trailing30d.bountyCostTomi.toString(),
     },
     summary: `30d revenue=${formatTOS(
-      toBigInt(trailing30d.period.revenueWei),
-    )}, cost=${formatTOS(toBigInt(trailing30d.period.costWei))}, net=${formatTOS(
-      toBigInt(trailing30d.period.netWei),
+      toBigInt(trailing30d.period.revenueTomi),
+    )}, cost=${formatTOS(toBigInt(trailing30d.period.costTomi))}, net=${formatTOS(
+      toBigInt(trailing30d.period.netTomi),
     )}, operating=${formatUsdCents(trailing30d.period.operatingCostCents)}`,
   };
 }
@@ -543,25 +543,25 @@ export function buildOperatorWalletReport(snapshot: OperatorWalletSnapshot): str
       snapshot.signerDefaulted === null ? "(unknown)" : snapshot.signerDefaulted ? "yes" : "no"
     }`,
     `Balance: ${
-      snapshot.balanceWei !== null
-        ? formatTOS(toBigInt(snapshot.balanceWei))
+      snapshot.balanceTomi !== null
+        ? formatTOS(toBigInt(snapshot.balanceTomi))
         : "(unknown)"
     }`,
-    `Reserved: ${formatTOS(toBigInt(snapshot.reservedBalanceWei))}`,
+    `Reserved: ${formatTOS(toBigInt(snapshot.reservedBalanceTomi))}`,
     `Available: ${
-      snapshot.availableBalanceWei !== null
-        ? formatTOS(toBigInt(snapshot.availableBalanceWei))
+      snapshot.availableBalanceTomi !== null
+        ? formatTOS(toBigInt(snapshot.availableBalanceTomi))
         : "(unknown)"
     }`,
-    `Pending receivables: ${formatTOS(toBigInt(snapshot.pendingReceivablesWei))}`,
-    `Pending payables: ${formatTOS(toBigInt(snapshot.pendingPayablesWei))}`,
-    `Open commitments: ${formatTOS(toBigInt(snapshot.openCommitmentsWei))}`,
-    `Approved unpaid: ${formatTOS(toBigInt(snapshot.approvedUnpaidWei))}`,
+    `Pending receivables: ${formatTOS(toBigInt(snapshot.pendingReceivablesTomi))}`,
+    `Pending payables: ${formatTOS(toBigInt(snapshot.pendingPayablesTomi))}`,
+    `Open commitments: ${formatTOS(toBigInt(snapshot.openCommitmentsTomi))}`,
+    `Approved unpaid: ${formatTOS(toBigInt(snapshot.approvedUnpaidTomi))}`,
     `Pending on-chain tx: ${snapshot.pendingOnchainTransactions}`,
     `Failed on-chain tx: ${snapshot.failedOnchainTransactions}`,
     `Retryable failed items: ${snapshot.retryableFailedItems}`,
     `Average daily native cost (30d): ${formatTOS(
-      toBigInt(snapshot.averageDailyNativeCostWei30d),
+      toBigInt(snapshot.averageDailyNativeCostTomi30d),
     )}`,
     `Runway: ${snapshot.runwayDays === null ? "infinite/unknown" : `${snapshot.runwayDays.toFixed(1)} days`}`,
     `Summary: ${snapshot.summary}`,
@@ -575,9 +575,9 @@ function buildFinancePeriodLine(
 ): string[] {
   return [
     `${label}:`,
-    `  Revenue: ${formatTOS(toBigInt(period.revenueWei))} (${period.revenueEvents} event${period.revenueEvents === 1 ? "" : "s"})`,
-    `  Cost: ${formatTOS(toBigInt(period.costWei))} (${period.costEvents} event${period.costEvents === 1 ? "" : "s"})`,
-    `  Net: ${formatTOS(toBigInt(period.netWei))}`,
+    `  Revenue: ${formatTOS(toBigInt(period.revenueTomi))} (${period.revenueEvents} event${period.revenueEvents === 1 ? "" : "s"})`,
+    `  Cost: ${formatTOS(toBigInt(period.costTomi))} (${period.costEvents} event${period.costEvents === 1 ? "" : "s"})`,
+    `  Net: ${formatTOS(toBigInt(period.netTomi))}`,
     `  Operating cost: ${formatUsdCents(period.operatingCostCents)} (inference=${formatUsdCents(period.inferenceCostCents)}, spend=${formatUsdCents(period.spendCostCents)})`,
   ];
 }
@@ -589,20 +589,20 @@ export function buildOperatorFinanceReport(snapshot: OperatorFinanceSnapshot): s
     ...buildFinancePeriodLine("Today", snapshot.periods.today),
     ...buildFinancePeriodLine("Trailing 7d", snapshot.periods.trailing7d),
     ...buildFinancePeriodLine("Trailing 30d", snapshot.periods.trailing30d),
-    `Pending receivables: ${formatTOS(toBigInt(snapshot.pendingReceivablesWei))}`,
-    `Pending payables: ${formatTOS(toBigInt(snapshot.pendingPayablesWei))}`,
+    `Pending receivables: ${formatTOS(toBigInt(snapshot.pendingReceivablesTomi))}`,
+    `Pending payables: ${formatTOS(toBigInt(snapshot.pendingPayablesTomi))}`,
     `Retryable failed items: ${snapshot.retryableFailedItems}`,
     `Pending on-chain tx: ${snapshot.pendingOnchainTransactions}`,
     `Failed on-chain tx: ${snapshot.failedOnchainTransactions}`,
     `30d revenue sources: x402=${formatTOS(
-      toBigInt(snapshot.revenueSources.x402ConfirmedWei30d),
+      toBigInt(snapshot.revenueSources.x402ConfirmedTomi30d),
     )}, bounty_solver_rewards=${formatTOS(
-      toBigInt(snapshot.revenueSources.bountySolverRewardsWei30d),
+      toBigInt(snapshot.revenueSources.bountySolverRewardsTomi30d),
     )}`,
     `30d cost sources: x402=${formatTOS(
-      toBigInt(snapshot.costSources.x402ConfirmedWei30d),
+      toBigInt(snapshot.costSources.x402ConfirmedTomi30d),
     )}, bounty_host_payouts=${formatTOS(
-      toBigInt(snapshot.costSources.bountyHostPayoutsWei30d),
+      toBigInt(snapshot.costSources.bountyHostPayoutsTomi30d),
     )}`,
     `Summary: ${snapshot.summary}`,
   ].join("\n");

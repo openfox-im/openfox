@@ -21,7 +21,7 @@ function makeProvider(overrides?: Partial<ProviderProfile>): ProviderProfile {
     reputationScore: 80,
     latencyMs: 500,
     feeSchedule: {
-      baseFee: "1000000000000000", // 0.001 ETH
+      baseFee: "1000000000000000", // 0.001 TOS
       perGasFee: "100",
       percentFee: 1,
       currency: "ETH",
@@ -38,7 +38,7 @@ function makeCheapProvider(): ProviderProfile {
     address: "0xCheapProvider000000000000000000000000000001",
     name: "CheapProvider",
     feeSchedule: {
-      baseFee: "100000000000000", // 0.0001 ETH
+      baseFee: "100000000000000", // 0.0001 TOS
       perGasFee: "10",
       percentFee: 0.5,
       currency: "ETH",

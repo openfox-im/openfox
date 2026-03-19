@@ -141,7 +141,7 @@ export function createNativeSettlementCallbackDispatcher(params: {
         rpcUrl: params.rpcUrl,
         privateKey: params.privateKey,
         to: callback.contractAddress,
-        amountWei: BigInt(target.valueWei),
+        amountTomi: BigInt(target.valueTomi),
         gas: BigInt(target.gas),
         data: callback.payloadHex,
         waitForReceipt: target.waitForReceipt,

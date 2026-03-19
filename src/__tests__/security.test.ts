@@ -61,7 +61,7 @@ describe("validateAddress", () => {
 // ── Value validation ────────────────────────────────────────────────
 
 describe("validateValue", () => {
-  it("accepts valid wei values", () => {
+  it("accepts valid tomi values", () => {
     expect(validateValue("0")).toBe(true);
     expect(validateValue("1")).toBe(true);
     expect(validateValue("1000000000000000000")).toBe(true);

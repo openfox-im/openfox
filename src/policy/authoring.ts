@@ -28,8 +28,8 @@ export interface PolicyDraft {
   privacyRestrictions: { weakTerminalBlocked: boolean; maxPrivateValue: string };
 }
 
-/** Compare two wei strings numerically. Returns negative if a < b, 0 if equal, positive if a > b. */
-function compareWei(a: string, b: string): number {
+/** Compare two tomi strings numerically. Returns negative if a < b, 0 if equal, positive if a > b. */
+function compareTomi(a: string, b: string): number {
   const aBig = BigInt(a || "0");
   const bBig = BigInt(b || "0");
   if (aBig < bBig) return -1;
@@ -37,11 +37,11 @@ function compareWei(a: string, b: string): number {
   return 0;
 }
 
-/** Format a wei string to a human-friendly token string. */
-function formatWei(wei: string): string {
-  if (!wei || wei === "0") return "0 TOS";
-  if (wei.length <= 18) return "<1 TOS";
-  const integerPart = wei.slice(0, wei.length - 18);
+/** Format a tomi string to a human-friendly token string. */
+function formatTomi(tomi: string): string {
+  if (!tomi || tomi === "0") return "0 TOS";
+  if (tomi.length <= 18) return "<1 TOS";
+  const integerPart = tomi.slice(0, tomi.length - 18);
   return `${integerPart} TOS`;
 }
 
@@ -211,21 +211,21 @@ export function validatePolicy(draft: PolicyDraft): { valid: boolean; errors: st
   }
 
   // Spend caps must be positive
-  if (compareWei(draft.spendCaps.singleTx, "0") <= 0) {
+  if (compareTomi(draft.spendCaps.singleTx, "0") <= 0) {
     errors.push("Single-transaction spend cap must be greater than zero");
   }
-  if (compareWei(draft.spendCaps.daily, "0") <= 0) {
+  if (compareTomi(draft.spendCaps.daily, "0") <= 0) {
     errors.push("Daily spend cap must be greater than zero");
   }
 
   // Single tx cap should not exceed daily cap
-  if (compareWei(draft.spendCaps.singleTx, draft.spendCaps.daily) > 0) {
+  if (compareTomi(draft.spendCaps.singleTx, draft.spendCaps.daily) > 0) {
     errors.push("Single-transaction cap exceeds daily cap");
   }
 
   // Each terminal policy: maxSingleValue <= maxDailyValue
   for (const [tc, config] of draft.terminalPolicies) {
-    if (config.enabled && compareWei(config.maxSingleValue, config.maxDailyValue) > 0) {
+    if (config.enabled && compareTomi(config.maxSingleValue, config.maxDailyValue) > 0) {
       errors.push(`Terminal ${tc}: single-tx limit exceeds daily limit`);
     }
     if (config.enabled && config.allowedActions.length === 0) {
@@ -247,7 +247,7 @@ export function validatePolicy(draft: PolicyDraft): { valid: boolean; errors: st
   }
 
   // Privacy restrictions
-  if (compareWei(draft.privacyRestrictions.maxPrivateValue, "0") <= 0) {
+  if (compareTomi(draft.privacyRestrictions.maxPrivateValue, "0") <= 0) {
     errors.push("Max private value must be greater than zero");
   }
 
@@ -277,8 +277,8 @@ export function explainPolicy(draft: PolicyDraft): string {
 
   // Spend caps
   lines.push("Spend Caps:");
-  lines.push(`  Daily:          ${formatWei(draft.spendCaps.daily)}`);
-  lines.push(`  Single tx:      ${formatWei(draft.spendCaps.singleTx)}`);
+  lines.push(`  Daily:          ${formatTomi(draft.spendCaps.daily)}`);
+  lines.push(`  Single tx:      ${formatTomi(draft.spendCaps.singleTx)}`);
   lines.push("");
 
   // Terminal policies
@@ -287,7 +287,7 @@ export function explainPolicy(draft: PolicyDraft): string {
     const status = config.enabled ? "enabled" : "disabled";
     lines.push(`  ${tc}: ${status}`);
     if (config.enabled) {
-      lines.push(`    Max single: ${formatWei(config.maxSingleValue)}, Max daily: ${formatWei(config.maxDailyValue)}`);
+      lines.push(`    Max single: ${formatTomi(config.maxSingleValue)}, Max daily: ${formatTomi(config.maxDailyValue)}`);
       lines.push(`    Min trust tier: ${config.minTrustTier}, Actions: ${config.allowedActions.join(", ")}`);
     }
   }
@@ -329,7 +329,7 @@ export function explainPolicy(draft: PolicyDraft): string {
   // Privacy
   lines.push("Privacy Restrictions:");
   lines.push(`  Weak terminal blocked: ${draft.privacyRestrictions.weakTerminalBlocked}`);
-  lines.push(`  Max private value: ${formatWei(draft.privacyRestrictions.maxPrivateValue)}`);
+  lines.push(`  Max private value: ${formatTomi(draft.privacyRestrictions.maxPrivateValue)}`);
 
   return lines.join("\n");
 }
@@ -349,10 +349,10 @@ export function diffPolicies(a: PolicyDraft, b: PolicyDraft): string[] {
 
   // Spend caps
   if (a.spendCaps.daily !== b.spendCaps.daily) {
-    diffs.push(`Daily spend cap: ${formatWei(a.spendCaps.daily)} -> ${formatWei(b.spendCaps.daily)}`);
+    diffs.push(`Daily spend cap: ${formatTomi(a.spendCaps.daily)} -> ${formatTomi(b.spendCaps.daily)}`);
   }
   if (a.spendCaps.singleTx !== b.spendCaps.singleTx) {
-    diffs.push(`Single-tx spend cap: ${formatWei(a.spendCaps.singleTx)} -> ${formatWei(b.spendCaps.singleTx)}`);
+    diffs.push(`Single-tx spend cap: ${formatTomi(a.spendCaps.singleTx)} -> ${formatTomi(b.spendCaps.singleTx)}`);
   }
 
   // Terminal policies
@@ -369,10 +369,10 @@ export function diffPolicies(a: PolicyDraft, b: PolicyDraft): string[] {
         diffs.push(`Terminal ${tc} enabled: ${ac.enabled} -> ${bc.enabled}`);
       }
       if (ac.maxSingleValue !== bc.maxSingleValue) {
-        diffs.push(`Terminal ${tc} max single: ${formatWei(ac.maxSingleValue)} -> ${formatWei(bc.maxSingleValue)}`);
+        diffs.push(`Terminal ${tc} max single: ${formatTomi(ac.maxSingleValue)} -> ${formatTomi(bc.maxSingleValue)}`);
       }
       if (ac.maxDailyValue !== bc.maxDailyValue) {
-        diffs.push(`Terminal ${tc} max daily: ${formatWei(ac.maxDailyValue)} -> ${formatWei(bc.maxDailyValue)}`);
+        diffs.push(`Terminal ${tc} max daily: ${formatTomi(ac.maxDailyValue)} -> ${formatTomi(bc.maxDailyValue)}`);
       }
       if (ac.minTrustTier !== bc.minTrustTier) {
         diffs.push(`Terminal ${tc} min trust: ${ac.minTrustTier} -> ${bc.minTrustTier}`);
@@ -408,7 +408,7 @@ export function diffPolicies(a: PolicyDraft, b: PolicyDraft): string[] {
     diffs.push(`Weak terminal blocked: ${a.privacyRestrictions.weakTerminalBlocked} -> ${b.privacyRestrictions.weakTerminalBlocked}`);
   }
   if (a.privacyRestrictions.maxPrivateValue !== b.privacyRestrictions.maxPrivateValue) {
-    diffs.push(`Max private value: ${formatWei(a.privacyRestrictions.maxPrivateValue)} -> ${formatWei(b.privacyRestrictions.maxPrivateValue)}`);
+    diffs.push(`Max private value: ${formatTomi(a.privacyRestrictions.maxPrivateValue)} -> ${formatTomi(b.privacyRestrictions.maxPrivateValue)}`);
   }
 
   // Escalation rules count

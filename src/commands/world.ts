@@ -801,14 +801,14 @@ Usage:
       logger.info(snapshot.summary);
       logger.info(snapshot.attributionSummary);
       logger.info(
-        `  budget=${snapshot.totals.totalBudgetWei} wei allocated=${snapshot.totals.allocatedBudgetWei} wei remaining=${snapshot.totals.remainingBudgetWei} wei`,
+        `  budget=${snapshot.totals.totalBudgetTomi} tomi allocated=${snapshot.totals.allocatedBudgetTomi} tomi remaining=${snapshot.totals.remainingBudgetTomi} tomi`,
       );
       logger.info(
-        `  payables=${snapshot.totals.pendingPayablesWei} wei receivables=${snapshot.totals.pendingReceivablesWei} wei host_payouts=${snapshot.totals.realizedHostPayoutsWei} wei solver_earnings=${snapshot.totals.realizedSolverEarningsWei} wei`,
+        `  payables=${snapshot.totals.pendingPayablesTomi} tomi receivables=${snapshot.totals.pendingReceivablesTomi} tomi host_payouts=${snapshot.totals.realizedHostPayoutsTomi} tomi solver_earnings=${snapshot.totals.realizedSolverEarningsTomi} tomi`,
       );
       for (const campaign of snapshot.campaigns.slice(0, 8)) {
         logger.info(
-          `  campaign ${campaign.title}  status=${campaign.status} budget=${campaign.budgetWei} remaining=${campaign.remainingWei}`,
+          `  campaign ${campaign.title}  status=${campaign.status} budget=${campaign.budgetTomi} remaining=${campaign.remainingTomi}`,
         );
       }
       for (const settlement of snapshot.recentSettlements.slice(0, 8)) {
@@ -1656,7 +1656,7 @@ Usage:
           title,
           description: readOption(args, "--description") ?? "",
           groupId: readOption(args, "--group"),
-          budgetWei: readOption(args, "--budget"),
+          budgetTomi: readOption(args, "--budget"),
           expiresInHours: readNumberOption(args, "--expires", 72),
         });
         if (asJson) {
@@ -1714,7 +1714,7 @@ Usage:
         logger.info(`Title: ${intent.title}`);
         logger.info(`Publisher: ${intent.publisherAddress}`);
         if (intent.groupId) logger.info(`Group: ${intent.groupId}`);
-        if (intent.budgetWei) logger.info(`Budget: ${intent.budgetWei} wei`);
+        if (intent.budgetTomi) logger.info(`Budget: ${intent.budgetTomi} tomi`);
         logger.info(`Expires: ${intent.expiresAt}`);
         if (intent.matchedSolverAddress) {
           logger.info(`Matched solver: ${intent.matchedSolverAddress}`);

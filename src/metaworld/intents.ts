@@ -39,7 +39,7 @@ export interface IntentRecord {
   title: string;
   description: string;
   requirements: IntentRequirement[];
-  budgetWei: string | null;
+  budgetTomi: string | null;
   budgetLine: string | null;
   budgetToken: string;
   status: IntentStatus;
@@ -58,7 +58,7 @@ export interface IntentResponseRecord {
   intentId: string;
   solverAddress: string;
   proposalText: string;
-  proposedAmountWei: string | null;
+  proposedAmountTomi: string | null;
   capabilityRefs: string[];
   status: IntentResponseStatus;
   artifactIds: string[];
@@ -80,7 +80,7 @@ interface IntentRow {
   title: string;
   description: string;
   requirements_json: string;
-  budget_wei: string | null;
+  budget_tomi: string | null;
   budget_line: string | null;
   budget_token: string;
   status: string;
@@ -99,7 +99,7 @@ interface ResponseRow {
   intent_id: string;
   solver_address: string;
   proposal_text: string;
-  proposed_amount_wei: string | null;
+  proposed_amount_tomi: string | null;
   capability_refs_json: string;
   status: string;
   artifact_ids_json: string;
@@ -127,7 +127,7 @@ function rowToIntent(row: IntentRow): IntentRecord {
     title: row.title,
     description: row.description,
     requirements: parseJsonSafe<IntentRequirement[]>(row.requirements_json, []),
-    budgetWei: row.budget_wei,
+    budgetTomi: row.budget_tomi,
     budgetLine: row.budget_line,
     budgetToken: row.budget_token,
     status: row.status as IntentStatus,
@@ -148,7 +148,7 @@ function rowToResponse(row: ResponseRow): IntentResponseRecord {
     intentId: row.intent_id,
     solverAddress: row.solver_address,
     proposalText: row.proposal_text,
-    proposedAmountWei: row.proposed_amount_wei,
+    proposedAmountTomi: row.proposed_amount_tomi,
     capabilityRefs: parseJsonSafe<string[]>(row.capability_refs_json, []),
     status: row.status as IntentResponseStatus,
     artifactIds: parseJsonSafe<string[]>(row.artifact_ids_json, []),
@@ -193,7 +193,7 @@ export function createIntent(
     title: string;
     description?: string;
     requirements?: IntentRequirement[];
-    budgetWei?: string;
+    budgetTomi?: string;
     budgetLine?: string;
     expiresInHours?: number;
   },
@@ -207,7 +207,7 @@ export function createIntent(
     .prepare(
       `INSERT INTO world_intents
         (intent_id, publisher_address, group_id, kind, title, description,
-         requirements_json, budget_wei, budget_line, status, expires_at, created_at, updated_at)
+         requirements_json, budget_tomi, budget_line, status, expires_at, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
     )
     .run(
@@ -218,7 +218,7 @@ export function createIntent(
       options.title,
       options.description ?? "",
       JSON.stringify(options.requirements ?? []),
-      options.budgetWei ?? null,
+      options.budgetTomi ?? null,
       options.budgetLine ?? null,
       expiresAt,
       now,
@@ -287,7 +287,7 @@ export function respondToIntent(
     intentId: string;
     solverAddress: string;
     proposalText?: string;
-    proposedAmountWei?: string;
+    proposedAmountTomi?: string;
     capabilityRefs?: string[];
   },
 ): IntentResponseRecord {
@@ -307,7 +307,7 @@ export function respondToIntent(
       .prepare(
         `INSERT INTO world_intent_responses
           (response_id, intent_id, solver_address, proposal_text,
-           proposed_amount_wei, capability_refs_json, status, created_at, updated_at)
+           proposed_amount_tomi, capability_refs_json, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       )
       .run(
@@ -315,7 +315,7 @@ export function respondToIntent(
         options.intentId,
         options.solverAddress,
         options.proposalText ?? "",
-        options.proposedAmountWei ?? null,
+        options.proposedAmountTomi ?? null,
         JSON.stringify(options.capabilityRefs ?? []),
         now,
         now,
@@ -503,7 +503,7 @@ export function approveIntentCompletion(
   assertTransition(intent.status, "completed");
 
   const now = new Date().toISOString();
-  const settlementProposalId = intent.budgetWei ? ulid() : undefined;
+  const settlementProposalId = intent.budgetTomi ? ulid() : undefined;
 
   // Approve the response review
   db.raw

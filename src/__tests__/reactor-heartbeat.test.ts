@@ -120,9 +120,9 @@ describe("reactor heartbeat — periodic task automation", () => {
   it("expired budget periods are reset on heartbeat", () => {
     const groupId = "heartbeat-budget-group";
     initializeGroupTreasury(db, groupId, TREASURY_KEY, [
-      { lineName: "daily-ops", capWei: "1000", period: "daily" },
-      { lineName: "weekly-dev", capWei: "5000", period: "weekly" },
-      { lineName: "monthly-marketing", capWei: "20000", period: "monthly" },
+      { lineName: "daily-ops", capTomi: "1000", period: "daily" },
+      { lineName: "weekly-dev", capTomi: "5000", period: "weekly" },
+      { lineName: "monthly-marketing", capTomi: "20000", period: "monthly" },
     ]);
 
     // Fund and spend against each line
@@ -134,7 +134,7 @@ describe("reactor heartbeat — periodic task automation", () => {
     // Verify spending is tracked
     let lines = listBudgetLines(db, groupId);
     const dailyBefore = lines.find((l) => l.lineName === "daily-ops")!;
-    expect(dailyBefore.spentWei).toBe("500");
+    expect(dailyBefore.spentTomi).toBe("500");
 
     // Simulate 25 hours later — daily should reset, weekly and monthly should not
     const twentyFiveHoursLater = new Date(Date.now() + 25 * 60 * 60 * 1000);
@@ -147,9 +147,9 @@ describe("reactor heartbeat — periodic task automation", () => {
     const weeklyAfter = lines.find((l) => l.lineName === "weekly-dev")!;
     const monthlyAfter = lines.find((l) => l.lineName === "monthly-marketing")!;
 
-    expect(dailyAfter.spentWei).toBe("0");
-    expect(weeklyAfter.spentWei).toBe("2000"); // Unchanged
-    expect(monthlyAfter.spentWei).toBe("10000"); // Unchanged
+    expect(dailyAfter.spentTomi).toBe("0");
+    expect(weeklyAfter.spentTomi).toBe("2000"); // Unchanged
+    expect(monthlyAfter.spentTomi).toBe("10000"); // Unchanged
 
     // Simulate 8 days later — weekly should also reset
     const eightDaysLater = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
@@ -164,19 +164,19 @@ describe("reactor heartbeat — periodic task automation", () => {
     recordTreasuryInflow(db, groupId, "50000", "0xsource");
 
     const treasury = getGroupTreasury(db, groupId)!;
-    expect(treasury.balanceWei).toBe("50000");
+    expect(treasury.balanceTomi).toBe("50000");
 
     // Simulate an on-chain sync by updating the balance
     // In production, the heartbeat would call an RPC to get the actual on-chain balance
     const now = new Date().toISOString();
     db.raw
       .prepare(
-        "UPDATE group_treasury SET balance_wei = ?, last_synced_at = ?, updated_at = ? WHERE group_id = ?",
+        "UPDATE group_treasury SET balance_tomi = ?, last_synced_at = ?, updated_at = ? WHERE group_id = ?",
       )
       .run("55000", now, now, groupId);
 
     const synced = getGroupTreasury(db, groupId)!;
-    expect(synced.balanceWei).toBe("55000");
+    expect(synced.balanceTomi).toBe("55000");
     expect(synced.lastSyncedAt).toBe(now);
   });
 
@@ -197,7 +197,7 @@ describe("reactor heartbeat — periodic task automation", () => {
     db.raw
       .prepare(
         `INSERT INTO group_chain_commitments
-         (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_wei, tx_hash, block_number, created_at)
+         (commitment_id, group_id, action_type, epoch, members_root, events_merkle_root, treasury_balance_tomi, tx_hash, block_number, created_at)
          VALUES (?, ?, 'state_commit', 1, 'root1', ?, '50000', '0xhbtx', NULL, ?)`,
       )
       .run(commitmentId, groupId, null, now);
@@ -210,7 +210,7 @@ describe("reactor heartbeat — periodic task automation", () => {
     expect(commitment.group_id).toBe(groupId);
     expect(commitment.action_type).toBe("state_commit");
     expect(commitment.epoch).toBe(1);
-    expect(commitment.treasury_balance_wei).toBe("50000");
+    expect(commitment.treasury_balance_tomi).toBe("50000");
   });
 
   it("one failing group does not stop other groups from being processed", async () => {

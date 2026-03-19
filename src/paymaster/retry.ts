@@ -93,7 +93,7 @@ export function createPaymasterAuthorizationRetryManager(params: {
         nonce: BigInt(record.executionNonce),
         gas: BigInt(record.gas),
         to: record.targetAddress,
-        value: BigInt(record.valueWei),
+        value: BigInt(record.valueTomi),
         data: record.dataHex,
         from: record.walletAddress,
         signerType: record.requesterSignerType,

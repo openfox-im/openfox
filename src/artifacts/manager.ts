@@ -120,7 +120,7 @@ export interface ArtifactStorageDriver {
     bundle_kind: string;
     size_bytes: number;
     ttl_seconds: number;
-    amount_wei: string;
+    amount_tomi: string;
     expires_at: string;
   }>;
   put(input: {
@@ -251,7 +251,7 @@ async function requestStorageQuoteFromPreparedBundle(params: {
     bundle_kind: string;
     size_bytes: number;
     ttl_seconds: number;
-    amount_wei: string;
+    amount_tomi: string;
     expires_at: string;
   };
 }
@@ -305,7 +305,7 @@ function createStorageQuoteRecord(params: {
     bundleKind: params.storage.quote.bundle_kind,
     sizeBytes: params.storage.quote.size_bytes,
     ttlSeconds: params.storage.quote.ttl_seconds,
-    amountWei: params.storage.quote.amount_wei,
+    amountTomi: params.storage.quote.amount_tomi,
     status: "used",
     expiresAt: params.storage.quote.expires_at,
     createdAt: params.storedAt,
@@ -328,7 +328,7 @@ function createStorageLeaseRecord(params: {
     requesterAddress: params.storage.quote.requester_address,
     sizeBytes: params.storage.head.size_bytes,
     ttlSeconds: params.storage.head.ttl_seconds,
-    amountWei: params.storage.head.amount_wei,
+    amountTomi: params.storage.head.amount_tomi,
     status: "active",
     issuedAt: params.storage.head.issued_at,
     expiresAt: params.storage.head.expires_at,
@@ -346,7 +346,7 @@ function createStorageLeaseRecord(params: {
     providerBaseUrl: params.storage.providerBaseUrl,
     sizeBytes: params.storage.head.size_bytes,
     ttlSeconds: params.storage.head.ttl_seconds,
-    amountWei: params.storage.head.amount_wei,
+    amountTomi: params.storage.head.amount_tomi,
     status: "active",
     storagePath: params.storage.head.get_url,
     requestKey: `artifact:${params.storage.head.lease_id}`,

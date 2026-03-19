@@ -36,7 +36,7 @@ export interface BountyEngine {
   openQuestionBounty(input: {
     question: string;
     referenceAnswer: string;
-    rewardWei: string;
+    rewardTomi: string;
     submissionDeadline: string;
     skillName?: string | null;
   }): BountyRecord;
@@ -102,11 +102,11 @@ function collectSolverPayoutStats(params: {
   solverAddress: string;
   now: Date;
 }): {
-  paidWeiLast24h: bigint;
+  paidTomiLast24h: bigint;
   mostRecentPaidAt?: string;
 } {
   const cutoffMs = params.now.getTime() - 24 * 60 * 60 * 1000;
-  let paidWeiLast24h = 0n;
+  let paidTomiLast24h = 0n;
   let mostRecentPaidAt: string | undefined;
 
   for (const bounty of params.db.listBounties()) {
@@ -120,11 +120,11 @@ function collectSolverPayoutStats(params: {
       mostRecentPaidAt = result.updatedAt;
     }
     if (updatedAtMs >= cutoffMs) {
-      paidWeiLast24h += BigInt(bounty.rewardWei);
+      paidTomiLast24h += BigInt(bounty.rewardTomi);
     }
   }
 
-  return { paidWeiLast24h, mostRecentPaidAt };
+  return { paidTomiLast24h, mostRecentPaidAt };
 }
 
 function collectCampaignProgress(params: {
@@ -132,19 +132,19 @@ function collectCampaignProgress(params: {
   campaign: CampaignRecord;
 }): CampaignProgress {
   const bounties = params.db.listBountiesByCampaign(params.campaign.campaignId);
-  const allocatedWei = bounties.reduce((sum, bounty) => sum + BigInt(bounty.rewardWei), 0n);
+  const allocatedTomi = bounties.reduce((sum, bounty) => sum + BigInt(bounty.rewardTomi), 0n);
   const submissionCount = bounties.reduce(
     (sum, bounty) => sum + params.db.listBountySubmissions(bounty.bountyId).length,
     0,
   );
   const openBountyCount = bounties.filter((bounty) => bounty.status === "open").length;
   const paidBountyCount = bounties.filter((bounty) => bounty.status === "paid").length;
-  const totalBudgetWei = BigInt(params.campaign.budgetWei);
-  const remainingWei = totalBudgetWei > allocatedWei ? totalBudgetWei - allocatedWei : 0n;
+  const totalBudgetTomi = BigInt(params.campaign.budgetTomi);
+  const remainingTomi = totalBudgetTomi > allocatedTomi ? totalBudgetTomi - allocatedTomi : 0n;
   return {
-    totalBudgetWei: totalBudgetWei.toString(),
-    allocatedWei: allocatedWei.toString(),
-    remainingWei: remainingWei.toString(),
+    totalBudgetTomi: totalBudgetTomi.toString(),
+    allocatedTomi: allocatedTomi.toString(),
+    remainingTomi: remainingTomi.toString(),
     bountyCount: bounties.length,
     openBountyCount,
     paidBountyCount,
@@ -176,7 +176,7 @@ export function createBountyEngine(params: {
       hostAddress: params.identity.address,
       title: input.title.trim(),
       description: input.description.trim(),
-      budgetWei: input.budgetWei,
+      budgetTomi: input.budgetTomi,
       maxOpenBounties: input.maxOpenBounties ?? params.bountyConfig.maxOpenBounties,
       allowedKinds: input.allowedKinds?.length
         ? [...input.allowedKinds]
@@ -199,8 +199,8 @@ export function createBountyEngine(params: {
     if (!campaign.description) {
       throw new Error("campaign description is required");
     }
-    if (BigInt(campaign.budgetWei) <= 0n) {
-      throw new Error("campaign budgetWei must be greater than zero");
+    if (BigInt(campaign.budgetTomi) <= 0n) {
+      throw new Error("campaign budgetTomi must be greater than zero");
     }
     params.db.insertCampaign(campaign);
     return campaign;
@@ -240,8 +240,8 @@ export function createBountyEngine(params: {
       if (progress.openBountyCount >= campaign.maxOpenBounties) {
         throw new Error("campaign has reached the maximum open bounty count");
       }
-      const nextAllocatedWei = BigInt(progress.allocatedWei) + BigInt(input.rewardWei);
-      if (nextAllocatedWei > BigInt(campaign.budgetWei)) {
+      const nextAllocatedTomi = BigInt(progress.allocatedTomi) + BigInt(input.rewardTomi);
+      if (nextAllocatedTomi > BigInt(campaign.budgetTomi)) {
         throw new Error("campaign budget is exhausted");
       }
     }
@@ -281,7 +281,7 @@ export function createBountyEngine(params: {
       skillName: input.skillName ?? null,
       metadata: input.metadata ?? {},
       policy: mergeBountyPolicy(params.bountyConfig.policy, input.policy),
-      rewardWei: input.rewardWei,
+      rewardTomi: input.rewardTomi,
       submissionDeadline: input.submissionDeadline,
       judgeMode: params.bountyConfig.judgeMode,
       status: "open",
@@ -291,7 +291,7 @@ export function createBountyEngine(params: {
     params.db.insertBounty(bounty);
     if (campaign) {
       const progress = collectCampaignProgress({ db: params.db, campaign });
-      if (BigInt(progress.remainingWei) === 0n) {
+      if (BigInt(progress.remainingTomi) === 0n) {
         params.db.updateCampaignStatus(campaign.campaignId, "exhausted");
       }
     }
@@ -305,7 +305,7 @@ export function createBountyEngine(params: {
         metadata: {
           title: bounty.title,
           kind: bounty.kind,
-          reward_wei: bounty.rewardWei,
+          reward_tomi: bounty.rewardTomi,
           judge_mode: bounty.judgeMode,
         },
       });
@@ -319,7 +319,7 @@ export function createBountyEngine(params: {
   function openQuestionBounty(input: {
     question: string;
     referenceAnswer: string;
-    rewardWei: string;
+    rewardTomi: string;
     submissionDeadline: string;
     skillName?: string | null;
   }): BountyRecord {
@@ -328,7 +328,7 @@ export function createBountyEngine(params: {
       title: input.question,
       taskPrompt: input.question,
       referenceOutput: input.referenceAnswer,
-      rewardWei: input.rewardWei,
+      rewardTomi: input.rewardTomi,
       submissionDeadline: input.submissionDeadline,
       skillName: input.skillName,
     });
@@ -459,9 +459,9 @@ export function createBountyEngine(params: {
         });
         artifactUrl = captured.lease.get_url;
       }
-      const projectedDailyPayout = payoutStats.paidWeiLast24h + BigInt(bounty.rewardWei);
+      const projectedDailyPayout = payoutStats.paidTomiLast24h + BigInt(bounty.rewardTomi);
       const withinDailyBudget =
-        projectedDailyPayout <= BigInt(policy.maxAutoPayPerSolverPerDayWei);
+        projectedDailyPayout <= BigInt(policy.maxAutoPayPerSolverPerDayTomi);
       if (
         judge.confidence >= params.bountyConfig.autoPayConfidenceThreshold &&
         params.payoutSender &&
@@ -469,7 +469,7 @@ export function createBountyEngine(params: {
       ) {
         const payout = await params.payoutSender.send({
           to: submission.solverAddress,
-          amountWei: BigInt(bounty.rewardWei),
+          amountTomi: BigInt(bounty.rewardTomi),
         });
         payoutTxHash = payout.txHash;
         bountyStatus = "paid";

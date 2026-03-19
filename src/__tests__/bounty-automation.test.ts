@@ -130,7 +130,7 @@ describe("bounty automation", () => {
     const bounty = hostEngine.openQuestionBounty({
       question: "Capital of France?",
       referenceAnswer: "Paris",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-09T01:00:00.000Z",
     });
 

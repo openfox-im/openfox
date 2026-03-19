@@ -23,7 +23,7 @@ export interface IntentSignerRequest {
   requesterAddress: string;
   quoteId: string;
   target: string;
-  valueWei?: string;
+  valueTomi?: string;
   data?: string;
   gas?: string;
   requestNonce: string;
@@ -41,7 +41,7 @@ export interface IntentPaymasterRequest {
   requesterAddress: string;
   walletAddress?: string;
   target: string;
-  valueWei?: string;
+  valueTomi?: string;
   data?: string;
   gas?: string;
   requestNonce: string;

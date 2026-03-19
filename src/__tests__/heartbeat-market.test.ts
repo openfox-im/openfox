@@ -103,7 +103,7 @@ describe("heartbeat market contract retry task", () => {
           bounty: {
             enabled: false,
             gas: "260000",
-            valueWei: "0",
+            valueTomi: "0",
             waitForReceipt: true,
             receiptTimeoutMs: 60000,
             payloadMode: "canonical_binding",
@@ -112,7 +112,7 @@ describe("heartbeat market contract retry task", () => {
           observation: {
             enabled: false,
             gas: "260000",
-            valueWei: "0",
+            valueTomi: "0",
             waitForReceipt: true,
             receiptTimeoutMs: 60000,
             payloadMode: "canonical_binding",
@@ -121,7 +121,7 @@ describe("heartbeat market contract retry task", () => {
           oracle: {
             enabled: true,
             gas: "260000",
-            valueWei: "0",
+            valueTomi: "0",
             waitForReceipt: true,
             receiptTimeoutMs: 60000,
             payloadMode: "canonical_binding",

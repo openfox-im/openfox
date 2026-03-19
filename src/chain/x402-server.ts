@@ -21,7 +21,7 @@ export interface X402ServerRequirementInput {
   rpcUrl: string;
   chainId?: bigint | number;
   providerAddress: string;
-  amountWei: string;
+  amountTomi: string;
   description: string;
   requiredDeadlineSeconds?: number;
 }
@@ -35,7 +35,7 @@ export interface X402ServerPaymentContext {
   providerAddress: string;
   requestKey: string;
   requestHash: Hex;
-  amountWei: string;
+  amountTomi: string;
   description: string;
   requiredDeadlineSeconds?: number;
 }
@@ -131,7 +131,7 @@ export async function buildX402ServerRequirement(
   return {
     scheme: "exact",
     network: `tos:${chainId.toString()}`,
-    maxAmountRequired: params.amountWei,
+    maxAmountRequired: params.amountTomi,
     payToAddress: normalizeAddress(params.providerAddress),
     asset: "native",
     requiredDeadlineSeconds: params.requiredDeadlineSeconds ?? 300,
@@ -161,7 +161,7 @@ function createPaymentRecord(params: {
   requestKey: string;
   requestHash: Hex;
   providerAddress: ChainAddress;
-  amountWei: string;
+  amountTomi: string;
   config: X402ServerConfig;
   verified: ReturnType<typeof verifyPayment>;
   nowIso: string;
@@ -177,7 +177,7 @@ function createPaymentRecord(params: {
     txNonce: params.verified.nonce.toString(),
     txHash: params.verified.txHash as Hex,
     rawTransaction: params.verified.rawTransaction as Hex,
-    amountWei: params.amountWei,
+    amountTomi: params.amountTomi,
     confirmationPolicy: params.config.confirmationPolicy,
     status: "verified",
     attemptCount: 0,
@@ -404,7 +404,7 @@ export async function requireX402ServerPayment(
   const requirement = await buildX402ServerRequirement({
     rpcUrl: params.rpcUrl,
     providerAddress,
-    amountWei: params.amountWei,
+    amountTomi: params.amountTomi,
     description: params.description,
     requiredDeadlineSeconds: params.requiredDeadlineSeconds,
   });
@@ -502,7 +502,7 @@ export async function requireX402ServerPayment(
     requestKey: params.requestKey,
     requestHash: params.requestHash,
     providerAddress,
-    amountWei: params.amountWei,
+    amountTomi: params.amountTomi,
     config: params.config,
     verified,
     nowIso: new Date().toISOString(),

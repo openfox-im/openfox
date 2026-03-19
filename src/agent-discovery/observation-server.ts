@@ -238,7 +238,7 @@ export async function startAgentDiscoveryObservationServer(
         json(res, 200, {
           ok: true,
           capability: observationConfig.capability,
-          priceWei: observationConfig.priceWei,
+          priceTomi: observationConfig.priceTomi,
           address,
         });
         return;
@@ -265,7 +265,7 @@ export async function startAgentDiscoveryObservationServer(
           rpcUrl,
           chainId: config.chainId,
           providerAddress: address,
-          amountWei: observationConfig.priceWei,
+          amountTomi: observationConfig.priceTomi,
           description: "OpenFox observation.once payment",
         });
         writeX402RequirementResponse({ res, requirement });
@@ -323,7 +323,7 @@ export async function startAgentDiscoveryObservationServer(
         providerAddress: address,
         requestKey,
         requestHash,
-        amountWei: observationConfig.priceWei,
+        amountTomi: observationConfig.priceTomi,
         description: "OpenFox observation.once payment",
       });
       if (payment.state === "required") {

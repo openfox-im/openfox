@@ -16,8 +16,8 @@ export interface ProviderProfile {
 }
 
 export interface FeeSchedule {
-  baseFee: string;            // wei
-  perGasFee: string;          // wei per gas unit
+  baseFee: string;            // tomi
+  perGasFee: string;          // tomi per gas unit
   percentFee: number;         // percentage of value (0-100)
   currency: string;
 }

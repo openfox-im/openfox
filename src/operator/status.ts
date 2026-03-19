@@ -265,8 +265,8 @@ export function buildRuntimeStatusSnapshot(
           capabilityPrefix: config.signerProvider.capabilityPrefix,
           publishToDiscovery: config.signerProvider.publishToDiscovery,
           quoteValiditySeconds: config.signerProvider.quoteValiditySeconds,
-          quotePriceWei: config.signerProvider.quotePriceWei,
-          submitPriceWei: config.signerProvider.submitPriceWei,
+          quotePriceTomi: config.signerProvider.quotePriceTomi,
+          submitPriceTomi: config.signerProvider.submitPriceTomi,
           requestTimeoutMs: config.signerProvider.requestTimeoutMs,
           maxDataBytes: config.signerProvider.maxDataBytes,
           policy: {
@@ -279,7 +279,7 @@ export function buildRuntimeStatusSnapshot(
             allowedTargets: config.signerProvider.policy.allowedTargets,
             allowedFunctionSelectors:
               config.signerProvider.policy.allowedFunctionSelectors,
-            maxValueWei: config.signerProvider.policy.maxValueWei,
+            maxValueTomi: config.signerProvider.policy.maxValueTomi,
             expiresAt: config.signerProvider.policy.expiresAt || null,
             allowSystemAction:
               config.signerProvider.policy.allowSystemAction === true,
@@ -289,7 +289,7 @@ export function buildRuntimeStatusSnapshot(
             requesterAddress: item.requesterAddress,
             targetAddress: item.targetAddress,
             status: item.status,
-            amountWei: item.amountWei,
+            amountTomi: item.amountTomi,
             expiresAt: item.expiresAt,
           })),
           recentExecutions: signerExecutions.map((item) => ({
@@ -314,8 +314,8 @@ export function buildRuntimeStatusSnapshot(
           quoteValiditySeconds: config.paymasterProvider.quoteValiditySeconds,
           authorizationValiditySeconds:
             config.paymasterProvider.authorizationValiditySeconds,
-          quotePriceWei: config.paymasterProvider.quotePriceWei,
-          authorizePriceWei: config.paymasterProvider.authorizePriceWei,
+          quotePriceTomi: config.paymasterProvider.quotePriceTomi,
+          authorizePriceTomi: config.paymasterProvider.authorizePriceTomi,
           requestTimeoutMs: config.paymasterProvider.requestTimeoutMs,
           maxDataBytes: config.paymasterProvider.maxDataBytes,
           defaultGas: config.paymasterProvider.defaultGas,
@@ -330,7 +330,7 @@ export function buildRuntimeStatusSnapshot(
             allowedTargets: config.paymasterProvider.policy.allowedTargets,
             allowedFunctionSelectors:
               config.paymasterProvider.policy.allowedFunctionSelectors,
-            maxValueWei: config.paymasterProvider.policy.maxValueWei,
+            maxValueTomi: config.paymasterProvider.policy.maxValueTomi,
             expiresAt: config.paymasterProvider.policy.expiresAt || null,
             allowSystemAction:
               config.paymasterProvider.policy.allowSystemAction === true,
@@ -341,7 +341,7 @@ export function buildRuntimeStatusSnapshot(
             walletAddress: item.walletAddress,
             targetAddress: item.targetAddress,
             status: item.status,
-            amountWei: item.amountWei,
+            amountTomi: item.amountTomi,
             expiresAt: item.expiresAt,
           })),
           recentAuthorizations: paymasterAuthorizations.map((item) => ({

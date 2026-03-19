@@ -86,8 +86,8 @@ describe("owner reports", () => {
       upsertStrategyProfile(db, {
         profileId: "default",
         name: "default",
-        revenueTargetWei: "1000000000000000000",
-        maxSpendPerOpportunityWei: "100000000000000000",
+        revenueTargetTomi: "1000000000000000000",
+        maxSpendPerOpportunityTomi: "100000000000000000",
         minMarginBps: 100,
         enabledOpportunityKinds: ["campaign", "provider"],
         enabledProviderClasses: ["oracle", "task_market"],
@@ -122,9 +122,9 @@ describe("owner reports", () => {
         providerAgentId: "host-agent-1",
         providerAddress:
           "0xc9b7083ed72ae7501f0f76c6fa2737ea3643ce0a7c85b2d81f4a2d030aea04ed",
-        grossValueWei: "50000000000000000",
-        estimatedCostWei: "1000000000000000",
-        marginWei: "49000000000000000",
+        grossValueTomi: "50000000000000000",
+        estimatedCostTomi: "1000000000000000",
+        marginTomi: "49000000000000000",
         marginBps: 9800,
         rawScore: 10,
       };
@@ -222,7 +222,7 @@ describe("owner reports", () => {
             status: "ok",
             object_id: "artifact-1",
             result_url: "https://storage.example/evidence/run-1",
-            price_wei: "100",
+            price_tomi: "100",
             stored_at: 1760000000,
             expires_at: 1760003600,
             idempotent: false,
@@ -231,14 +231,14 @@ describe("owner reports", () => {
             {
               sourceUrl: "https://news.example/1",
               status: "verified",
-              fetchResponse: { price_wei: "10" },
-              verifyResponse: { price_wei: "20", verdict: "valid" },
+              fetchResponse: { price_tomi: "10" },
+              verifyResponse: { price_tomi: "20", verdict: "valid" },
             },
             {
               sourceUrl: "https://news.example/2",
               status: "verified",
-              fetchResponse: { price_wei: "10" },
-              verifyResponse: { price_wei: "20", verdict: "valid" },
+              fetchResponse: { price_tomi: "10" },
+              verifyResponse: { price_tomi: "20", verdict: "valid" },
             },
           ],
           payments: [],
@@ -263,7 +263,7 @@ describe("owner reports", () => {
             canonical_result: "yes",
             confidence: 0.93,
             summary: "Resolved to yes.",
-            price_wei: "40",
+            price_tomi: "40",
             settlement_tx_hash:
               "0xfb43d57082cdcd5103e2d7593ab60734eeee43e7c023635d644c37105b69c022",
             market_callback_tx_hash:
@@ -293,8 +293,8 @@ describe("owner reports", () => {
       expect(report.payload.input.evidenceOracle).not.toBeNull();
       expect(report.payload.input.evidenceOracle?.evidence.totalRuns).toBe(1);
       expect(report.payload.input.evidenceOracle?.oracle.totalResults).toBe(1);
-      expect(report.payload.input.evidenceOracle?.evidence.estimatedCostWei).toBe("160");
-      expect(report.payload.input.evidenceOracle?.oracle.estimatedCostWei).toBe("40");
+      expect(report.payload.input.evidenceOracle?.evidence.estimatedCostTomi).toBe("160");
+      expect(report.payload.input.evidenceOracle?.oracle.estimatedCostTomi).toBe("40");
       expect(renderOwnerReportText(report)).toContain("Evidence Workflows");
       expect(renderOwnerReportText(report)).toContain("Oracle Results");
       expect(renderOwnerReportHtml(report)).toContain("Evidence and Oracle");

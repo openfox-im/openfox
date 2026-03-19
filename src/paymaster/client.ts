@@ -17,7 +17,7 @@ export interface RemotePaymasterQuoteInput {
   requesterAddress: Address;
   walletAddress?: Address;
   target: Address;
-  valueWei?: string;
+  valueTomi?: string;
   data?: `0x${string}`;
   gas?: string;
   reason?: string;
@@ -65,7 +65,7 @@ export async function fetchPaymasterQuote(
     },
     wallet_address: input.walletAddress ?? input.requesterAddress,
     target: input.target,
-    value_wei: input.valueWei ?? "0",
+    value_tomi: input.valueTomi ?? "0",
     ...(input.data ? { data: input.data } : {}),
     ...(input.gas ? { gas: input.gas } : {}),
     ...(input.reason ? { reason: input.reason } : {}),
@@ -78,11 +78,16 @@ export async function authorizePaymasterExecution(
   status?: number;
   body: Record<string, unknown>;
 }> {
+  const sdkQuote = {
+    ...input.quote,
+    valueTomi: input.quote.valueTomi,
+    amountTomi: input.quote.amountTomi,
+  } as any;
   const authorizeRequest = await buildPaymasterAuthorizationRequest({
     rpcUrl: input.rpcUrl,
     account: input.account,
     requesterAddress: input.requesterAddress,
-    quote: input.quote,
+    quote: sdkQuote,
     requestNonce: input.requestNonce,
     requestExpiresAt: input.requestExpiresAt,
     reason: input.reason,

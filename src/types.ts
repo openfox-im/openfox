@@ -104,8 +104,8 @@ export interface AgentDiscoveryFaucetServerConfig {
   port: number;
   path: string;
   capability: string;
-  payoutAmountWei: string;
-  maxAmountWei: string;
+  payoutAmountTomi: string;
+  maxAmountTomi: string;
   cooldownSeconds: number;
   requireNativeIdentity: boolean;
 }
@@ -116,7 +116,7 @@ export interface AgentDiscoveryObservationServerConfig {
   port: number;
   path: string;
   capability: string;
-  priceWei: string;
+  priceTomi: string;
   requestTimeoutMs: number;
   maxResponseBytes: number;
   allowPrivateTargets: boolean;
@@ -128,7 +128,7 @@ export interface AgentDiscoveryOracleServerConfig {
   port: number;
   path: string;
   capability: string;
-  priceWei: string;
+  priceTomi: string;
   maxQuestionChars: number;
   maxContextChars: number;
   maxOptions: number;
@@ -140,7 +140,7 @@ export interface AgentDiscoveryNewsFetchServerConfig {
   port: number;
   path: string;
   capability: string;
-  priceWei: string;
+  priceTomi: string;
   maxSourceUrlChars: number;
   requestTimeoutMs: number;
   maxResponseBytes: number;
@@ -171,7 +171,7 @@ export interface AgentDiscoveryProofVerifyServerConfig {
   port: number;
   path: string;
   capability: string;
-  priceWei: string;
+  priceTomi: string;
   maxPayloadChars: number;
   requestTimeoutMs: number;
   maxFetchBytes: number;
@@ -196,8 +196,8 @@ export interface AgentDiscoveryStorageServerConfig {
   path: string;
   putCapability: string;
   getCapability: string;
-  putPriceWei: string;
-  getPriceWei: string;
+  putPriceTomi: string;
+  getPriceTomi: string;
   maxObjectBytes: number;
   storageDir: string;
   defaultTtlSeconds: number;
@@ -215,7 +215,7 @@ export interface AgentDiscoverySentimentAnalysisServerConfig {
   port: number;
   path: string;
   capability: string;
-  priceWei: string;
+  priceTomi: string;
   maxTextChars: number;
   requestTimeoutMs: number;
 }
@@ -225,8 +225,8 @@ export interface AgentGatewayBootnodeConfig {
   url: string;
   payToAddress?: `0x${string}`;
   paymentDirection?: "provider_pays" | "requester_pays" | "split";
-  sessionFeeWei?: string;
-  perRequestFeeWei?: string;
+  sessionFeeTomi?: string;
+  perRequestFeeTomi?: string;
 }
 
 export interface AgentGatewaySignedBootnodeListPayload {
@@ -257,14 +257,14 @@ export interface AgentGatewayServerConfig {
   maxRoutesPerSession: number;
   maxRequestBodyBytes: number;
   relayPaymentEnabled?: boolean;
-  relayPriceWei?: string;
+  relayPriceTomi?: string;
   relayPaymentDescription?: string;
   relayPaymentRequiredDeadlineSeconds?: number;
   registerCapabilityOnStartup?: boolean;
   grantCapabilityBit?: number;
   paymentDirection?: "provider_pays" | "requester_pays" | "split";
-  sessionFeeWei?: string;
-  perRequestFeeWei?: string;
+  sessionFeeTomi?: string;
+  perRequestFeeTomi?: string;
   maxSessions?: number;
   maxBandwidthKbps?: number;
   supportedTransports?: string[];
@@ -319,7 +319,7 @@ export interface AgentDiscoverySelectionPolicy {
   requireRegistered: boolean;
   excludeSuspended: boolean;
   onchainCapabilityMode: AgentDiscoveryOnchainCapabilityMode;
-  minimumStakeWei: string;
+  minimumStakeTomi: string;
   minimumReputation: string;
   preferHigherStake: boolean;
   preferHigherReputation: boolean;
@@ -376,8 +376,8 @@ export const DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG: AgentDiscoveryFaucetS
     port: 4877,
     path: "/agent-discovery/faucet",
     capability: "sponsor.topup.testnet",
-    payoutAmountWei: "10000000000000000",
-    maxAmountWei: "10000000000000000",
+    payoutAmountTomi: "10000000000000000",
+    maxAmountTomi: "10000000000000000",
     cooldownSeconds: 86400,
     requireNativeIdentity: true,
   };
@@ -389,7 +389,7 @@ export const DEFAULT_AGENT_DISCOVERY_OBSERVATION_SERVER_CONFIG: AgentDiscoveryOb
     port: 4878,
     path: "/agent-discovery/observe-once",
     capability: "observation.once",
-    priceWei: "1000000000000000",
+    priceTomi: "1000000000000000",
     requestTimeoutMs: 10_000,
     maxResponseBytes: 131072,
     allowPrivateTargets: false,
@@ -402,7 +402,7 @@ export const DEFAULT_AGENT_DISCOVERY_ORACLE_SERVER_CONFIG: AgentDiscoveryOracleS
     port: 4879,
     path: "/agent-discovery/oracle-resolve",
     capability: "oracle.resolve",
-    priceWei: "2000000000000000",
+    priceTomi: "2000000000000000",
     maxQuestionChars: 1024,
     maxContextChars: 8192,
     maxOptions: 16,
@@ -415,7 +415,7 @@ export const DEFAULT_AGENT_DISCOVERY_NEWS_FETCH_SERVER_CONFIG: AgentDiscoveryNew
     port: 4881,
     path: "/agent-discovery/news-fetch",
     capability: "news.fetch",
-    priceWei: "3000000000000000",
+    priceTomi: "3000000000000000",
     maxSourceUrlChars: 2048,
     requestTimeoutMs: 10_000,
     maxResponseBytes: 262144,
@@ -436,7 +436,7 @@ export const DEFAULT_AGENT_DISCOVERY_PROOF_VERIFY_SERVER_CONFIG: AgentDiscoveryP
     port: 4882,
     path: "/agent-discovery/proof-verify",
     capability: "proof.verify",
-    priceWei: "2000000000000000",
+    priceTomi: "2000000000000000",
     maxPayloadChars: 16384,
     requestTimeoutMs: 10_000,
     maxFetchBytes: 262144,
@@ -460,8 +460,8 @@ export const DEFAULT_AGENT_DISCOVERY_STORAGE_SERVER_CONFIG: AgentDiscoveryStorag
     path: "/agent-discovery/storage",
     putCapability: "storage.put",
     getCapability: "storage.get",
-    putPriceWei: "1000000000000000",
-    getPriceWei: "500000000000000",
+    putPriceTomi: "1000000000000000",
+    getPriceTomi: "500000000000000",
     maxObjectBytes: 262144,
     storageDir: "~/.openfox/storage-provider",
     defaultTtlSeconds: 86_400,
@@ -480,7 +480,7 @@ export const DEFAULT_AGENT_DISCOVERY_SENTIMENT_ANALYSIS_SERVER_CONFIG: AgentDisc
     port: 4884,
     path: "/agent-discovery/sentiment-analyze",
     capability: "sentiment.analyze",
-    priceWei: "1500000000000000",
+    priceTomi: "1500000000000000",
     maxTextChars: 4096,
     requestTimeoutMs: 10_000,
   };
@@ -500,14 +500,14 @@ export const DEFAULT_AGENT_GATEWAY_SERVER_CONFIG: AgentGatewayServerConfig = {
   maxRoutesPerSession: 16,
   maxRequestBodyBytes: 131072,
   relayPaymentEnabled: false,
-  relayPriceWei: "1000000000000000",
+  relayPriceTomi: "1000000000000000",
   relayPaymentDescription: "OpenFox gateway relay payment",
   relayPaymentRequiredDeadlineSeconds: 300,
   registerCapabilityOnStartup: false,
   grantCapabilityBit: undefined,
   paymentDirection: "requester_pays",
-  sessionFeeWei: "0",
-  perRequestFeeWei: "0",
+  sessionFeeTomi: "0",
+  perRequestFeeTomi: "0",
   maxSessions: 200,
   maxBandwidthKbps: 10000,
   supportedTransports: ["wss"],
@@ -545,7 +545,7 @@ export const DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY: AgentDiscoverySelectionPo
     requireRegistered: true,
     excludeSuspended: true,
     onchainCapabilityMode: "off",
-    minimumStakeWei: "0",
+    minimumStakeTomi: "0",
     minimumReputation: "0",
     preferHigherStake: true,
     preferHigherReputation: true,
@@ -555,40 +555,40 @@ export const DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES: AgentDiscoveryPolicyProfil
   {
     sponsor: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       onchainCapabilityMode: "prefer_onchain",
     },
     observation: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       onchainCapabilityMode: "prefer_onchain",
     },
     oracle: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       minimumReputation: "1",
       onchainCapabilityMode: "require_onchain",
     },
     news: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       minimumReputation: "1",
       onchainCapabilityMode: "prefer_onchain",
     },
     proof: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       minimumReputation: "1",
       onchainCapabilityMode: "require_onchain",
     },
     storage: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       onchainCapabilityMode: "prefer_onchain",
     },
     gateway: {
       ...DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
-      minimumStakeWei: "1",
+      minimumStakeTomi: "1",
       onchainCapabilityMode: "prefer_onchain",
     },
   };
@@ -678,10 +678,10 @@ export interface OpenFoxConfig {
 }
 
 export interface WalletFundingConfig {
-  localDefaultAmountWei: string;
+  localDefaultAmountTomi: string;
   localFunderAddress?: HexAddress;
   localFunderPassword?: string;
-  testnetDefaultAmountWei: string;
+  testnetDefaultAmountTomi: string;
   testnetFaucetUrl?: string;
   testnetReason: string;
 }
@@ -715,7 +715,7 @@ export type BountyDecision = "accepted" | "rejected";
 export interface BountyPolicy {
   maxSubmissionsPerSolver: number;
   solverCooldownSeconds: number;
-  maxAutoPayPerSolverPerDayWei: string;
+  maxAutoPayPerSolverPerDayTomi: string;
   trustedProofUrlPrefixes: string[];
 }
 
@@ -725,7 +725,7 @@ export interface CampaignRecord {
   hostAddress: Address;
   title: string;
   description: string;
-  budgetWei: string;
+  budgetTomi: string;
   maxOpenBounties: number;
   allowedKinds: BountyKind[];
   metadata?: Record<string, unknown>;
@@ -737,16 +737,16 @@ export interface CampaignRecord {
 export interface CampaignCreateInput {
   title: string;
   description: string;
-  budgetWei: string;
+  budgetTomi: string;
   maxOpenBounties?: number;
   allowedKinds?: BountyKind[];
   metadata?: Record<string, unknown>;
 }
 
 export interface CampaignProgress {
-  totalBudgetWei: string;
-  allocatedWei: string;
-  remainingWei: string;
+  totalBudgetTomi: string;
+  allocatedTomi: string;
+  remainingTomi: string;
   bountyCount: number;
   openBountyCount: number;
   paidBountyCount: number;
@@ -763,7 +763,7 @@ export interface BountyConfig {
   pathPrefix: string;
   remoteBaseUrl?: string;
   discoveryCapability: string;
-  rewardWei: string;
+  rewardTomi: string;
   autoPayConfidenceThreshold: number;
   defaultSubmissionTtlSeconds: number;
   pollIntervalSeconds: number;
@@ -789,7 +789,7 @@ export interface BountyRecord {
   skillName?: string | null;
   metadata?: Record<string, unknown>;
   policy?: BountyPolicy;
-  rewardWei: string;
+  rewardTomi: string;
   submissionDeadline: string;
   judgeMode: BountyJudgeMode;
   status: BountyStatus;
@@ -833,7 +833,7 @@ export interface BountyCreateInput {
   title: string;
   taskPrompt: string;
   referenceOutput: string;
-  rewardWei: string;
+  rewardTomi: string;
   submissionDeadline: string;
   skillName?: string | null;
   metadata?: Record<string, unknown>;
@@ -854,7 +854,7 @@ export interface OpportunityScoutConfig {
   discoveryCapabilities: string[];
   remoteBaseUrls: string[];
   maxItems: number;
-  minRewardWei: string;
+  minRewardTomi: string;
 }
 
 export type OpportunityKind = "bounty" | "campaign" | "provider";
@@ -883,8 +883,8 @@ export type OpportunityReportCadence = "on_demand" | "daily" | "weekly";
 export interface OpportunityStrategyProfile {
   profileId: string;
   name: string;
-  revenueTargetWei: string;
-  maxSpendPerOpportunityWei: string;
+  revenueTargetTomi: string;
+  maxSpendPerOpportunityTomi: string;
   minMarginBps: number;
   enabledOpportunityKinds: OpportunityKind[];
   enabledProviderClasses: OpportunityProviderClass[];
@@ -916,7 +916,7 @@ export interface OwnerFinanceAttributionEntry {
   attributionId: string;
   kind: OwnerFinanceAttributionKind;
   title: string;
-  amountWei: string;
+  amountTomi: string;
   amountCents?: number;
   sourceId?: string | null;
   sourceKind?: string | null;
@@ -931,12 +931,12 @@ export interface OwnerFinanceSnapshotData {
   periodEnd: string;
   generatedAt: string;
   address: Address;
-  realizedRevenueWei: string;
-  realizedCostWei: string;
-  realizedNetWei: string;
-  pendingReceivablesWei: string;
-  pendingPayablesWei: string;
-  pendingNetWei: string;
+  realizedRevenueTomi: string;
+  realizedCostTomi: string;
+  realizedNetTomi: string;
+  pendingReceivablesTomi: string;
+  pendingPayablesTomi: string;
+  pendingNetTomi: string;
   revenueEvents: number;
   costEvents: number;
   inferenceCostCents: number;
@@ -946,10 +946,10 @@ export interface OwnerFinanceSnapshotData {
   pendingOnchainTransactions: number;
   failedOnchainTransactions: number;
   majorCategories: {
-    x402RevenueWei: string;
-    bountySolverRewardsWei: string;
-    x402CostWei: string;
-    bountyHostPayoutsWei: string;
+    x402RevenueTomi: string;
+    bountySolverRewardsTomi: string;
+    x402CostTomi: string;
+    bountyHostPayoutsTomi: string;
   };
   topGains: OwnerFinanceAttributionEntry[];
   topLosses: OwnerFinanceAttributionEntry[];
@@ -982,7 +982,7 @@ export interface OwnerReportInput {
           validSources: number;
           attemptedSources: number;
           aggregatePublished: number;
-          estimatedCostWei: string;
+          estimatedCostTomi: string;
           zktlsBundles?: number;
           proofVerifications?: number;
           nativeAttestedVerifications?: number;
@@ -998,11 +998,11 @@ export interface OwnerReportInput {
           settledResults: number;
           marketBoundResults: number;
           averageConfidence: number;
-          estimatedCostWei: string;
+          estimatedCostTomi: string;
           committeeRuns?: number;
           committeeQuorumMet?: number;
           committeeDisagreements?: number;
-          committeePayoutWei?: string;
+          committeePayoutTomi?: string;
           summary: string;
         };
         summary: string;
@@ -1071,9 +1071,9 @@ export interface OwnerOpportunityAlertRecord {
   suggestedAction: string;
   capability?: string | null;
   baseUrl?: string | null;
-  rewardWei?: string | null;
-  estimatedCostWei: string;
-  marginWei: string;
+  rewardTomi?: string | null;
+  estimatedCostTomi: string;
+  marginTomi: string;
   marginBps: number;
   strategyScore?: number | null;
   strategyMatched: boolean;
@@ -1365,7 +1365,7 @@ export interface SignerProviderPolicyConfig {
   delegateIdentity?: string;
   allowedTargets: Address[];
   allowedFunctionSelectors: Hex[];
-  maxValueWei: string;
+  maxValueTomi: string;
   expiresAt?: string;
   allowSystemAction?: boolean;
 }
@@ -1378,8 +1378,8 @@ export interface SignerProviderConfig {
   capabilityPrefix: string;
   publishToDiscovery: boolean;
   quoteValiditySeconds: number;
-  quotePriceWei: string;
-  submitPriceWei: string;
+  quotePriceTomi: string;
+  submitPriceTomi: string;
   requestTimeoutMs: number;
   maxDataBytes: number;
   defaultGas: string;
@@ -1400,7 +1400,7 @@ export interface SignerQuoteRecord {
   walletAddress: Address;
   requesterAddress: Address;
   targetAddress: Address;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyId: string;
@@ -1408,7 +1408,7 @@ export interface SignerQuoteRecord {
   scopeHash: Hex;
   delegateIdentity?: string | null;
   trustTier: SignerProviderTrustTier;
-  amountWei: string;
+  amountTomi: string;
   status: SignerQuoteStatus;
   expiresAt: string;
   createdAt: string;
@@ -1424,7 +1424,7 @@ export interface SignerExecutionRecord {
   walletAddress: Address;
   requesterAddress: Address;
   targetAddress: Address;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyId: string;
@@ -1455,7 +1455,7 @@ export interface PaymasterProviderPolicyConfig {
   allowedWallets: Address[];
   allowedTargets: Address[];
   allowedFunctionSelectors: Hex[];
-  maxValueWei: string;
+  maxValueTomi: string;
   expiresAt?: string;
   allowSystemAction?: boolean;
 }
@@ -1469,8 +1469,8 @@ export interface PaymasterProviderConfig {
   publishToDiscovery: boolean;
   quoteValiditySeconds: number;
   authorizationValiditySeconds: number;
-  quotePriceWei: string;
-  authorizePriceWei: string;
+  quotePriceTomi: string;
+  authorizePriceTomi: string;
   requestTimeoutMs: number;
   maxDataBytes: number;
   defaultGas: string;
@@ -1496,7 +1496,7 @@ export interface PaymasterQuoteRecord {
   requesterAddress: Address;
   requesterSignerType: string;
   targetAddress: Address;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyId: string;
@@ -1504,7 +1504,7 @@ export interface PaymasterQuoteRecord {
   scopeHash: Hex;
   delegateIdentity?: string | null;
   trustTier: PaymasterProviderTrustTier;
-  amountWei: string;
+  amountTomi: string;
   sponsorNonce: string;
   sponsorExpiry: number;
   status: PaymasterQuoteStatus;
@@ -1526,7 +1526,7 @@ export interface PaymasterAuthorizationRecord {
   requesterAddress: Address;
   requesterSignerType: string;
   targetAddress: Address;
-  valueWei: string;
+  valueTomi: string;
   dataHex: Hex;
   gas: string;
   policyId: string;
@@ -1589,8 +1589,8 @@ export interface StorageMarketConfig {
   defaultTtlSeconds: number;
   maxTtlSeconds: number;
   maxBundleBytes: number;
-  minimumPriceWei: string;
-  pricePerMiBWei: string;
+  minimumPriceTomi: string;
+  pricePerMiBTomi: string;
   publishToDiscovery: boolean;
   allowAnonymousGet: boolean;
   leaseHealth: StorageLeaseHealthConfig;
@@ -1606,7 +1606,7 @@ export interface StorageQuoteRecord {
   bundleKind: string;
   sizeBytes: number;
   ttlSeconds: number;
-  amountWei: string;
+  amountTomi: string;
   status: "quoted" | "used" | "expired";
   expiresAt: string;
   createdAt: string;
@@ -1624,7 +1624,7 @@ export interface StorageLeaseRecord {
   providerBaseUrl?: string | null;
   sizeBytes: number;
   ttlSeconds: number;
-  amountWei: string;
+  amountTomi: string;
   status: StorageLeaseStatus;
   storagePath: string;
   requestKey: string;
@@ -1647,7 +1647,7 @@ export interface StorageRenewalRecord {
   previousExpiresAt: string;
   renewedExpiresAt: string;
   addedTtlSeconds: number;
-  amountWei: string;
+  amountTomi: string;
   paymentId?: Hex | null;
   receipt: StorageReceipt;
   receiptHash: Hex;
@@ -1834,7 +1834,7 @@ export interface SettlementCallbackTargetConfig {
   enabled: boolean;
   contractAddress?: Address;
   gas: string;
-  valueWei: string;
+  valueTomi: string;
   waitForReceipt: boolean;
   receiptTimeoutMs: number;
   payloadMode: SettlementCallbackPayloadMode;
@@ -1882,7 +1882,7 @@ export interface MarketContractTargetConfig {
   packageName?: string;
   functionSignature?: string;
   gas: string;
-  valueWei: string;
+  valueTomi: string;
   waitForReceipt: boolean;
   receiptTimeoutMs: number;
   payloadMode: MarketContractPayloadMode;
@@ -1971,7 +1971,7 @@ export interface X402PaymentRecord {
   txNonce: string;
   txHash: Hex;
   rawTransaction: Hex;
-  amountWei: string;
+  amountTomi: string;
   confirmationPolicy: X402ConfirmationPolicy;
   status: X402PaymentStatus;
   attemptCount: number;
@@ -1997,8 +1997,8 @@ export const DEFAULT_STORAGE_MARKET_CONFIG: StorageMarketConfig = {
   defaultTtlSeconds: 86400,
   maxTtlSeconds: 2592000,
   maxBundleBytes: 8 * 1024 * 1024,
-  minimumPriceWei: "1000000000000000",
-  pricePerMiBWei: "1000000000000000",
+  minimumPriceTomi: "1000000000000000",
+  pricePerMiBTomi: "1000000000000000",
   publishToDiscovery: true,
   allowAnonymousGet: true,
   leaseHealth: {
@@ -2053,7 +2053,7 @@ export const DEFAULT_ARTIFACT_PIPELINE_CONFIG: ArtifactPipelineConfig = {
 export const DEFAULT_BOUNTY_POLICY: BountyPolicy = {
   maxSubmissionsPerSolver: 1,
   solverCooldownSeconds: 3600,
-  maxAutoPayPerSolverPerDayWei: "1000000000000000000",
+  maxAutoPayPerSolverPerDayTomi: "1000000000000000000",
   trustedProofUrlPrefixes: [
     "https://x.com/",
     "https://twitter.com/",
@@ -2072,7 +2072,7 @@ export const DEFAULT_BOUNTY_CONFIG: BountyConfig = {
   pathPrefix: "/bounty",
   remoteBaseUrl: undefined,
   discoveryCapability: "task.submit",
-  rewardWei: "10000000000000000",
+  rewardTomi: "10000000000000000",
   autoPayConfidenceThreshold: 0.9,
   defaultSubmissionTtlSeconds: 3600,
   pollIntervalSeconds: 30,
@@ -2097,7 +2097,7 @@ export const DEFAULT_OPPORTUNITY_SCOUT_CONFIG: OpportunityScoutConfig = {
   ],
   remoteBaseUrls: [],
   maxItems: 25,
-  minRewardWei: "0",
+  minRewardTomi: "0",
 };
 
 export const DEFAULT_OWNER_REPORTS_CONFIG: OwnerReportsConfig = {
@@ -2213,8 +2213,8 @@ export const DEFAULT_SIGNER_PROVIDER_CONFIG: SignerProviderConfig = {
   capabilityPrefix: "signer",
   publishToDiscovery: true,
   quoteValiditySeconds: 300,
-  quotePriceWei: "0",
-  submitPriceWei: "1000000000000000",
+  quotePriceTomi: "0",
+  submitPriceTomi: "1000000000000000",
   requestTimeoutMs: 15000,
   maxDataBytes: 16384,
   defaultGas: "180000",
@@ -2223,7 +2223,7 @@ export const DEFAULT_SIGNER_PROVIDER_CONFIG: SignerProviderConfig = {
     policyId: "default",
     allowedTargets: [],
     allowedFunctionSelectors: [],
-    maxValueWei: "0",
+    maxValueTomi: "0",
     allowSystemAction: false,
   },
 };
@@ -2237,8 +2237,8 @@ export const DEFAULT_PAYMASTER_PROVIDER_CONFIG: PaymasterProviderConfig = {
   publishToDiscovery: true,
   quoteValiditySeconds: 300,
   authorizationValiditySeconds: 300,
-  quotePriceWei: "0",
-  authorizePriceWei: "1000000000000000",
+  quotePriceTomi: "0",
+  authorizePriceTomi: "1000000000000000",
   requestTimeoutMs: 15000,
   maxDataBytes: 16384,
   defaultGas: "180000",
@@ -2248,7 +2248,7 @@ export const DEFAULT_PAYMASTER_PROVIDER_CONFIG: PaymasterProviderConfig = {
     allowedWallets: [],
     allowedTargets: [],
     allowedFunctionSelectors: [],
-    maxValueWei: "0",
+    maxValueTomi: "0",
     allowSystemAction: false,
   },
 };
@@ -2270,7 +2270,7 @@ export const DEFAULT_SETTLEMENT_CONFIG: SettlementConfig = {
       enabled: false,
       contractAddress: undefined,
       gas: "220000",
-      valueWei: "0",
+      valueTomi: "0",
       waitForReceipt: true,
       receiptTimeoutMs: 60000,
       payloadMode: "canonical_receipt",
@@ -2281,7 +2281,7 @@ export const DEFAULT_SETTLEMENT_CONFIG: SettlementConfig = {
       enabled: false,
       contractAddress: undefined,
       gas: "220000",
-      valueWei: "0",
+      valueTomi: "0",
       waitForReceipt: true,
       receiptTimeoutMs: 60000,
       payloadMode: "canonical_receipt",
@@ -2292,7 +2292,7 @@ export const DEFAULT_SETTLEMENT_CONFIG: SettlementConfig = {
       enabled: false,
       contractAddress: undefined,
       gas: "220000",
-      valueWei: "0",
+      valueTomi: "0",
       waitForReceipt: true,
       receiptTimeoutMs: 60000,
       payloadMode: "canonical_receipt",
@@ -2312,7 +2312,7 @@ export const DEFAULT_MARKET_CONTRACT_CONFIG: MarketContractConfig = {
     packageName: undefined,
     functionSignature: undefined,
     gas: "260000",
-    valueWei: "0",
+    valueTomi: "0",
     waitForReceipt: true,
     receiptTimeoutMs: 60000,
     payloadMode: "canonical_binding",
@@ -2324,7 +2324,7 @@ export const DEFAULT_MARKET_CONTRACT_CONFIG: MarketContractConfig = {
     packageName: undefined,
     functionSignature: undefined,
     gas: "260000",
-    valueWei: "0",
+    valueTomi: "0",
     waitForReceipt: true,
     receiptTimeoutMs: 60000,
     payloadMode: "canonical_binding",
@@ -2336,7 +2336,7 @@ export const DEFAULT_MARKET_CONTRACT_CONFIG: MarketContractConfig = {
     packageName: undefined,
     functionSignature: undefined,
     gas: "260000",
-    valueWei: "0",
+    valueTomi: "0",
     waitForReceipt: true,
     receiptTimeoutMs: 60000,
     payloadMode: "canonical_binding",
@@ -2355,10 +2355,10 @@ export const DEFAULT_X402_SERVER_CONFIG: X402ServerConfig = {
 };
 
 export const DEFAULT_WALLET_FUNDING_CONFIG: WalletFundingConfig = {
-  localDefaultAmountWei: "5000000000000000000",
+  localDefaultAmountTomi: "5000000000000000000",
   localFunderAddress: undefined,
   localFunderPassword: undefined,
-  testnetDefaultAmountWei: "10000000000000000",
+  testnetDefaultAmountTomi: "10000000000000000",
   testnetFaucetUrl: undefined,
   testnetReason: "bootstrap openfox wallet",
 };

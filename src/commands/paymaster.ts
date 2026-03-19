@@ -99,7 +99,7 @@ Usage:
   openfox paymaster list [--kind <quote|authorization>] [--status <quoted|used|expired|authorized|submitted|confirmed|failed|rejected>] [--json]
   openfox paymaster get (--quote <id> | --authorization <id>) [--json]
   openfox paymaster discover [--capability-prefix <prefix>] [--trust-tier <tier>] [--json]
-  openfox paymaster quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] [--wallet <address>] --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
+  openfox paymaster quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] [--wallet <address>] --target <address> [--value-tomi <tomi>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
   openfox paymaster authorize [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> [--reason <text>] [--json]
   openfox paymaster status --provider <base-url> --authorization <id> [--json]
   openfox paymaster receipt --provider <base-url> --authorization <id> [--json]
@@ -133,7 +133,7 @@ Usage:
         }
         for (const item of items) {
           logger.info(
-            `${item.quoteId}  [${item.status}] wallet=${item.walletAddress} sponsor=${item.sponsorAddress} target=${item.targetAddress} amount=${item.amountWei}`,
+            `${item.quoteId}  [${item.status}] wallet=${item.walletAddress} sponsor=${item.sponsorAddress} target=${item.targetAddress} amount=${item.amountTomi}`,
           );
         }
         return;
@@ -240,14 +240,14 @@ Usage:
       });
       const target = readOption(args, "--target");
       if (!providerBaseUrl || !target) {
-        throw new Error("Usage: openfox paymaster quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] [--wallet <address>] --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
+        throw new Error("Usage: openfox paymaster quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] [--wallet <address>] --target <address> [--value-tomi <tomi>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
       }
       const result = await fetchPaymasterQuote({
         providerBaseUrl,
         requesterAddress: config.walletAddress,
         walletAddress: (readOption(args, "--wallet") as `0x${string}` | undefined) ?? undefined,
         target: target as `0x${string}`,
-        valueWei: readOption(args, "--value-wei") || "0",
+        valueTomi: readOption(args, "--value-tomi") || "0",
         data: (readOption(args, "--data") as `0x${string}` | undefined) ?? undefined,
         gas: readOption(args, "--gas") || undefined,
         reason: readOption(args, "--reason") || undefined,

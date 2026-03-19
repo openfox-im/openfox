@@ -139,7 +139,7 @@ describe("x402 server payment manager", () => {
       providerAddress,
       requestKey,
       requestHash,
-      amountWei: "1000000000000000",
+      amountTomi: "1000000000000000",
       description: "OpenFox observation.once payment",
     });
     expect(first.state).toBe("pending");
@@ -152,7 +152,7 @@ describe("x402 server payment manager", () => {
       providerAddress,
       requestKey,
       requestHash,
-      amountWei: "1000000000000000",
+      amountTomi: "1000000000000000",
       description: "OpenFox observation.once payment",
     });
     expect(second.state).toBe("ready");
@@ -237,7 +237,7 @@ describe("x402 server payment manager", () => {
       providerAddress,
       requestKey: "oracle:req:a",
       requestHash: requestHashA,
-      amountWei: "2000000000000000",
+      amountTomi: "2000000000000000",
       description: "OpenFox oracle.resolve payment",
     });
     expect(first.state).toBe("ready");
@@ -254,7 +254,7 @@ describe("x402 server payment manager", () => {
         providerAddress,
         requestKey: "oracle:req:b",
         requestHash: requestHashB,
-        amountWei: "2000000000000000",
+        amountTomi: "2000000000000000",
         description: "OpenFox oracle.resolve payment",
       }),
     ).rejects.toBeInstanceOf(X402ServerPaymentRejectedError);

@@ -23,12 +23,12 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
 
-function parseAmount(args: string[], defaultWei?: string): bigint | undefined {
-  const amountWei = readFlag(args, "--amount-wei");
-  if (amountWei) return BigInt(amountWei);
+function parseAmount(args: string[], defaultTomi?: string): bigint | undefined {
+  const amountTomi = readFlag(args, "--amount-tomi");
+  if (amountTomi) return BigInt(amountTomi);
   const amount = readFlag(args, "--amount");
   if (amount) return parseChainAmount(amount);
-  return defaultWei ? BigInt(defaultWei) : undefined;
+  return defaultTomi ? BigInt(defaultTomi) : undefined;
 }
 
 function usage(): string {
@@ -38,8 +38,8 @@ OpenFox wallet
 Usage:
   openfox wallet status [--json]
   openfox wallet report [--json]
-  openfox wallet fund local [--amount 5] [--amount-wei <wei>] [--from 0x...] [--password ...] [--wait]
-  openfox wallet fund testnet [--amount 0.01] [--amount-wei <wei>] [--faucet-url <url>] [--reason "..."] [--wait]
+  openfox wallet fund local [--amount 5] [--amount-tomi <tomi>] [--from 0x...] [--password ...] [--wait]
+  openfox wallet fund testnet [--amount 0.01] [--amount-tomi <tomi>] [--faucet-url <url>] [--reason "..."] [--wait]
   openfox wallet bootstrap-signer --type <ed25519|secp256r1|bls12-381|elgamal> [--generate] [--public-key 0x...] [--private-key 0x...] [--output <path>] [--overwrite] [--wait]
 
 Notes:
@@ -71,7 +71,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
               address: snapshot.address,
               rpcUrl: snapshot.rpcUrl ?? null,
               chainId: snapshot.chainId?.toString() ?? null,
-              balanceWei: snapshot.balanceWei?.toString() ?? null,
+              balanceTomi: snapshot.balanceTomi?.toString() ?? null,
               nonce: snapshot.nonce?.toString() ?? null,
               signer: snapshot.signer ?? null,
             },
@@ -116,7 +116,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
       if (mode === "local") {
         const result = await fundWalletFromLocalDevnet({
           config,
-          amountWei: parseAmount(args, config.walletFunding?.localDefaultAmountWei),
+          amountTomi: parseAmount(args, config.walletFunding?.localDefaultAmountTomi),
           from: readFlag(args, "--from"),
           password: readFlag(args, "--password"),
           waitForReceipt: hasFlag(args, "--wait"),
@@ -126,7 +126,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
             "Local funding submitted.",
             `From: ${result.from}`,
             `To:   ${result.to}`,
-            `Amount: ${result.amountWei.toString()} wei`,
+            `Amount: ${result.amountTomi.toString()} tomi`,
             `Tx:   ${result.txHash}`,
           ].join("\n"),
         );
@@ -135,7 +135,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
 
       const result = await fundWalletFromTestnet({
         config,
-        amountWei: parseAmount(args, config.walletFunding?.testnetDefaultAmountWei),
+        amountTomi: parseAmount(args, config.walletFunding?.testnetDefaultAmountTomi),
         faucetUrl: readFlag(args, "--faucet-url"),
         reason: readFlag(args, "--reason"),
         waitForReceipt: hasFlag(args, "--wait"),
@@ -145,7 +145,7 @@ export async function runWalletCommand(args: string[]): Promise<void> {
           "Testnet funding requested.",
           `Provider: ${result.provider}`,
           `To: ${result.to}`,
-          `Amount: ${result.amountWei.toString()} wei`,
+          `Amount: ${result.amountTomi.toString()} tomi`,
           `Status: ${result.status}`,
           ...(result.txHash ? [`Tx: ${result.txHash}`] : []),
           ...(result.reason ? [`Reason: ${result.reason}`] : []),

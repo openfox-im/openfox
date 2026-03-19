@@ -107,7 +107,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 function parseRequestedAmount(value: string): bigint {
   if (!/^\d+$/.test(value.trim())) {
-    throw new Error("requested_amount must be a decimal wei string");
+    throw new Error("requested_amount must be a decimal tomi string");
   }
   return BigInt(value.trim());
 }
@@ -115,7 +115,7 @@ function parseRequestedAmount(value: string): bigint {
 function validateRequest(
   request: FaucetInvocationRequest,
   faucet: AgentDiscoveryFaucetServerConfig,
-): { requesterAddress: string; requestedAmountWei: bigint; requestNonce: string } {
+): { requesterAddress: string; requestedAmountTomi: bigint; requestNonce: string } {
   if (request.capability !== faucet.capability) {
     throw new Error(`unsupported capability ${request.capability}`);
   }
@@ -128,15 +128,15 @@ function validateRequest(
   if (!isAddress(request.requester.identity.value)) {
     throw new Error("requester identity is not a valid native address");
   }
-  const requestedAmountWei = parseRequestedAmount(request.requested_amount);
-  if (requestedAmountWei <= 0n) {
+  const requestedAmountTomi = parseRequestedAmount(request.requested_amount);
+  if (requestedAmountTomi <= 0n) {
     throw new Error("requested_amount must be positive");
   }
   const requestNonce = normalizeNonce(request.request_nonce);
   validateRequestExpiry(request.request_expires_at);
   return {
     requesterAddress: normalizeAddress(request.requester.identity.value),
-    requestedAmountWei,
+    requestedAmountTomi,
     requestNonce,
   };
 }
@@ -149,8 +149,8 @@ export async function startAgentDiscoveryFaucetServer(
   if (!rpcUrl) {
     throw new Error("Chain RPC is required to run the faucet server");
   }
-  const payoutAmountWei = parseRequestedAmount(faucetConfig.payoutAmountWei);
-  const maxAmountWei = parseRequestedAmount(faucetConfig.maxAmountWei);
+  const payoutAmountTomi = parseRequestedAmount(faucetConfig.payoutAmountTomi);
+  const maxAmountTomi = parseRequestedAmount(faucetConfig.maxAmountTomi);
   const path = faucetConfig.path.startsWith("/") ? faucetConfig.path : `/${faucetConfig.path}`;
   const healthzPath = `${path}/healthz`;
 
@@ -161,8 +161,8 @@ export async function startAgentDiscoveryFaucetServer(
         json(res, 200, {
           ok: true,
           capability: faucetConfig.capability,
-          payoutAmountWei: payoutAmountWei.toString(),
-          maxAmountWei: maxAmountWei.toString(),
+          payoutAmountTomi: payoutAmountTomi.toString(),
+          maxAmountTomi: maxAmountTomi.toString(),
           address,
         });
         return;
@@ -173,7 +173,7 @@ export async function startAgentDiscoveryFaucetServer(
       }
 
       const body = (await readJsonBody(req)) as FaucetInvocationRequest;
-      const { requesterAddress, requestedAmountWei, requestNonce } = validateRequest(body, faucetConfig);
+      const { requesterAddress, requestedAmountTomi, requestNonce } = validateRequest(body, faucetConfig);
       ensureRequestNotReplayed({
         db,
         scope: "faucet",
@@ -192,20 +192,20 @@ export async function startAgentDiscoveryFaucetServer(
         json(res, 429, response);
         return;
       }
-      if (requestedAmountWei > maxAmountWei) {
+      if (requestedAmountTomi > maxAmountTomi) {
         const response: FaucetResponse = {
           status: "rejected",
-          reason: `requested amount exceeds maxAmountWei ${maxAmountWei.toString()}`,
+          reason: `requested amount exceeds maxAmountTomi ${maxAmountTomi.toString()}`,
         };
         json(res, 400, response);
         return;
       }
 
-      const amountWei =
-        requestedAmountWei < payoutAmountWei ? requestedAmountWei : payoutAmountWei;
+      const amountTomi =
+        requestedAmountTomi < payoutAmountTomi ? requestedAmountTomi : payoutAmountTomi;
       const client = new RpcClient({ rpcUrl });
       const providerBalance = await client.getBalance(normalizeAddress(address));
-      if (providerBalance < amountWei) {
+      if (providerBalance < amountTomi) {
         const response: FaucetResponse = {
           status: "rejected",
           reason: "provider balance is insufficient",
@@ -218,7 +218,7 @@ export async function startAgentDiscoveryFaucetServer(
         rpcUrl,
         privateKey,
         to: requesterAddress,
-        amountWei,
+        amountTomi,
         waitForReceipt: false,
       });
       recordRequestNonce({
@@ -235,7 +235,7 @@ export async function startAgentDiscoveryFaucetServer(
         JSON.stringify({
           at: new Date().toISOString(),
           requester: requesterAddress,
-          amountWei: amountWei.toString(),
+          amountTomi: amountTomi.toString(),
           txHash: transfer.txHash,
         }),
       );
@@ -244,7 +244,7 @@ export async function startAgentDiscoveryFaucetServer(
         status: "approved",
         transfer_network: `tos:${config.chainId || 0}`,
         tx_hash: transfer.txHash,
-        amount: amountWei.toString(),
+        amount: amountTomi.toString(),
         cooldown_until: now + faucetConfig.cooldownSeconds,
       };
       json(res, 200, response);

@@ -94,7 +94,7 @@ async function buildSignerRouteProvider(
       providerBaseUrl,
       requesterAddress: execution.requester as Address,
       target: target as Address,
-      valueWei: execution.value,
+      valueTomi: execution.value,
       gas: String(execution.gasEstimate ?? DEFAULT_GAS_ESTIMATE),
       ...(execution.data ? { data: execution.data } : {}),
       reason: `intent:${execution.action}`,
@@ -111,7 +111,7 @@ async function buildSignerRouteProvider(
       reputationScore: computeReputationScore(provider),
       latencyMs: Date.now() - startedAt,
       feeSchedule: {
-        baseFee: asNumericString(quote["amount_wei"]) ?? "0",
+        baseFee: asNumericString(quote["amount_tomi"]) ?? "0",
         perGasFee: "0",
         percentFee: 0,
         currency: "TOS",
@@ -144,7 +144,7 @@ async function buildSponsorQuote(
       requesterAddress: execution.requester as Address,
       walletAddress: execution.requester as Address,
       target: target as Address,
-      valueWei: execution.value,
+      valueTomi: execution.value,
       gas: String(execution.gasEstimate ?? DEFAULT_GAS_ESTIMATE),
       ...(execution.data ? { data: execution.data } : {}),
       reason: `intent:${execution.action}`,
@@ -156,7 +156,7 @@ async function buildSponsorQuote(
         ?? provider.search.primaryIdentity
         ?? provider.card.primary_identity.value,
       sponsorName: provider.card.display_name,
-      feeAmount: asNumericString(quote["amount_wei"]) ?? "0",
+      feeAmount: asNumericString(quote["amount_tomi"]) ?? "0",
       feeCurrency: "TOS",
       gasLimit: parseNumber(quote["gas"]) ?? execution.gasEstimate ?? DEFAULT_GAS_ESTIMATE,
       expiresAt:

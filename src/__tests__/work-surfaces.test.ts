@@ -83,15 +83,15 @@ describe("data_labeling bounty surface", () => {
       defaultKind: "data_labeling",
       skill: "data-labeling-bounty-host",
     };
-    const payouts: Array<{ to: string; amountWei: bigint }> = [];
+    const payouts: Array<{ to: string; amountTomi: bigint }> = [];
     const engine = createBountyEngine({
       identity: createIdentity("host", HOST_ADDRESS, "host-agent"),
       db,
       inference,
       bountyConfig,
       payoutSender: {
-        async send({ to, amountWei }) {
-          payouts.push({ to, amountWei });
+        async send({ to, amountTomi }) {
+          payouts.push({ to, amountTomi });
           return { txHash: "0xpaid" };
         },
       },
@@ -104,7 +104,7 @@ describe("data_labeling bounty surface", () => {
       taskPrompt:
         'Label each sentence as positive, negative, or neutral:\n1. "I love this product"\n2. "It broke on day one"\n3. "The box is brown"',
       referenceOutput: "1. positive\n2. negative\n3. neutral",
-      rewardWei: "1000",
+      rewardTomi: "1000",
       submissionDeadline: "2027-03-11T01:00:00.000Z",
       skillName: "data-labeling-bounty-host",
     });
@@ -122,7 +122,7 @@ describe("data_labeling bounty surface", () => {
     expect(submission.result.decision).toBe("accepted");
     expect(submission.result.payoutTxHash).toBe("0xpaid");
     expect(submission.bounty.status).toBe("paid");
-    expect(payouts).toEqual([{ to: SOLVER_ADDRESS, amountWei: 1000n }]);
+    expect(payouts).toEqual([{ to: SOLVER_ADDRESS, amountTomi: 1000n }]);
   });
 
   it("rejects a data_labeling submission with incorrect labels", async () => {
@@ -154,7 +154,7 @@ describe("data_labeling bounty surface", () => {
       title: "Label 2 items",
       taskPrompt: 'Label: 1. "Great" 2. "Terrible"',
       referenceOutput: "1. positive\n2. negative",
-      rewardWei: "500",
+      rewardTomi: "500",
       submissionDeadline: "2027-03-11T01:00:00.000Z",
     });
 
@@ -467,7 +467,7 @@ describe("opportunity ranking for new work surfaces", () => {
       "storage_artifacts",
     ];
     strategy.minMarginBps = 0;
-    strategy.maxSpendPerOpportunityWei = "1000000000000000000";
+    strategy.maxSpendPerOpportunityTomi = "1000000000000000000";
 
     const items: OpportunityItem[] = [
       {
@@ -479,9 +479,9 @@ describe("opportunity ranking for new work surfaces", () => {
         capability: "task.submit",
         baseUrl: "https://host.example.com",
         bountyId: "bounty-dl-1",
-        grossValueWei: "50000000000000000",
-        estimatedCostWei: "0",
-        marginWei: "50000000000000000",
+        grossValueTomi: "50000000000000000",
+        estimatedCostTomi: "0",
+        marginTomi: "50000000000000000",
         marginBps: 10000,
         rawScore: 50,
       },
@@ -494,9 +494,9 @@ describe("opportunity ranking for new work surfaces", () => {
         capability: "task.submit",
         baseUrl: "https://host.example.com",
         bountyId: "bounty-tr-1",
-        grossValueWei: "30000000000000000",
-        estimatedCostWei: "0",
-        marginWei: "30000000000000000",
+        grossValueTomi: "30000000000000000",
+        estimatedCostTomi: "0",
+        marginTomi: "30000000000000000",
         marginBps: 10000,
         rawScore: 30,
       },
@@ -508,9 +508,9 @@ describe("opportunity ranking for new work surfaces", () => {
         description: "Paid sentiment.analyze service",
         capability: "sentiment.analyze",
         mode: "paid",
-        grossValueWei: "0",
-        estimatedCostWei: "1500000000000000",
-        marginWei: "-1500000000000000",
+        grossValueTomi: "0",
+        estimatedCostTomi: "1500000000000000",
+        marginTomi: "-1500000000000000",
         marginBps: -10000,
         rawScore: 0,
       },
@@ -529,7 +529,7 @@ describe("opportunity ranking for new work surfaces", () => {
     const strategy = createDefaultStrategyProfile();
     strategy.enabledProviderClasses = ["observation", "oracle"];
     strategy.minMarginBps = 0;
-    strategy.maxSpendPerOpportunityWei = "1000000000000000000";
+    strategy.maxSpendPerOpportunityTomi = "1000000000000000000";
 
     const items: OpportunityItem[] = [
       {
@@ -539,9 +539,9 @@ describe("opportunity ranking for new work surfaces", () => {
         title: "Label items",
         description: "Data labeling task",
         capability: "task.submit",
-        grossValueWei: "50000000000000000",
-        estimatedCostWei: "0",
-        marginWei: "50000000000000000",
+        grossValueTomi: "50000000000000000",
+        estimatedCostTomi: "0",
+        marginTomi: "50000000000000000",
         marginBps: 10000,
         rawScore: 50,
       },
@@ -560,8 +560,8 @@ describe("opportunity ranking for new work surfaces", () => {
       const profile = upsertStrategyProfile(db, {
         profileId: "labeling-focused",
         name: "Data Labeling Focus",
-        revenueTargetWei: "500000000000000000",
-        maxSpendPerOpportunityWei: "50000000000000000",
+        revenueTargetTomi: "500000000000000000",
+        maxSpendPerOpportunityTomi: "50000000000000000",
         minMarginBps: 1000,
         enabledOpportunityKinds: ["bounty", "campaign", "provider"],
         enabledProviderClasses: ["task_market", "general_provider"],

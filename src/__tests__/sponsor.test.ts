@@ -81,10 +81,10 @@ describe("Sponsor Discovery", () => {
 
     it("filters by max fee percent", () => {
       const quotes = [
-        makeQuote({ feeAmount: "50000000000000000", sponsorAddress: "0xEXPENSIVE" }),  // 5% of 1 ETH
-        makeQuote({ feeAmount: "5000000000000000", sponsorAddress: "0xCHEAP" }),        // 0.5% of 1 ETH
+        makeQuote({ feeAmount: "50000000000000000", sponsorAddress: "0xEXPENSIVE" }),  // 5% of 1 TOS
+        makeQuote({ feeAmount: "5000000000000000", sponsorAddress: "0xCHEAP" }),        // 0.5% of 1 TOS
       ];
-      // maxFeePercent = 1.0 means 1%, so max fee = 1% of 1 ETH = 0.01 ETH = 10000000000000000
+      // maxFeePercent = 1.0 means 1%, so max fee = 1% of 1 TOS = 0.01 TOS = 10000000000000000
       const policy = makePolicy({ maxFeePercent: 1.0 });
       const result = selectSponsor(quotes, policy, "1000000000000000000");
 
@@ -173,7 +173,7 @@ describe("Sponsor Discovery", () => {
         makeQuote({ feeAmount: "50000000000000000" }), // 0.05 ETH fee
       ];
       const policy = makePolicy({ strategy: "cheapest" });
-      const result = selectSponsor(quotes, policy, "1000000000000000000"); // 1 ETH value
+      const result = selectSponsor(quotes, policy, "1000000000000000000"); // 1 TOS value
 
       expect(result).not.toBeNull();
       expect(result!.totalCostDisplay).toBe("1.0000 TOS (+ 0.050000 fee)");
@@ -184,7 +184,7 @@ describe("Sponsor Discovery", () => {
         makeQuote({ feeAmount: "0" }),
       ];
       const policy = makePolicy({ strategy: "cheapest" });
-      const result = selectSponsor(quotes, policy, "1000000000000000000"); // 1 ETH value
+      const result = selectSponsor(quotes, policy, "1000000000000000000"); // 1 TOS value
 
       expect(result).not.toBeNull();
       expect(result!.totalCostDisplay).toBe("1.0000 TOS (gasless)");

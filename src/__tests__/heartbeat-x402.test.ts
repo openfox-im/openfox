@@ -69,7 +69,7 @@ describe("heartbeat x402 retry task", () => {
         "0x12252ae6b5d22fa4f58b295fe42cdb782f41881025d22645816d196b4f2e5143",
       rawTransaction:
         "0x1234",
-      amountWei: "1000",
+      amountTomi: "1000",
       confirmationPolicy: "receipt",
       status: "submitted",
       attemptCount: 1,

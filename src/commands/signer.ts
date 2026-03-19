@@ -95,8 +95,8 @@ Usage:
   openfox signer list [--status <pending|submitted|confirmed|failed|rejected>] [--json]
   openfox signer get --execution <id> [--json]
   openfox signer discover [--capability-prefix <prefix>] [--json]
-  openfox signer quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
-  openfox signer submit [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
+  openfox signer quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --target <address> [--value-tomi <tomi>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
+  openfox signer submit [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> --target <address> [--value-tomi <tomi>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]
   openfox signer status --provider <base-url> --execution <id> [--json]
   openfox signer receipt --provider <base-url> --execution <id> [--json]
 `);
@@ -204,13 +204,13 @@ Usage:
       });
       const target = readOption(args, "--target");
       if (!providerBaseUrl || !target) {
-        throw new Error("Usage: openfox signer quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
+        throw new Error("Usage: openfox signer quote [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --target <address> [--value-tomi <tomi>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
       }
       const result = await fetchSignerQuote({
         providerBaseUrl,
         requesterAddress: config.walletAddress,
         target: target as `0x${string}`,
-        valueWei: readOption(args, "--value-wei") || "0",
+        valueTomi: readOption(args, "--value-tomi") || "0",
         data: (readOption(args, "--data") as `0x${string}` | undefined) ?? undefined,
         gas: readOption(args, "--gas") || undefined,
         reason: readOption(args, "--reason") || undefined,
@@ -253,7 +253,7 @@ Usage:
       const quoteId = readOption(args, "--quote-id");
       const target = readOption(args, "--target");
       if (!providerBaseUrl || !quoteId || !target) {
-        throw new Error("Usage: openfox signer submit [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> --target <address> [--value-wei <wei>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
+        throw new Error("Usage: openfox signer submit [--provider <base-url>] [--capability-prefix <prefix>] [--trust-tier <tier>] --quote-id <id> --target <address> [--value-tomi <tomi>] [--data <hex>] [--gas <gas>] [--reason <text>] [--json]");
       }
       if (!config.rpcUrl) {
         throw new Error("rpcUrl is required for signer submit");
@@ -266,7 +266,7 @@ Usage:
         requesterAddress: config.walletAddress,
         quoteId,
         target: target as `0x${string}`,
-        valueWei: readOption(args, "--value-wei") || "0",
+        valueTomi: readOption(args, "--value-tomi") || "0",
         data: (readOption(args, "--data") as `0x${string}` | undefined) ?? undefined,
         gas: readOption(args, "--gas") || undefined,
         requestNonce: randomUUID().replace(/-/g, ""),

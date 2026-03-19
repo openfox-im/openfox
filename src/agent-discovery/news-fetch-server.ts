@@ -586,7 +586,7 @@ async function requirePayment(params: {
   res: ServerResponse;
   config: OpenFoxConfig;
   providerAddress: string;
-  amountWei: string;
+  amountTomi: string;
 }): Promise<VerifiedPayment | null> {
   const rpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
   if (!rpcUrl) {
@@ -597,7 +597,7 @@ async function requirePayment(params: {
   const requirement: PaymentRequirement = {
     scheme: "exact",
     network: formatNetwork(chainId),
-    maxAmountRequired: params.amountWei,
+    maxAmountRequired: params.amountTomi,
     payToAddress: normalizeAddress(params.providerAddress),
     asset: "native",
     requiredDeadlineSeconds: 300,
@@ -633,7 +633,7 @@ export async function startAgentDiscoveryNewsFetchServer(
         json(res, 200, {
           ok: true,
           capability: newsFetchConfig.capability,
-          priceWei: newsFetchConfig.priceWei,
+          priceTomi: newsFetchConfig.priceTomi,
           address,
           integration: "skill_composed",
           backendMode: newsFetchConfig.backendMode,
@@ -703,7 +703,7 @@ export async function startAgentDiscoveryNewsFetchServer(
           res,
           config,
           providerAddress: address,
-          amountWei: newsFetchConfig.priceWei,
+          amountTomi: newsFetchConfig.priceTomi,
         });
         if (paid) {
           res.statusCode = 200;
@@ -750,7 +750,7 @@ export async function startAgentDiscoveryNewsFetchServer(
         res,
         config,
         providerAddress: address,
-        amountWei: newsFetchConfig.priceWei,
+        amountTomi: newsFetchConfig.priceTomi,
       });
       if (!paid) {
         return;
@@ -802,7 +802,7 @@ export async function startAgentDiscoveryNewsFetchServer(
         status: "ok",
         job_id: jobId,
         result_url: buildNewsFetchResultPath(jobId),
-        price_wei: newsFetchConfig.priceWei,
+        price_tomi: newsFetchConfig.priceTomi,
         payment_tx_hash: paid.txHash,
         fetched_at: fetchedAt,
         source_url: sourceUrl.toString(),

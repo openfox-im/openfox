@@ -50,7 +50,7 @@ function mapWorkItem(bounty: BountyRecord): WorldBoardItem {
     actorAddress: bounty.hostAddress,
     title: bounty.title,
     summary: trimSummary(
-      `${bounty.kind} bounty · reward ${bounty.rewardWei} wei · deadline ${bounty.submissionDeadline}`,
+      `${bounty.kind} bounty · reward ${bounty.rewardTomi} tomi · deadline ${bounty.submissionDeadline}`,
     ),
     status: bounty.status,
     refs: {
@@ -67,7 +67,7 @@ function mapOpportunityItem(alert: OwnerOpportunityAlertRecord): WorldBoardItem 
     occurredAt: alert.createdAt,
     title: alert.title,
     summary: trimSummary(
-      `${alert.summary} Margin ${alert.marginWei} wei (${alert.marginBps} bps).`,
+      `${alert.summary} Margin ${alert.marginTomi} tomi (${alert.marginBps} bps).`,
     ),
     status: alert.status,
     refs: {

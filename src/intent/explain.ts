@@ -13,17 +13,17 @@ function shorten(value: string, prefixLen = 6, suffixLen = 4): string {
   return `${value.slice(0, prefixLen)}...${value.slice(-suffixLen)}`;
 }
 
-/** Format a wei string into a human-friendly token amount (simple integer division by 1e18). */
-function formatWei(wei: string): string {
-  if (!wei || wei === "0") return "0";
+/** Format a tomi string into a human-friendly token amount (simple integer division by 1e18). */
+function formatTomi(tomi: string): string {
+  if (!tomi || tomi === "0") return "0";
   // Handle values smaller than 1 token
-  if (wei.length <= 18) {
-    const padded = wei.padStart(18, "0");
+  if (tomi.length <= 18) {
+    const padded = tomi.padStart(18, "0");
     const decimals = padded.replace(/0+$/, "");
     return decimals.length > 0 ? `0.${padded.slice(0, 6).replace(/0+$/, "")}` : "0";
   }
-  const integerPart = wei.slice(0, wei.length - 18);
-  const fractionalPart = wei.slice(wei.length - 18, wei.length - 18 + 4).replace(/0+$/, "");
+  const integerPart = tomi.slice(0, tomi.length - 18);
+  const fractionalPart = tomi.slice(tomi.length - 18, tomi.length - 18 + 4).replace(/0+$/, "");
   return fractionalPart.length > 0 ? `${integerPart}.${fractionalPart}` : integerPart;
 }
 
@@ -55,7 +55,7 @@ export function explainIntent(intent: IntentEnvelope): string {
   const trust = describeTrust(intent.trustTier);
 
   // Extract common param patterns for richer descriptions
-  const value = typeof intent.params["value"] === "string" ? formatWei(intent.params["value"] as string) : undefined;
+  const value = typeof intent.params["value"] === "string" ? formatTomi(intent.params["value"] as string) : undefined;
   const to = typeof intent.params["to"] === "string" ? shorten(intent.params["to"] as string) : undefined;
   const token = typeof intent.params["token"] === "string" ? (intent.params["token"] as string) : "TOS";
 
@@ -83,7 +83,7 @@ export function explainPlan(plan: PlanRecord): string {
   const details: string[] = [];
   if (plan.estimatedGas > 0) details.push(`est. gas: ${plan.estimatedGas}`);
   if (plan.estimatedValue && plan.estimatedValue !== "0") {
-    details.push(`est. value: ${formatWei(plan.estimatedValue)} TOS`);
+    details.push(`est. value: ${formatTomi(plan.estimatedValue)} TOS`);
   }
   if (plan.route && plan.route.length > 0) {
     details.push(`${plan.route.length} step${plan.route.length > 1 ? "s" : ""}`);
@@ -122,7 +122,7 @@ export function explainApproval(approval: ApprovalRecord): string {
   }
 
   if (approval.scope?.maxValue) {
-    parts.push(`for up to ${formatWei(approval.scope.maxValue)} TOS`);
+    parts.push(`for up to ${formatTomi(approval.scope.maxValue)} TOS`);
   }
 
   parts.push(`on ${terminal}s`);
@@ -142,7 +142,7 @@ export function explainReceipt(receipt: ExecutionReceipt): string {
       ? "Reverted"
       : "Failed";
 
-  const value = formatWei(receipt.value);
+  const value = formatTomi(receipt.value);
   const parts: string[] = [`${statusLabel}: ${value} TOS transferred.`];
   parts.push(`Gas used: ${receipt.gasUsed}.`);
 
@@ -182,7 +182,7 @@ export function formatApprovalPrompt(intent: IntentEnvelope, plan: PlanRecord): 
   if (intent.constraints) {
     lines.push("");
     lines.push("Constraints:");
-    if (intent.constraints.maxValue) lines.push(`  Max value: ${formatWei(intent.constraints.maxValue)} TOS`);
+    if (intent.constraints.maxValue) lines.push(`  Max value: ${formatTomi(intent.constraints.maxValue)} TOS`);
     if (intent.constraints.maxGas) lines.push(`  Max gas: ${intent.constraints.maxGas}`);
     if (intent.constraints.requiredTrustTier !== undefined) lines.push(`  Required trust: ${describeTrust(intent.constraints.requiredTrustTier)}`);
     if (intent.constraints.deadline) lines.push(`  Deadline: ${new Date(intent.constraints.deadline * 1000).toISOString()}`);
@@ -197,7 +197,7 @@ export function formatApprovalPrompt(intent: IntentEnvelope, plan: PlanRecord): 
   lines.push(`Provider: ${plan.provider}`);
   if (plan.sponsor) lines.push(`Sponsor: ${plan.sponsor}`);
   lines.push(`Estimated gas: ${plan.estimatedGas}`);
-  lines.push(`Estimated value: ${formatWei(plan.estimatedValue)} TOS`);
+  lines.push(`Estimated value: ${formatTomi(plan.estimatedValue)} TOS`);
   lines.push(`Policy hash: ${shorten(plan.policyHash)}`);
 
   if (plan.route && plan.route.length > 0) {
@@ -205,7 +205,7 @@ export function formatApprovalPrompt(intent: IntentEnvelope, plan: PlanRecord): 
     lines.push("Route:");
     for (let i = 0; i < plan.route.length; i++) {
       const step = plan.route[i]!;
-      const stepValue = step.value ? ` (${formatWei(step.value)} TOS)` : "";
+      const stepValue = step.value ? ` (${formatTomi(step.value)} TOS)` : "";
       lines.push(`  ${i + 1}. ${step.action} -> ${shorten(step.target)}${stepValue}`);
     }
   }

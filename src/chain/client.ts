@@ -414,7 +414,7 @@ export async function sendNativeTransfer(params: {
   rpcUrl: string;
   privateKey: HexString;
   to: ChainAddress | string;
-  amountWei: bigint;
+  amountTomi: bigint;
   gas?: bigint;
   data?: HexString;
   waitForReceipt?: boolean;
@@ -437,7 +437,7 @@ export async function sendNativeTransfer(params: {
     nonce,
     gas: params.gas ?? 21_000n,
     to: normalizeAddress(params.to),
-    value: params.amountWei,
+    value: params.amountTomi,
     data: params.data ?? "0x",
     from,
   });
@@ -484,7 +484,7 @@ export async function sendSystemAction(params: {
     rpcUrl: params.rpcUrl,
     privateKey: params.privateKey,
     to: SYSTEM_ACTION_ADDRESS,
-    amountWei: 0n,
+    amountTomi: 0n,
     gas: params.gas ?? 120_000n,
     data: utf8ToHex(JSON.stringify(body)),
     waitForReceipt: params.waitForReceipt,
