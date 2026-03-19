@@ -6,24 +6,36 @@
 
 **While you sleep, Fox keeps working and brings the coins back.**
 
-OpenFox is a continuously running AI agent platform on `TOS.network`, built
-around a local-first runtime that keeps working in the background:
+OpenFox is an **intent-native runtime and terminal operating layer** for
+agents on `TOS.network`.
 
-- watching for opportunities
-- taking jobs
-- calling tools
-- calling other agents
-- executing tasks
-- handling payments and rewards
-- storing proofs and settling work
-- continuing to operate while you are away from the keyboard
+It is not primarily a chat UI, a wallet form, or a transaction composer.
+It is the layer that lets humans, terminals, and agents express what they
+want, then turns that intent into policy-checked execution and auditable
+receipts.
+
+The core product surface is:
+
+- intent
+- policy
+- approval
+- execution
+- receipt
+
+Not:
+
+- raw transactions
+- gas management
+- chain state babysitting
+- one-device wallet assumptions
 
 The product goal is simple:
 
 > You do not sit in front of AI and babysit it.  
-> Fox goes out, does the work, and brings the coins back.
+> You express intent, approve what matters, and Fox keeps the work moving.
 
-Here, "coins" is not just a slogan. It means real earning capacity:
+Here, "coins" is not just a slogan. It means real earning capacity through a
+persistent agent that can keep operating while you are away:
 
 - paid API revenue
 - automation revenue
@@ -35,43 +47,60 @@ Here, "coins" is not just a slogan. It means real earning capacity:
 
 ## What OpenFox Is
 
-OpenFox is a **local-first, wallet-native, payment-aware agent platform and
-runtime**.
+OpenFox is the **intent runtime and multi-terminal access layer** in the
+broader stack.
 
-It is designed to run continuously, maintain its own state, use local and remote tools, manage wallets and payment flows, and optimize around long-lived value creation instead of single-turn chat.
+In the 2046 architecture split:
 
-OpenFox is meant to be:
+- `OpenFox` owns intent, sessions, terminals, approvals, and operator-visible audit
+- `TOL` owns machine-readable contract semantics and automation metadata
+- `GTOS` owns settlement, policy enforcement, identity, and receipts
 
-- an agent platform, not a chat UI
-- an agent that keeps running
-- an agent that controls its own wallet
-- an agent that can find work, take work, hire other agents, and settle
-- an agent that can keep operating while you sleep
+That means OpenFox should not be understood as "just another wallet app" or
+"just another AI frontend".
+
+It is meant to be:
+
+- a persistent local-first personal-agent runtime
+- a multi-terminal access layer for app, card, POS, voice, kiosk, and robot entry points
+- a policy-aware coordinator for programmable accounts
+- a payment-aware agent shell that can route, sponsor, settle, and audit work
+- an agent platform that keeps operating while you sleep
+
+In this model, the wallet is not the app surface. It is a
+**policy-bound programmable account**, and OpenFox is the runtime that
+coordinates access to that account across many weak terminals.
 
 ---
 
 ## The Problem We Are Solving
 
-Most AI products today still work like this:
+Most AI and wallet products still start from the wrong abstraction:
 
-> a human clicks once, the model replies once
+> the human fills a form, the system emits a transaction, the user manually
+> tracks what happened next
 
-That is not how durable value is created in the real world.
+That is not how agent-mediated finance or durable automation should work.
 
-Real value usually comes from:
+Real value comes from:
 
 - continuous observation
 - repeated execution
 - scheduled actions
 - multi-step workflows
+- policy-bound authority
 - payments and settlement
 - reacting to external events without constant human supervision
 
-So OpenFox is not primarily about making AI "more conversational".
+The blockchain is not the product surface. The intent system is the product
+surface.
+
+So OpenFox is not primarily about making AI "more conversational", and it is
+not primarily about exposing raw transaction plumbing.
 
 It is about this:
 
-**turn AI into an agent that keeps working.**
+**turn wallet and agent UX from transaction-first into intent-native.**
 
 ---
 
@@ -103,7 +132,11 @@ It can:
 - observe results
 - keep advancing work over time
 
-### 3. Wallet and payment support
+### 3. Wallet, payment, and authority coordination
+
+OpenFox does not treat the wallet as a button that emits raw transactions.
+It treats it as a policy-aware account context that can be routed, approved,
+funded, sponsored, and settled through the runtime.
 
 OpenFox already has TOS wallet integration and can:
 
@@ -113,11 +146,14 @@ OpenFox already has TOS wallet integration and can:
 - sign native TOS transfers
 - send native TOS transactions
 
-It also supports TOS `x402` payment flow, which is a key building block for paid agent services and paid APIs.
+It also supports TOS `x402` payment flow, which is a key building block for
+paid agent services and paid APIs.
 
-### 4. Background persistence
+### 4. Background persistence and session continuity
 
-OpenFox includes heartbeat logic, scheduled tasks, and persistent local state, so it does not require constant terminal attention.
+OpenFox includes heartbeat logic, scheduled tasks, and persistent local state,
+so it does not require constant terminal attention and can preserve authority,
+history, and work state across sessions.
 
 It can maintain:
 
@@ -234,10 +270,28 @@ The Gateway v1 path is:
 
 That means an OpenFox instance without a public IP can still provide an externally reachable capability through a gateway agent.
 
-### 6. Intent-First Execution
+### 6. Intent-Native Execution
 
-OpenFox uses an intent pipeline for financial actions. Users express what they
-want — transfer, subscribe, delegate — and the pipeline handles the rest.
+OpenFox uses an intent-native pipeline for financial actions and agent-mediated
+execution.
+
+Users, terminals, and agents express what they want. OpenFox decides how that
+intent can be satisfied under policy, terminal trust, available sponsors, and
+provider routes.
+
+What the user should face is:
+
+- the desired outcome
+- the approval narrative
+- the resulting receipt
+
+What the runtime should absorb is:
+
+- route discovery
+- sponsor selection
+- policy checks
+- terminal risk
+- execution details
 
 The lifecycle is:
 
@@ -245,19 +299,11 @@ The lifecycle is:
 
 How it works:
 
-1. A user or agent submits an intent (e.g. "transfer 5 TOS to Alice")
-2. The pipeline discovers available sponsors and routes, then builds a plan
-3. Automatic sponsor selection picks the cheapest, fastest, or most trusted option
-4. Policy checks run against the account's rules — escalation triggers if needed
-5. On approval, the pipeline executes and produces an auditable receipt
-
-Reference modules:
-
-- `src/intent/` — intent types, state machine, store, explain, escalation, policy presets
-- `src/pipeline/` — end-to-end execution pipeline (executor, factory)
-- `src/sponsor/` — sponsor discovery, quote ranking, attribution tracking
-- `src/routing/` — discovery-native financial router with multi-factor scoring
-- `src/agent/intent-tools.ts` — agent-facing tools for the intent pipeline
+1. A user, terminal, or agent submits an intent (e.g. "transfer 5 TOS to Alice")
+2. OpenFox normalizes that request into a durable execution object
+3. The pipeline discovers routes, counterparties, and sponsors, then builds a plan
+4. Policy checks evaluate recipient, amount, terminal class, trust tier, and escalation requirements
+5. On approval, execution runs and produces an auditable receipt and settlement trail
 
 CLI surface:
 
@@ -270,28 +316,33 @@ openfox intent replay <intent-id>
 openfox intent quotes <intent-id>
 ```
 
-### 7. Multi-Terminal Access
+### 7. Multi-Terminal Access Layer
 
-OpenFox supports six terminal types as entry points into the agent runtime.
+OpenFox supports six terminal types as entry points into the persistent agent
+runtime.
+
+Those terminals are not the wallet itself. They are weak or strong entry
+points into a policy-bound account and a persistent personal-agent context.
 Each terminal type has its own trust tier, spending limits, and policy
 enforcement rules.
 
-| Terminal | Trust Tier | Adapter |
-|---|---|---|
-| Mobile App | high | `src/terminal/app.ts` |
-| NFC Card | medium | `src/terminal/card.ts` |
-| POS Terminal | medium | `src/terminal/pos.ts` |
-| Voice Assistant | low | `src/terminal/voice.ts` |
-| Public Kiosk | low | `src/terminal/kiosk.ts` |
-| Robot API | varies | `src/terminal/robot.ts` |
+| Terminal | Trust Tier |
+|---|---|
+| Mobile App | high |
+| NFC Card | medium |
+| POS Terminal | medium |
+| Voice Assistant | low |
+| Public Kiosk | low |
+| Robot API | varies |
 
 Key capabilities:
 
 - Per-terminal trust tiers and policy enforcement
-- Hardware abstraction layer for NFC readers, POS devices, and Voice I/O (`src/terminal/hardware/`)
-- Session persistence across restarts
+- Session continuity across terminals and restarts
+- Bounded authority for low-trust and public terminals
 - Degraded-mode handling for connectivity loss
 - Recovery flow for low-trust and public terminals
+- Session revocation and recovery controls
 
 CLI surface:
 
@@ -304,9 +355,11 @@ openfox terminal policy <terminal-class>
 
 ### 8. Policy Authoring
 
-Operators can author, simulate, and manage account policies through a dedicated
-policy surface. The system ships with 8 policy templates organized by account
-type and trust level.
+Authority should not live in hidden frontend logic.
+
+OpenFox exposes policy authoring, simulation, and explanation surfaces for
+accounts, terminal classes, and approval escalation. The system ships with
+policy templates organized by account type and trust level.
 
 Key capabilities:
 
@@ -315,8 +368,6 @@ Key capabilities:
 - Privacy-aware escalation rules
 - Human-readable policy explanations
 - Policy diff and validation tooling
-
-Reference: `src/policy/` — authoring, simulation, templates
 
 CLI surface:
 
@@ -330,13 +381,14 @@ openfox policy diff <policy-a> <policy-b>
 openfox policy validate <policy-id>
 ```
 
-### 9. Audit and Dispute Resolution
+### 9. Audit, Receipts, and Dispute Resolution
+
+An intent-native system only works if every authority boundary and every
+outcome can be inspected later.
 
 Every intent, plan, approval, and execution produces an append-only audit
 journal entry. The audit surface provides replay inspection, proof display,
 report generation, and dispute tools.
-
-Reference: `src/audit/`
 
 Key capabilities:
 
@@ -373,8 +425,6 @@ Mail addresses support both raw addresses and TNS names:
 - `0x1234...abcd` — direct 32-byte TOS address
 - `alice` — resolved on-chain via `tns_resolve` → `keccak256("alice@tos.network")`
 - `alice@tos.network` — same resolution, explicit suffix
-
-Reference: `src/mail/` — types, store, threading, client, server, TNS resolution
 
 Agent tools:
 
@@ -439,24 +489,31 @@ That makes it an extensible agent runtime rather than a fixed-purpose applicatio
 
 ## Product Direction
 
-OpenFox is not trying to be "another AI chat app".
+OpenFox is not trying to be "another AI chat app" or "another wallet app".
 
 It is trying to become:
 
-**an agent platform on `TOS.network` that can discover opportunities, take
-work, get paid, issue rewards, call other agents, and complete proof and
-settlement flows.**
+**the intent-native runtime and terminal operating layer for agent-mediated
+finance and work on `TOS.network`.**
+
+In short:
+
+> OpenFox owns intent and terminals.
+> TOL owns contract semantics.
+> GTOS owns settlement and authority.
 
 The shortest description is:
 
 > OpenFox is the fox that keeps working on your machine.  
-> While you sleep, it keeps watching, executing, and bringing the coins back.
+> While you sleep, it keeps watching, routing, executing, and bringing the
+> coins back.
 
 The near-term product direction includes:
 
-- intent-first execution pipeline for all financial actions
+- intent-native execution for payments, services, automation, and delegation
 - multi-terminal access with trust-tiered policy enforcement
 - policy-bound accounts with simulation and authoring tools
+- human-readable approval and receipt surfaces instead of transaction-first UX
 - opportunity discovery and scouting
 - task, bounty, and paid-service intake
 - x402 and native-`TOS` payment collection
@@ -1072,40 +1129,20 @@ The longer-term fit is even stronger for:
 ## Project Structure
 
 ```text
-src/
-  agent/            # ReAct loop, system prompt, context, tool execution
-  agent/intent-tools.ts  # agent-facing intent pipeline tools
-  agent/mail-tools.ts    # agent-facing P2P mail tools
-  runtime/           # legacy compatibility clients plus x402 helpers
-  git/              # state versioning and git tools
-  heartbeat/        # cron daemon and scheduled tasks
-  identity/         # wallet management and local bootstrap
-  intent/           # intent lifecycle — types, state machine, store, explain, escalation
-  terminal/         # terminal adapters (app, card, POS, voice, kiosk, robot)
-  terminal/hardware/ # hardware abstractions (NFC, POS device, Voice I/O)
-  sponsor/          # sponsor discovery, quote ranking, attribution tracking
-  audit/            # append-only audit journal, replay, proof display, disputes
-  routing/          # discovery-native financial router with multi-factor scoring
-  pipeline/         # end-to-end intent execution pipeline (executor, factory)
-  mail/             # P2P agent mail — types, store, threading, client, server, TNS
-  policy/           # policy authoring, simulation, and templates
-  registry/         # on-chain agent identity and discovery
-  replication/      # child spawning and lineage tracking
-  self-mod/         # audit log and tools manager
-  setup/            # setup wizard and config editors
-  skills/           # skill loader and registry
-  social/           # agent-to-agent communication
-  state/            # SQLite persistence
-  survival/         # runtime survival and funding logic
-  commands/intent.ts   # CLI: intent transfer/status/list/explain/replay/quotes
-  commands/terminal.ts # CLI: terminal list/sessions/revoke/policy
-  commands/audit.ts    # CLI: audit journal/report/proofs
-  commands/policy.ts   # CLI: policy list/show/simulate/create/explain/diff/validate
-  commands/mail.ts     # CLI: mail inbox/sent/read/send/reply/search/threads/folders
 packages/
-  cli/              # operator CLI
+  cli/              # package entrypoint and CLI command surface
+docs/
+  ...               # architecture, operator, and product docs
+templates/
+  ...               # starter configs and flow templates
+skills/
+  ...               # reusable bounded provider / solver / operator skills
+packs/
+  ...               # versioned public-fleet and market operation packs
+dist/
+  ...               # built runtime modules: intent, terminal, policy, routing, pipeline, mail, audit, and more
 scripts/
-  openfox.sh      # bootstrap helper
+  openfox.sh        # bootstrap helper
 ```
 
 ---
