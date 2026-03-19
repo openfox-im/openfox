@@ -11,7 +11,7 @@ import {
   type Hex,
   type LocalAccount,
   type Signature,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import { createTestConfig, createTestDb } from "./mocks.js";
 import { startPaymasterProviderServer } from "../paymaster/http.js";
 import type { OpenFoxIdentity, X402PaymentRecord } from "../types.js";

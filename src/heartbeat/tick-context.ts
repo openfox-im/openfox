@@ -7,7 +7,7 @@
  */
 
 import type BetterSqlite3 from "better-sqlite3";
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import type {
   RuntimeClient,
   HeartbeatConfig,

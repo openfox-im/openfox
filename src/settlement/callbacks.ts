@@ -4,7 +4,7 @@ import {
   toHex,
   type Address,
   type Hex,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import type {
   OpenFoxDatabase,
   SettlementCallbackConfig,

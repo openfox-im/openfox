@@ -7,8 +7,8 @@ import {
   type Address,
   type Hex,
   type Signature,
-} from "tosdk";
-import type { LocalAccount } from "tosdk/accounts";
+} from "@tosnetwork/tosdk";
+import type { LocalAccount } from "@tosnetwork/tosdk/accounts";
 import { x402Fetch } from "../runtime/x402.js";
 import type { PaymasterQuoteRecord } from "../types.js";
 

@@ -4,7 +4,7 @@
  * Enables the openfox to make native TOS payments via HTTP 402.
  */
 
-import type { LocalAccount } from "tosdk/accounts";
+import type { LocalAccount } from "@tosnetwork/tosdk/accounts";
 import { ChainRpcClient, buildX402Payment, parseAmount } from "../chain/client.js";
 import { normalizeAddress, type ChainAddress } from "../chain/address.js";
 import { loadConfig } from "../config.js";

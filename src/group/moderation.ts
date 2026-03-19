@@ -14,7 +14,7 @@ import {
   unbanGroupMember,
 } from "./store.js";
 import type { OpenFoxDatabase } from "../types.js";
-import type { PrivateKeyAccount } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
 
 const logger = createLogger("group-moderation");
 

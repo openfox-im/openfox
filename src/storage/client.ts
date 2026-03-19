@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import type { PrivateKeyAccount } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
 import type {
   StorageAuditResponse,
   StorageLeaseResponse,

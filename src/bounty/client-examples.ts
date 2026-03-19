@@ -20,7 +20,7 @@
  *   GET /healthz - Health check
  */
 
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 
 // ─── Types ────────────────────────────────────────────────────
 

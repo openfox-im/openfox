@@ -12,7 +12,7 @@ import os from "os";
 import path from "path";
 import { createDatabase } from "../state/database.js";
 import type { OpenFoxDatabase } from "../types.js";
-import { keccak256 } from "tosdk";
+import { keccak256 } from "@tosnetwork/tosdk";
 import {
   buildEventsMerkleRoot,
   registerGroupOnChain,

@@ -7,7 +7,7 @@ import {
   type ArtifactVerificationReceipt,
   type PrivateKeyAccount,
   type StorageReceipt,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import { ulid } from "ulid";
 import {
   buildBundleFromEntries,

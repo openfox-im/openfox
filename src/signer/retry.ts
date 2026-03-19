@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import type { Hex } from "tosdk";
+import type { Hex } from "@tosnetwork/tosdk";
 import type {
   OpenFoxConfig,
   OpenFoxDatabase,

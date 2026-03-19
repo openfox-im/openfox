@@ -1,5 +1,5 @@
-import type { PrivateKeyAccount } from "tosdk";
-import { verifyMessage } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
+import { verifyMessage } from "@tosnetwork/tosdk";
 import type { OpenFoxConfig, OpenFoxIdentity } from "../types.js";
 import {
   capabilityFromConfig,

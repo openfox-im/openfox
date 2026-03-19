@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 
 const TEST_PRIVATE_KEY =
   "0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8" as const;

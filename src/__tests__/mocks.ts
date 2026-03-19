@@ -26,7 +26,7 @@ import type {
   InboxMessage,
 } from "../types.js";
 import { DEFAULT_CONFIG } from "../types.js";
-import type { Address, PrivateKeyAccount } from "tosdk";
+import type { Address, PrivateKeyAccount } from "@tosnetwork/tosdk";
 import path from "path";
 import os from "os";
 import fs from "fs";

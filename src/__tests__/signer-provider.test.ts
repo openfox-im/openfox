@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Hex } from "tosdk";
+import type { Hex } from "@tosnetwork/tosdk";
 import { createTestConfig, createTestDb, createTestIdentity } from "./mocks.js";
 import { startSignerProviderServer } from "../signer/http.js";
 import type { X402PaymentRecord } from "../types.js";

@@ -1,4 +1,4 @@
-import { keccak256, toHex, type Hex } from "tosdk";
+import { keccak256, toHex, type Hex } from "@tosnetwork/tosdk";
 import { normalizeAddress, type ChainAddress } from "../chain/address.js";
 import type {
   PaymasterProviderConfig,

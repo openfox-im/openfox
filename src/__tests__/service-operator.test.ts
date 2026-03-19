@@ -1,6 +1,6 @@
 import http from "http";
 import { afterEach, describe, expect, it } from "vitest";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import { createTestConfig, createTestDb } from "./mocks.js";
 import {
   buildGatewayBootnodesSnapshot,

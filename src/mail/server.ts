@@ -6,7 +6,7 @@
  */
 
 import http, { type IncomingMessage, type ServerResponse } from "http";
-import { verifyMessage } from "tosdk";
+import { verifyMessage } from "@tosnetwork/tosdk";
 import { createLogger } from "../observability/logger.js";
 import { decryptAgentGatewayPayload } from "../agent-gateway/e2e.js";
 import {

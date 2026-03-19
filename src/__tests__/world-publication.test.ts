@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import http from "http";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 import { createDatabase } from "../state/database.js";
 import { createGroup } from "../group/store.js";

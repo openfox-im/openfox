@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import http from "http";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import { createDatabase } from "../state/database.js";
 import { startMetaWorldServer, type MetaWorldServer } from "../metaworld/server.js";
 import {

@@ -5,7 +5,7 @@ import {
   type Address,
   type Hex,
   type StorageAnchorSummary,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import {
   bindExecutionTrailsByTransaction,
   propagateExecutionTrailsForSubject,

@@ -2,7 +2,7 @@ import {
   createSignerProviderClient,
   type Address,
   type PrivateKeyAccount,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import { x402Fetch } from "../runtime/x402.js";
 
 export interface RemoteSignerQuoteInput {

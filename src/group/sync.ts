@@ -6,7 +6,7 @@
  */
 
 import { ulid } from "ulid";
-import { keccak256, toHex, type Hex } from "tosdk";
+import { keccak256, toHex, type Hex } from "@tosnetwork/tosdk";
 import type { OpenFoxDatabase } from "../types.js";
 import { createLogger } from "../observability/logger.js";
 import {

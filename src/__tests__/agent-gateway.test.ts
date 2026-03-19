@@ -1,6 +1,6 @@
 import http from "http";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import type {
   OpenFoxConfig,
   OpenFoxDatabase,

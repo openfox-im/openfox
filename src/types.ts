@@ -18,7 +18,7 @@ import type {
   SettlementReceipt,
   StorageAnchorSummary,
   StorageReceipt,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import {
   cloneSkillBackendStages,
   DEFAULT_NEWS_FETCH_SKILL_STAGES,

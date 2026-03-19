@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import { createArtifactManager } from "../artifacts/manager.js";
 import { startArtifactCaptureServer } from "../artifacts/server.js";
 import { DEFAULT_ARTIFACT_PIPELINE_CONFIG } from "../types.js";

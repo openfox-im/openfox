@@ -1,4 +1,4 @@
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import type { BountyRecord, CampaignRecord, CampaignProgress, InferenceClient } from "../types.js";
 import { buildQuestionBountySolverPrompt } from "./skills/question-solver.js";
 import { buildTaskBountySolverPrompt } from "./skills/task-solver.js";

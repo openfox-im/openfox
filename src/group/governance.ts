@@ -7,7 +7,7 @@
  */
 
 import { ulid } from "ulid";
-import { keccak256, toHex, type Hex, type PrivateKeyAccount } from "tosdk";
+import { keccak256, toHex, type Hex, type PrivateKeyAccount } from "@tosnetwork/tosdk";
 import { createLogger } from "../observability/logger.js";
 import type { OpenFoxDatabase } from "../types.js";
 import { getGroup, listGroupMembers, type GroupMemberRecord } from "./store.js";

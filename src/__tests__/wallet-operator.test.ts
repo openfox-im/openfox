@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { publicKeyToNativeAddress } from "tosdk";
+import { publicKeyToNativeAddress } from "@tosnetwork/tosdk";
 import { createTestConfig } from "./mocks.js";
 
 describe("wallet operator", () => {

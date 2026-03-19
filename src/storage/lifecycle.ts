@@ -3,7 +3,7 @@ import {
   hashStorageReceipt,
   type Address,
   type StorageReceipt,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import type {
   OpenFoxDatabase,
   StorageAuditRecord,

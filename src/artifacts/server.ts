@@ -1,6 +1,6 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { URL } from "url";
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import type {
   ArtifactAnchorRecord,
   ArtifactCaptureServerConfig,

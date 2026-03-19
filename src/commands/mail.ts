@@ -207,7 +207,7 @@ async function handleSend(args: string[]): Promise<void> {
     const wallet = JSON.parse(walletRaw) as { privateKey: `0x${string}` };
 
     // Create a minimal account for signing
-    const { privateKeyToAccount } = await import("tosdk");
+    const { privateKeyToAccount } = await import("@tosnetwork/tosdk");
     const account = privateKeyToAccount(wallet.privateKey);
 
     const result = await deliverMessage({
@@ -258,7 +258,7 @@ async function handleReply(args: string[]): Promise<void> {
       return;
     }
     const wallet = JSON.parse(walletRaw) as { privateKey: `0x${string}` };
-    const { privateKeyToAccount } = await import("tosdk");
+    const { privateKeyToAccount } = await import("@tosnetwork/tosdk");
     const account = privateKeyToAccount(wallet.privateKey);
 
     const result = await deliverMessage({

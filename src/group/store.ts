@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import { keccak256, toHex, type Hex, type PrivateKeyAccount } from "tosdk";
+import { keccak256, toHex, type Hex, type PrivateKeyAccount } from "@tosnetwork/tosdk";
 import type { OpenFoxDatabase } from "../types.js";
 
 export type GroupVisibility = "private" | "listed" | "public";

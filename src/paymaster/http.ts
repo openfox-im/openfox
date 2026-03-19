@@ -11,7 +11,7 @@ import {
   type Hex,
   type Signature,
   type TransactionSerializableNative,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import type {
   OpenFoxConfig,
   OpenFoxDatabase,

@@ -60,7 +60,7 @@ import {
   registerCapabilityName,
 } from "../chain/client.js";
 import { randomUUID } from "crypto";
-import { keccak256, toHex } from "tosdk";
+import { keccak256, toHex } from "@tosnetwork/tosdk";
 import { createNativeSettlementPublisher } from "../settlement/publisher.js";
 import { createNativeSettlementCallbackDispatcher } from "../settlement/callbacks.js";
 import { createMarketBindingPublisher } from "../market/publisher.js";

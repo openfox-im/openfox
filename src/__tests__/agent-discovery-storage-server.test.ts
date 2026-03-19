@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import {
   DEFAULT_PROVIDER_BACKEND_MODE,
   DEFAULT_STORAGE_GET_SKILL_STAGES,

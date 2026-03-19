@@ -1,4 +1,4 @@
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import type { OpenFoxConfig, OpenFoxDatabase, SignerProviderTrustTier } from "../types.js";
 import type { ProviderProfile } from "../routing/types.js";
 import type { SponsorQuote } from "../sponsor/types.js";

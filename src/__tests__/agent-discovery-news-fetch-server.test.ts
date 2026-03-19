@@ -4,7 +4,7 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import {
   buildX402Payment,
   encodeX402PaymentHeader,

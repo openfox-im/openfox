@@ -39,7 +39,7 @@ export const REACTOR_TASKS: Record<string, HeartbeatTaskFn> = {
       const { loadWalletPrivateKey } = await import(
         "../identity/wallet.js"
       );
-      const { privateKeyToAccount } = await import("tosdk");
+      const { privateKeyToAccount } = await import("@tosnetwork/tosdk");
 
       const privateKey = loadWalletPrivateKey();
       if (!privateKey) {

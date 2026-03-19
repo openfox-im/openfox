@@ -1,5 +1,5 @@
 import { getPublicKey } from "@noble/secp256k1";
-import { keccak256, toHex } from "tosdk";
+import { keccak256, toHex } from "@tosnetwork/tosdk";
 
 export type ChainAddress = `0x${string}`;
 export type HexString = `0x${string}`;

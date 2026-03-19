@@ -1,4 +1,4 @@
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import { discoverCapabilityProviders } from "../agent-discovery/client.js";
 import type {
   BountyConfig,

@@ -9,7 +9,7 @@ import Database from "better-sqlite3";
 import type BetterSqlite3 from "better-sqlite3";
 import fs from "fs";
 import path from "path";
-import type { Hex } from "tosdk";
+import type { Hex } from "@tosnetwork/tosdk";
 
 type DatabaseType = BetterSqlite3.Database;
 import type {

@@ -13,7 +13,7 @@ import {
   keccak256,
   toBytes,
   verifyMessage,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 
 /**
  * A fully signed social message.

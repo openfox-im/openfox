@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import type { LocalAccount } from "tosdk/accounts";
+import type { LocalAccount } from "@tosnetwork/tosdk/accounts";
 import type { OpenFoxDatabase, OpenFoxIdentity, OpenFoxConfig } from "../types.js";
 import { x402Fetch } from "../runtime/x402.js";
 import type {

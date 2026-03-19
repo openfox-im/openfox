@@ -6,7 +6,7 @@
  * inflow/outflow recording, and period-based budget resets.
  */
 
-import { keccak256, toHex } from "tosdk";
+import { keccak256, toHex } from "@tosnetwork/tosdk";
 import { createLogger } from "../observability/logger.js";
 import { deriveAddressFromPrivateKey, type ChainAddress, type HexString } from "../chain/address.js";
 import { ulid } from "ulid";

@@ -2,10 +2,10 @@ import type {
   Address,
   Hex,
   MarketBindingReceipt,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import {
   hashMarketBindingReceipt,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import type {
   MarketBindingKind,
   MarketBindingRecord,

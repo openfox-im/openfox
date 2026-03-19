@@ -8,7 +8,7 @@
  * request timeouts, replay protection, and rate limiting.
  */
 
-import type { PrivateKeyAccount } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
 import type { SocialClientInterface, InboxMessage } from "../types.js";
 import { ResilientHttpClient } from "../runtime/http-client.js";
 import { signSendPayload, signPollPayload, MESSAGE_LIMITS } from "./signing.js";

@@ -6,8 +6,8 @@
  * not the legacy 20-byte signer address.
  */
 
-import type { PrivateKeyAccount } from "tosdk";
-import { generatePrivateKey, privateKeyToAccount } from "tosdk/accounts";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
+import { generatePrivateKey, privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import fs from "fs";
 import path from "path";
 import type { WalletData } from "../types.js";

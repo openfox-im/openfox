@@ -1,4 +1,4 @@
-import { verifyMessage } from "tosdk";
+import { verifyMessage } from "@tosnetwork/tosdk";
 import type {
   AgentGatewayBootnodeConfig,
   AgentGatewaySignedBootnodeList,

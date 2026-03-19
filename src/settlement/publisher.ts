@@ -6,7 +6,7 @@ import {
   type Address,
   type Hex,
   type SettlementReceipt,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import {
   sendNativeTransfer,
 } from "../chain/client.js";

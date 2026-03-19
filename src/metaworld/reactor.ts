@@ -13,7 +13,7 @@
  * and cross-module governance proposals.
  */
 
-import type { PrivateKeyAccount } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
 import type { OpenFoxDatabase } from "../types.js";
 import type { OpenFoxConfig } from "../types.js";
 import type { HexString } from "../chain/address.js";

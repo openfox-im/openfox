@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import type { Hex } from "tosdk";
+import type { Hex } from "@tosnetwork/tosdk";
 
 import type {
   ExecutionTrailExecutionKind,

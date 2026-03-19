@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { privateKeyToAccount } from "tosdk/accounts";
+import { privateKeyToAccount } from "@tosnetwork/tosdk/accounts";
 import { createConfig } from "../config.js";
 import { createDatabase } from "../state/database.js";
 import type { OpenFoxConfig, OpenFoxDatabase, WalletData } from "../types.js";

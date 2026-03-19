@@ -5,7 +5,7 @@
  * to 0x addresses via the on-chain TOS Name Service.
  */
 
-import { createPublicClient, http } from "tosdk";
+import { createPublicClient, http } from "@tosnetwork/tosdk";
 import { createLogger } from "../observability/logger.js";
 
 const logger = createLogger("mail.tns");

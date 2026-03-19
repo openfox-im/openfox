@@ -1,4 +1,4 @@
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import { sendNativeTransfer } from "../chain/client.js";
 
 export interface BountyPayoutSender {

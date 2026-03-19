@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { etc, sign as signSecp256k1 } from "@noble/secp256k1";
-import type { PrivateKeyAccount } from "tosdk";
-import { keccak256, parseUnits, toHex } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
+import { keccak256, parseUnits, toHex } from "@tosnetwork/tosdk";
 import { ChainRpcError } from "./errors.js";
 import {
   deriveAddressFromPrivateKey,

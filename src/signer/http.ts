@@ -1,6 +1,6 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { createHash, randomUUID } from "crypto";
-import type { Hex } from "tosdk";
+import type { Hex } from "@tosnetwork/tosdk";
 import type {
   OpenFoxConfig,
   OpenFoxDatabase,

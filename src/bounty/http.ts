@@ -1,7 +1,7 @@
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import { URL } from "url";
 import type { BountyEngine } from "./engine.js";
-import type { Address } from "tosdk";
+import type { Address } from "@tosnetwork/tosdk";
 import type { BountyConfig } from "../types.js";
 
 const BODY_LIMIT_BYTES = 128 * 1024;

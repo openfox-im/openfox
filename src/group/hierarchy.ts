@@ -6,7 +6,7 @@
  */
 
 import { ulid } from "ulid";
-import type { PrivateKeyAccount } from "tosdk";
+import type { PrivateKeyAccount } from "@tosnetwork/tosdk";
 import { createLogger } from "../observability/logger.js";
 import type { OpenFoxDatabase } from "../types.js";
 import {

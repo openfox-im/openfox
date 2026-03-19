@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import http, { type IncomingMessage, type ServerResponse } from "http";
 import path from "path";
 import { createHash, randomUUID } from "crypto";
-import { hashStorageReceipt, type Address } from "tosdk";
+import { hashStorageReceipt, type Address } from "@tosnetwork/tosdk";
 import {
   DEFAULT_X402_SERVER_CONFIG,
   type OpenFoxConfig,

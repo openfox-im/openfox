@@ -13,7 +13,7 @@ import {
   elgamalPrivateKeyToAccount,
   generatePrivateKey,
   secp256r1PrivateKeyToAccount,
-} from "tosdk";
+} from "@tosnetwork/tosdk";
 import type {
   FaucetInvocationRequest,
   FaucetInvocationResponse,

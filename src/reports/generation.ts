@@ -1,4 +1,4 @@
-import { keccak256, toHex } from "tosdk";
+import { keccak256, toHex } from "@tosnetwork/tosdk";
 import type {
   InferenceClient,
   OpenFoxConfig,

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { keccak256, toHex, type Hex } from "tosdk";
+import { keccak256, toHex, type Hex } from "@tosnetwork/tosdk";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
 import * as raw from "multiformats/codecs/raw";

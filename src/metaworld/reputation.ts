@@ -7,7 +7,7 @@
  */
 
 import type { OpenFoxDatabase } from "../types.js";
-import { keccak256, toHex } from "tosdk";
+import { keccak256, toHex } from "@tosnetwork/tosdk";
 import { createLogger } from "../observability/logger.js";
 import { worldEventBus } from "./event-bus.js";
 

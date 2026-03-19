@@ -1,5 +1,5 @@
 import { Signature } from "@noble/secp256k1";
-import { keccak256, toHex } from "tosdk";
+import { keccak256, toHex } from "@tosnetwork/tosdk";
 import type { IncomingMessage, ServerResponse } from "http";
 import {
   deriveAddressFromPublicKey,
