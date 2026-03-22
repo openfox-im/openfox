@@ -469,6 +469,234 @@ describe("agent discovery", () => {
     expect(paidHeaderSeen).toBe(true);
   });
 
+  it("falls back across providers and uses feedback to reorder future execution selection", async () => {
+    const { requestObservationOnce } =
+      await import("../agent-discovery/client.js");
+    const config = makeConfig();
+    config.agentDiscovery = {
+      ...config.agentDiscovery!,
+      endpoints: [{ kind: "http", url: "http://provider-a.example/observe" }],
+      capabilities: [{ name: "observation.once", mode: "sponsored" }],
+    };
+    const identity = makeIdentity();
+
+    const providerAConfig = {
+      ...config,
+      agentDiscovery: {
+        ...config.agentDiscovery!,
+        endpoints: [{ kind: "http", url: "http://provider-a.example/observe" }],
+        capabilities: [{ name: "observation.once", mode: "sponsored" }],
+      },
+    };
+    const providerBConfig = {
+      ...config,
+      agentDiscovery: {
+        ...config.agentDiscovery!,
+        endpoints: [{ kind: "http", url: "http://provider-b.example/observe" }],
+        capabilities: [{ name: "observation.once", mode: "sponsored" }],
+      },
+    };
+
+    const providerACard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: providerAConfig,
+      agentDiscovery: providerAConfig.agentDiscovery!,
+      address: config.walletAddress!,
+      discoveryNodeId: "node-provider-a",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 50,
+    });
+    const providerBCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: providerBConfig,
+      agentDiscovery: providerBConfig.agentDiscovery!,
+      address: config.walletAddress!,
+      discoveryNodeId: "node-provider-b",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 49,
+    });
+
+    const db = {
+      store: new Map<string, string>(),
+      getKV(key: string) {
+        return this.store.get(key);
+      },
+      setKV(key: string, value: string) {
+        this.store.set(key, value);
+      },
+    };
+
+    const attempts: string[] = [];
+    let providerAFails = true;
+
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url === "http://127.0.0.1:8545") {
+        const body = JSON.parse(String(init?.body)) as {
+          method: string;
+          id: number;
+          params: unknown[];
+        };
+        switch (body.method) {
+          case "tos_agentDiscoverySearch":
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                result: [
+                  {
+                    nodeId: "node-provider-a",
+                    nodeRecord: "enr:provider-a",
+                    primaryIdentity: config.walletAddress,
+                    connectionModes: 3,
+                    cardSequence: 50,
+                    trust: {
+                      registered: true,
+                      suspended: false,
+                      stake: "100",
+                      reputation: "100",
+                      ratingCount: "5",
+                      capabilityRegistered: true,
+                      hasOnchainCapability: true,
+                      localRankScore: 95,
+                    },
+                  },
+                  {
+                    nodeId: "node-provider-b",
+                    nodeRecord: "enr:provider-b",
+                    primaryIdentity: config.walletAddress,
+                    connectionModes: 3,
+                    cardSequence: 49,
+                    trust: {
+                      registered: true,
+                      suspended: false,
+                      stake: "50",
+                      reputation: "50",
+                      ratingCount: "2",
+                      capabilityRegistered: true,
+                      hasOnchainCapability: true,
+                      localRankScore: 80,
+                    },
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          case "tos_agentDiscoveryGetCard": {
+            const nodeRecord = String(body.params[0]);
+            const isA = nodeRecord === "enr:provider-a";
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                result: {
+                  nodeId: isA ? "node-provider-a" : "node-provider-b",
+                  nodeRecord,
+                  cardJson: JSON.stringify(isA ? providerACard : providerBCard),
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          default:
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                error: {
+                  code: -32601,
+                  message: `unsupported method ${body.method}`,
+                },
+              }),
+              { status: 200 },
+            );
+        }
+      }
+
+      if (url === "http://provider-a.example/observe") {
+        attempts.push("A");
+        if (providerAFails) {
+          return new Response(
+            JSON.stringify({ error: "provider a failed" }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            status: "ok",
+            observed_at: 1770000001,
+            target_url: "https://target.example/data",
+            http_status: 200,
+            content_type: "application/json",
+            body_json: { provider: "a" },
+            body_sha256: "0xaaa",
+            size_bytes: 12,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      if (url === "http://provider-b.example/observe") {
+        attempts.push("B");
+        return new Response(
+          JSON.stringify({
+            status: "ok",
+            observed_at: 1770000002,
+            target_url: "https://target.example/data",
+            http_status: 200,
+            content_type: "application/json",
+            body_json: { provider: "b" },
+            body_sha256: "0xbbb",
+            size_bytes: 12,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      throw new Error(`unexpected fetch url ${url}`);
+    }) as typeof fetch;
+
+    const first = await requestObservationOnce({
+      identity,
+      config,
+      address: config.walletAddress!,
+      targetUrl: "https://target.example/data",
+      db: db as any,
+    });
+
+    expect(first.provider.search.nodeId).toBe("node-provider-b");
+    expect(attempts[0]).toBe("A");
+    expect(attempts.at(-1)).toBe("B");
+    expect(attempts.filter((entry) => entry === "B")).toHaveLength(1);
+
+    const feedbackA = JSON.parse(
+      db.getKV(
+        "agent_discovery:provider_feedback:node-provider-a:observation.once",
+      ) || "{}",
+    ) as { failureCount?: number };
+    const feedbackB = JSON.parse(
+      db.getKV(
+        "agent_discovery:provider_feedback:node-provider-b:observation.once",
+      ) || "{}",
+    ) as { successCount?: number };
+    expect(feedbackA.failureCount).toBe(1);
+    expect(feedbackB.successCount).toBe(1);
+
+    attempts.length = 0;
+    providerAFails = false;
+
+    const second = await requestObservationOnce({
+      identity,
+      config,
+      address: config.walletAddress!,
+      targetUrl: "https://target.example/data",
+      db: db as any,
+    });
+
+    expect(second.provider.search.nodeId).toBe("node-provider-b");
+    expect(attempts[0]).toBe("B");
+  });
+
   it("ranks providers using trust summary and excludes suspended providers", async () => {
     const { discoverCapabilityProviders } =
       await import("../agent-discovery/client.js");

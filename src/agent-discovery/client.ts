@@ -1104,6 +1104,105 @@ async function throwNoProviderFound(params: {
   );
 }
 
+function preferPaidProviders(
+  providers: VerifiedAgentProvider[],
+): VerifiedAgentProvider[] {
+  const paid = providers.filter(
+    (entry) => entry.matchedCapability.mode === "paid",
+  );
+  if (!paid.length) {
+    return providers;
+  }
+  return [
+    ...paid,
+    ...providers.filter((entry) => entry.matchedCapability.mode !== "paid"),
+  ];
+}
+
+async function invokeCapabilityWithFallback<
+  TRequest extends { request_nonce: string },
+  TResponse,
+>(params: {
+  rankedProviders: VerifiedAgentProvider[];
+  identity: OpenFoxIdentity;
+  config: OpenFoxConfig;
+  db?: OpenFoxDatabase;
+  capability: string;
+  request: TRequest;
+  eventKey: string;
+  parseResponse: (value: unknown) => TResponse;
+  isValidResponse: (response: TResponse) => boolean;
+  invalidResponseMessage: string;
+}): Promise<{
+  provider: VerifiedAgentProvider;
+  request: TRequest;
+  response: TResponse;
+}> {
+  const failures: string[] = [];
+
+  for (const provider of params.rankedProviders) {
+    try {
+      const result = await invokeProviderCapability({
+        provider,
+        identity: params.identity,
+        config: params.config,
+        requestBody: JSON.stringify(params.request),
+      });
+      if (!result.success) {
+        throw new Error(
+          result.error || `Provider request failed with status ${result.status}`,
+        );
+      }
+
+      const response = params.parseResponse(result.response);
+      if (!params.isValidResponse(response)) {
+        throw new Error(params.invalidResponseMessage);
+      }
+
+      params.db?.setKV(
+        params.eventKey,
+        JSON.stringify({
+          at: new Date().toISOString(),
+          providerNodeId: provider.search.nodeId,
+          capability: params.capability,
+          request: params.request,
+          response,
+          attemptedProviders: failures.length
+            ? failures.map((summary) => ({ summary }))
+            : [],
+        }),
+      );
+      recordProviderFeedback({
+        db: params.db,
+        config: params.config,
+        provider,
+        capability: params.capability,
+        outcome: "success",
+        requestNonce: params.request.request_nonce,
+      });
+      return { provider, request: params.request, response };
+    } catch (error) {
+      recordProviderFeedback({
+        db: params.db,
+        config: params.config,
+        provider,
+        capability: params.capability,
+        outcome: classifyInvocationError(error),
+        requestNonce: params.request.request_nonce,
+      });
+      failures.push(
+        `${provider.search.nodeId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  throw new Error(
+    `All providers failed for capability ${params.capability}: ${failures.join(" | ")}`,
+  );
+}
+
 export async function requestTestnetFaucet(params: {
   identity: OpenFoxIdentity;
   config: OpenFoxConfig;
@@ -1146,8 +1245,6 @@ export async function requestTestnetFaucet(params: {
       db: params.db,
     });
   }
-
-  const provider = ranked[0];
   const request: FaucetInvocationRequest = {
     capability,
     requester: {
@@ -1162,39 +1259,24 @@ export async function requestTestnetFaucet(params: {
     requested_amount: params.requestedAmountTomi.toString(),
     reason: params.reason || "bootstrap openfox wallet",
   };
-
-  let response: FaucetInvocationResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as FaucetInvocationResponse)
-        : (result.response as FaucetInvocationResponse);
-    if (!response || typeof response.status !== "string") {
-      throw new Error("Provider returned an invalid faucet response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: ranked,
+    identity: params.identity,
+    config: params.config,
+    db: params.db,
+    capability,
+    request,
+    eventKey: "agent_discovery:last_faucet_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as FaucetInvocationResponse,
+    isValidResponse: (response) =>
+      Boolean(response) && typeof response.status === "string",
+    invalidResponseMessage: "Provider returned an invalid faucet response",
+  });
+  const provider = invoked.provider;
+  const response = invoked.response;
 
   let receipt: Record<string, unknown> | null | undefined;
   const receiptRpcUrl = params.config.rpcUrl || process.env.TOS_RPC_URL;
@@ -1226,14 +1308,6 @@ export async function requestTestnetFaucet(params: {
       receipt,
     }),
   );
-  recordProviderFeedback({
-    db: params.db,
-    config: params.config,
-    provider,
-    capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
-  });
 
   return { provider, request, response, receipt };
 }
@@ -1277,9 +1351,6 @@ export async function requestObservationOnce(params: {
       db: params.db,
     });
   }
-  const provider =
-    ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
-    ranked[0];
   const request: ObservationInvocationRequest = {
     capability,
     requester: {
@@ -1294,56 +1365,23 @@ export async function requestObservationOnce(params: {
     target_url: params.targetUrl,
     reason: params.reason || "one-shot paid observation",
   };
-
-  let response: ObservationInvocationResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as ObservationInvocationResponse)
-        : (result.response as ObservationInvocationResponse);
-    if (!response || response.status !== "ok") {
-      throw new Error("Provider returned an invalid observation response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
-  params.db?.setKV(
-    "agent_discovery:last_observation_event",
-    JSON.stringify({
-      at: new Date().toISOString(),
-      providerNodeId: provider.search.nodeId,
-      capability,
-      request,
-      response,
-    }),
-  );
-  recordProviderFeedback({
-    db: params.db,
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: preferPaidProviders(ranked),
+    identity: params.identity,
     config: params.config,
-    provider,
+    db: params.db,
     capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
+    request,
+    eventKey: "agent_discovery:last_observation_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as ObservationInvocationResponse,
+    isValidResponse: (response) => Boolean(response) && response.status === "ok",
+    invalidResponseMessage: "Provider returned an invalid observation response",
   });
+  const provider = invoked.provider;
+  const response = invoked.response;
   return { provider, request, response };
 }
 
@@ -1389,9 +1427,6 @@ export async function requestOracleResolution(params: {
       db: params.db,
     });
   }
-  const provider =
-    ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
-    ranked[0];
   const request: OracleResolutionRequest = {
     capability,
     requester: {
@@ -1409,56 +1444,23 @@ export async function requestOracleResolution(params: {
     ...(params.context ? { context: params.context } : {}),
     reason: params.reason || "paid oracle resolution",
   };
-
-  let response: OracleResolutionResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as OracleResolutionResponse)
-        : (result.response as OracleResolutionResponse);
-    if (!response || response.status !== "ok") {
-      throw new Error("Provider returned an invalid oracle response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
-  params.db?.setKV(
-    "agent_discovery:last_oracle_event",
-    JSON.stringify({
-      at: new Date().toISOString(),
-      providerNodeId: provider.search.nodeId,
-      capability,
-      request,
-      response,
-    }),
-  );
-  recordProviderFeedback({
-    db: params.db,
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: preferPaidProviders(ranked),
+    identity: params.identity,
     config: params.config,
-    provider,
+    db: params.db,
     capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
+    request,
+    eventKey: "agent_discovery:last_oracle_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as OracleResolutionResponse,
+    isValidResponse: (response) => Boolean(response) && response.status === "ok",
+    invalidResponseMessage: "Provider returned an invalid oracle response",
   });
+  const provider = invoked.provider;
+  const response = invoked.response;
   return { provider, request, response };
 }
 
@@ -1504,9 +1506,6 @@ export async function requestNewsFetch(params: {
       db: params.db,
     });
   }
-  const provider =
-    ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
-    ranked[0];
   const request: NewsFetchInvocationRequest = {
     capability,
     requester: {
@@ -1524,60 +1523,25 @@ export async function requestNewsFetch(params: {
     ...(params.headlineHint ? { headline_hint: params.headlineHint } : {}),
     reason: params.reason || "paid news fetch",
   };
-
-  let response: NewsFetchInvocationResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as NewsFetchInvocationResponse)
-        : (result.response as NewsFetchInvocationResponse);
-    if (
-      !response ||
-      (response.status !== "ok" &&
-        response.status !== "integration_required")
-    ) {
-      throw new Error("Provider returned an invalid news.fetch response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
-  params.db?.setKV(
-    "agent_discovery:last_news_fetch_event",
-    JSON.stringify({
-      at: new Date().toISOString(),
-      providerNodeId: provider.search.nodeId,
-      capability,
-      request,
-      response,
-    }),
-  );
-  recordProviderFeedback({
-    db: params.db,
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: preferPaidProviders(ranked),
+    identity: params.identity,
     config: params.config,
-    provider,
+    db: params.db,
     capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
+    request,
+    eventKey: "agent_discovery:last_news_fetch_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as NewsFetchInvocationResponse,
+    isValidResponse: (response) =>
+      Boolean(response) &&
+      (response.status === "ok" || response.status === "integration_required"),
+    invalidResponseMessage: "Provider returned an invalid news.fetch response",
   });
+  const provider = invoked.provider;
+  const response = invoked.response;
   return { provider, request, response };
 }
 
@@ -1624,9 +1588,6 @@ export async function requestProofVerify(params: {
       db: params.db,
     });
   }
-  const provider =
-    ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
-    ranked[0];
   const request: ProofVerifyInvocationRequest = {
     capability,
     requester: {
@@ -1647,60 +1608,26 @@ export async function requestProofVerify(params: {
     ...(params.verifierProfile ? { verifier_profile: params.verifierProfile } : {}),
     reason: params.reason || "paid proof verification",
   };
-
-  let response: ProofVerifyInvocationResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as ProofVerifyInvocationResponse)
-        : (result.response as ProofVerifyInvocationResponse);
-    if (
-      !response ||
-      (response.status !== "ok" &&
-        response.status !== "integration_required")
-    ) {
-      throw new Error("Provider returned an invalid proof.verify response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
-  params.db?.setKV(
-    "agent_discovery:last_proof_verify_event",
-    JSON.stringify({
-      at: new Date().toISOString(),
-      providerNodeId: provider.search.nodeId,
-      capability,
-      request,
-      response,
-    }),
-  );
-  recordProviderFeedback({
-    db: params.db,
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: preferPaidProviders(ranked),
+    identity: params.identity,
     config: params.config,
-    provider,
+    db: params.db,
     capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
+    request,
+    eventKey: "agent_discovery:last_proof_verify_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as ProofVerifyInvocationResponse,
+    isValidResponse: (response) =>
+      Boolean(response) &&
+      (response.status === "ok" || response.status === "integration_required"),
+    invalidResponseMessage:
+      "Provider returned an invalid proof.verify response",
   });
+  const provider = invoked.provider;
+  const response = invoked.response;
   return { provider, request, response };
 }
 
@@ -1747,9 +1674,6 @@ export async function requestStoragePut(params: {
       db: params.db,
     });
   }
-  const provider =
-    ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
-    ranked[0];
   const request: StoragePutInvocationRequest = {
     capability,
     requester: {
@@ -1770,56 +1694,23 @@ export async function requestStoragePut(params: {
     ...(params.metadata ? { metadata: params.metadata } : {}),
     reason: params.reason || "paid storage put",
   };
-
-  let response: StoragePutInvocationResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as StoragePutInvocationResponse)
-        : (result.response as StoragePutInvocationResponse);
-    if (!response || response.status !== "ok") {
-      throw new Error("Provider returned an invalid storage.put response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
-  params.db?.setKV(
-    "agent_discovery:last_storage_put_event",
-    JSON.stringify({
-      at: new Date().toISOString(),
-      providerNodeId: provider.search.nodeId,
-      capability,
-      request,
-      response,
-    }),
-  );
-  recordProviderFeedback({
-    db: params.db,
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: preferPaidProviders(ranked),
+    identity: params.identity,
     config: params.config,
-    provider,
+    db: params.db,
     capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
+    request,
+    eventKey: "agent_discovery:last_storage_put_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as StoragePutInvocationResponse,
+    isValidResponse: (response) => Boolean(response) && response.status === "ok",
+    invalidResponseMessage: "Provider returned an invalid storage.put response",
   });
+  const provider = invoked.provider;
+  const response = invoked.response;
   return { provider, request, response };
 }
 
@@ -1865,9 +1756,6 @@ export async function requestStorageGet(params: {
       db: params.db,
     });
   }
-  const provider =
-    ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
-    ranked[0];
   const request: StorageGetInvocationRequest = {
     capability,
     requester: {
@@ -1887,55 +1775,22 @@ export async function requestStorageGet(params: {
     ...(params.maxBytes !== undefined ? { max_bytes: params.maxBytes } : {}),
     reason: params.reason || "paid storage get",
   };
-
-  let response: StorageGetInvocationResponse;
-  try {
-    const result = await invokeProviderCapability({
-      provider,
-      identity: params.identity,
-      config: params.config,
-      requestBody: JSON.stringify(request),
-    });
-    if (!result.success) {
-      throw new Error(
-        result.error || `Provider request failed with status ${result.status}`,
-      );
-    }
-    response =
-      typeof result.response === "string"
-        ? (JSON.parse(result.response) as StorageGetInvocationResponse)
-        : (result.response as StorageGetInvocationResponse);
-    if (!response || response.status !== "ok") {
-      throw new Error("Provider returned an invalid storage.get response");
-    }
-  } catch (error) {
-    recordProviderFeedback({
-      db: params.db,
-      config: params.config,
-      provider,
-      capability,
-      outcome: classifyInvocationError(error),
-      requestNonce: request.request_nonce,
-    });
-    throw error;
-  }
-  params.db?.setKV(
-    "agent_discovery:last_storage_get_event",
-    JSON.stringify({
-      at: new Date().toISOString(),
-      providerNodeId: provider.search.nodeId,
-      capability,
-      request,
-      response,
-    }),
-  );
-  recordProviderFeedback({
-    db: params.db,
+  const invoked = await invokeCapabilityWithFallback({
+    rankedProviders: preferPaidProviders(ranked),
+    identity: params.identity,
     config: params.config,
-    provider,
+    db: params.db,
     capability,
-    outcome: "success",
-    requestNonce: request.request_nonce,
+    request,
+    eventKey: "agent_discovery:last_storage_get_event",
+    parseResponse: (value) =>
+      (typeof value === "string"
+        ? JSON.parse(value)
+        : value) as StorageGetInvocationResponse,
+    isValidResponse: (response) => Boolean(response) && response.status === "ok",
+    invalidResponseMessage: "Provider returned an invalid storage.get response",
   });
+  const provider = invoked.provider;
+  const response = invoked.response;
   return { provider, request, response };
 }
