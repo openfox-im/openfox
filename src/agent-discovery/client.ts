@@ -17,6 +17,9 @@ import type {
   OpenFoxIdentity,
 } from "../types.js";
 import {
+  DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+} from "../types.js";
+import {
   buildSignedAgentDiscoveryCard,
   verifyAgentDiscoveryCard,
 } from "./card.js";
@@ -25,6 +28,7 @@ import {
   type AgentDiscoveryCard,
   type AgentDiscoveryCardResponse,
   type AgentDiscoveryConfig,
+  type AgentDiscoveryExecutionPolicy,
   type AgentDiscoveryInfo,
   type AgentDiscoveryLocalFeedback,
   type AgentDiscoveryProviderDiagnostics,
@@ -286,6 +290,10 @@ function capabilityFamily(
   return null;
 }
 
+interface ResolvedExecutionPolicy extends AgentDiscoveryExecutionPolicy {
+  selectionPolicy: AgentDiscoverySelectionPolicy;
+}
+
 function resolveSelectionPolicy(
   config: OpenFoxConfig,
   capability: string,
@@ -315,6 +323,26 @@ function resolveSelectionPolicy(
     ...(config.agentDiscovery?.selectionPolicy ?? {}),
     ...(profile ?? {}),
     ...(override ?? {}),
+  };
+}
+
+function resolveExecutionPolicy(
+  config: OpenFoxConfig,
+  capability: string,
+  selectionOverride?: Partial<AgentDiscoverySelectionPolicy>,
+  executionOverride?: Partial<AgentDiscoveryExecutionPolicy>,
+): ResolvedExecutionPolicy {
+  const family = capabilityFamily(capability);
+  const profile =
+    family && config.agentDiscovery?.executionPolicyProfiles
+      ? config.agentDiscovery.executionPolicyProfiles[family]
+      : undefined;
+  return {
+    ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+    ...(config.agentDiscovery?.executionPolicy ?? {}),
+    ...(profile ?? {}),
+    ...(executionOverride ?? {}),
+    selectionPolicy: resolveSelectionPolicy(config, capability, selectionOverride),
   };
 }
 
@@ -650,24 +678,43 @@ function attachLocalFeedback(
   }));
 }
 
+function providerAdvertisedFee(provider: VerifiedAgentProvider): bigint | null {
+  const policy =
+    provider.matchedCapability.policy &&
+    typeof provider.matchedCapability.policy === "object"
+      ? provider.matchedCapability.policy
+      : undefined;
+  const perRequest =
+    typeof policy?.per_request_fee_tos === "string"
+      ? parseBigIntAmount(policy.per_request_fee_tos)
+      : 0n;
+  if (perRequest > 0n) {
+    return perRequest;
+  }
+  const sessionFee =
+    typeof policy?.session_fee_tos === "string"
+      ? parseBigIntAmount(policy.session_fee_tos)
+      : 0n;
+  if (sessionFee > 0n) {
+    return sessionFee;
+  }
+  return null;
+}
+
 function sortProviders(
   providers: VerifiedAgentProvider[],
   requestedAmount: bigint,
-  selectionPolicy: AgentDiscoverySelectionPolicy,
+  executionPolicy: ResolvedExecutionPolicy,
   db: OpenFoxDatabase | undefined,
   capability: string,
 ): VerifiedAgentProvider[] {
+  const selectionPolicy = executionPolicy.selectionPolicy;
   const scoreMode = (mode: string): number => {
-    switch (mode) {
-      case "sponsored":
-        return 3;
-      case "hybrid":
-        return 2;
-      case "paid":
-        return 1;
-      default:
-        return 0;
+    const idx = executionPolicy.preferredModes.findIndex((item) => item === mode);
+    if (idx === -1) {
+      return 0;
     }
+    return executionPolicy.preferredModes.length - idx;
   };
 
   return attachLocalFeedback(providers, db, capability)
@@ -709,6 +756,17 @@ function sortProviders(
       const rightLocalScore = right.localFeedback?.localScore ?? 0;
       if (leftLocalScore !== rightLocalScore) {
         return rightLocalScore - leftLocalScore;
+      }
+      if (executionPolicy.preferLowerAdvertisedFee) {
+        const leftFee = providerAdvertisedFee(left);
+        const rightFee = providerAdvertisedFee(right);
+        if (leftFee !== null || rightFee !== null) {
+          if (leftFee === null) return 1;
+          if (rightFee === null) return -1;
+          if (leftFee !== rightFee) {
+            return leftFee < rightFee ? -1 : 1;
+          }
+        }
       }
       if (selectionPolicy.preferHigherReputation) {
         const leftRep = parseSignedBigInt(leftTrust?.reputation);
@@ -952,22 +1010,25 @@ export async function discoverCapabilityProviders(params: {
   capability: string;
   limit?: number;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
   db?: OpenFoxDatabase;
 }): Promise<VerifiedAgentProvider[]> {
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    params.capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await collectVerifiedCapabilityProviders({
     config: params.config,
     capability: params.capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
   });
 
   return sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(
-      params.config,
-      params.capability,
-      params.selectionPolicy,
-    ),
+    executionPolicy,
     params.db,
     params.capability,
   );
@@ -979,21 +1040,24 @@ export async function resolveCapabilityProvider(params: {
   requestedAmountTomi?: bigint;
   limit?: number;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
   db?: OpenFoxDatabase;
 }): Promise<VerifiedAgentProvider | null> {
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    params.capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await collectVerifiedCapabilityProviders({
     config: params.config,
     capability: params.capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
   });
   const ranked = sortProviders(
     providers,
     params.requestedAmountTomi ?? 0n,
-    resolveSelectionPolicy(
-      params.config,
-      params.capability,
-      params.selectionPolicy,
-    ),
+    executionPolicy,
     params.db,
     params.capability,
   );
@@ -1006,19 +1070,21 @@ export async function diagnoseCapabilityProviders(params: {
   requestedAmountTomi?: bigint;
   limit?: number;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
   db?: OpenFoxDatabase;
 }): Promise<AgentDiscoveryProviderDiagnostics[]> {
-  const policy = resolveSelectionPolicy(
+  const executionPolicy = resolveExecutionPolicy(
     params.config,
     params.capability,
     params.selectionPolicy,
+    params.executionPolicy,
   );
   const requestedAmount = params.requestedAmountTomi ?? 0n;
   const providers = attachLocalFeedback(
     await collectVerifiedCapabilityProviders({
       config: params.config,
       capability: params.capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
     }),
     params.db,
     params.capability,
@@ -1026,7 +1092,7 @@ export async function diagnoseCapabilityProviders(params: {
   const selected = sortProviders(
     [...providers],
     requestedAmount,
-    policy,
+    executionPolicy,
     params.db,
     params.capability,
   )[0];
@@ -1034,7 +1100,7 @@ export async function diagnoseCapabilityProviders(params: {
     .map((provider) =>
       buildProviderDiagnostics(
         provider,
-        policy,
+        executionPolicy.selectionPolicy,
         requestedAmount,
         provider.search.nodeId === selected?.search.nodeId,
       ),
@@ -1056,6 +1122,7 @@ export async function resolveCapabilityProviderWithDiagnostics(params: {
   requestedAmountTomi?: bigint;
   limit?: number;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
   db?: OpenFoxDatabase;
 }): Promise<ResolveCapabilityProviderResult> {
   const diagnostics = await diagnoseCapabilityProviders(params);
@@ -1087,6 +1154,7 @@ async function throwNoProviderFound(params: {
   requestedAmountTomi?: bigint;
   limit?: number;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
   db?: OpenFoxDatabase;
 }): Promise<never> {
   const diagnostics = await diagnoseCapabilityProviders({
@@ -1095,6 +1163,7 @@ async function throwNoProviderFound(params: {
     requestedAmountTomi: params.requestedAmountTomi,
     limit: params.limit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   throw new Error(
@@ -1102,21 +1171,6 @@ async function throwNoProviderFound(params: {
       diagnostics,
     )}`,
   );
-}
-
-function preferPaidProviders(
-  providers: VerifiedAgentProvider[],
-): VerifiedAgentProvider[] {
-  const paid = providers.filter(
-    (entry) => entry.matchedCapability.mode === "paid",
-  );
-  if (!paid.length) {
-    return providers;
-  }
-  return [
-    ...paid,
-    ...providers.filter((entry) => entry.matchedCapability.mode !== "paid"),
-  ];
 }
 
 async function invokeCapabilityWithFallback<
@@ -1128,6 +1182,7 @@ async function invokeCapabilityWithFallback<
   config: OpenFoxConfig;
   db?: OpenFoxDatabase;
   capability: string;
+  maxFallbackProviders?: number;
   request: TRequest;
   eventKey: string;
   parseResponse: (value: unknown) => TResponse;
@@ -1140,7 +1195,12 @@ async function invokeCapabilityWithFallback<
 }> {
   const failures: string[] = [];
 
-  for (const provider of params.rankedProviders) {
+  const rankedProviders =
+    params.maxFallbackProviders && params.maxFallbackProviders > 0
+      ? params.rankedProviders.slice(0, params.maxFallbackProviders)
+      : params.rankedProviders;
+
+  for (const provider of rankedProviders) {
     try {
       const result = await invokeProviderCapability({
         provider,
@@ -1214,6 +1274,7 @@ export async function requestTestnetFaucet(params: {
   waitForReceipt?: boolean;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: FaucetInvocationRequest;
@@ -1221,17 +1282,24 @@ export async function requestTestnetFaucet(params: {
   receipt?: Record<string, unknown> | null;
 }> {
   const capability = params.capability ?? "sponsor.topup.testnet";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     params.requestedAmountTomi,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1240,8 +1308,9 @@ export async function requestTestnetFaucet(params: {
       config: params.config,
       capability,
       requestedAmountTomi: params.requestedAmountTomi,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1265,6 +1334,7 @@ export async function requestTestnetFaucet(params: {
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_faucet_event",
     parseResponse: (value) =>
@@ -1322,23 +1392,31 @@ export async function requestObservationOnce(params: {
   limit?: number;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: ObservationInvocationRequest;
   response: ObservationInvocationResponse;
 }> {
   const capability = params.capability ?? "observation.once";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1346,8 +1424,9 @@ export async function requestObservationOnce(params: {
     await throwNoProviderFound({
       config: params.config,
       capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1366,11 +1445,12 @@ export async function requestObservationOnce(params: {
     reason: params.reason || "one-shot paid observation",
   };
   const invoked = await invokeCapabilityWithFallback({
-    rankedProviders: preferPaidProviders(ranked),
+    rankedProviders: ranked,
     identity: params.identity,
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_observation_event",
     parseResponse: (value) =>
@@ -1398,23 +1478,31 @@ export async function requestOracleResolution(params: {
   limit?: number;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: OracleResolutionRequest;
   response: OracleResolutionResponse;
 }> {
   const capability = params.capability ?? "oracle.resolve";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1422,8 +1510,9 @@ export async function requestOracleResolution(params: {
     await throwNoProviderFound({
       config: params.config,
       capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1445,11 +1534,12 @@ export async function requestOracleResolution(params: {
     reason: params.reason || "paid oracle resolution",
   };
   const invoked = await invokeCapabilityWithFallback({
-    rankedProviders: preferPaidProviders(ranked),
+    rankedProviders: ranked,
     identity: params.identity,
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_oracle_event",
     parseResponse: (value) =>
@@ -1477,23 +1567,31 @@ export async function requestNewsFetch(params: {
   limit?: number;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: NewsFetchInvocationRequest;
   response: NewsFetchInvocationResponse;
 }> {
   const capability = params.capability ?? "news.fetch";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1501,8 +1599,9 @@ export async function requestNewsFetch(params: {
     await throwNoProviderFound({
       config: params.config,
       capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1524,11 +1623,12 @@ export async function requestNewsFetch(params: {
     reason: params.reason || "paid news fetch",
   };
   const invoked = await invokeCapabilityWithFallback({
-    rankedProviders: preferPaidProviders(ranked),
+    rankedProviders: ranked,
     identity: params.identity,
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_news_fetch_event",
     parseResponse: (value) =>
@@ -1559,23 +1659,31 @@ export async function requestProofVerify(params: {
   limit?: number;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: ProofVerifyInvocationRequest;
   response: ProofVerifyInvocationResponse;
 }> {
   const capability = params.capability ?? "proof.verify";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1583,8 +1691,9 @@ export async function requestProofVerify(params: {
     await throwNoProviderFound({
       config: params.config,
       capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1609,11 +1718,12 @@ export async function requestProofVerify(params: {
     reason: params.reason || "paid proof verification",
   };
   const invoked = await invokeCapabilityWithFallback({
-    rankedProviders: preferPaidProviders(ranked),
+    rankedProviders: ranked,
     identity: params.identity,
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_proof_verify_event",
     parseResponse: (value) =>
@@ -1645,23 +1755,31 @@ export async function requestStoragePut(params: {
   limit?: number;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: StoragePutInvocationRequest;
   response: StoragePutInvocationResponse;
 }> {
   const capability = params.capability ?? "storage.put";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1669,8 +1787,9 @@ export async function requestStoragePut(params: {
     await throwNoProviderFound({
       config: params.config,
       capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1695,11 +1814,12 @@ export async function requestStoragePut(params: {
     reason: params.reason || "paid storage put",
   };
   const invoked = await invokeCapabilityWithFallback({
-    rankedProviders: preferPaidProviders(ranked),
+    rankedProviders: ranked,
     identity: params.identity,
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_storage_put_event",
     parseResponse: (value) =>
@@ -1727,23 +1847,31 @@ export async function requestStorageGet(params: {
   limit?: number;
   db?: OpenFoxDatabase;
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
 }): Promise<{
   provider: VerifiedAgentProvider;
   request: StorageGetInvocationRequest;
   response: StorageGetInvocationResponse;
 }> {
   const capability = params.capability ?? "storage.get";
+  const executionPolicy = resolveExecutionPolicy(
+    params.config,
+    capability,
+    params.selectionPolicy,
+    params.executionPolicy,
+  );
   const providers = await discoverCapabilityProviders({
     config: params.config,
     capability,
-    limit: params.limit ?? 10,
+    limit: params.limit ?? executionPolicy.searchLimit,
     selectionPolicy: params.selectionPolicy,
+    executionPolicy: params.executionPolicy,
     db: params.db,
   });
   const ranked = sortProviders(
     providers,
     0n,
-    resolveSelectionPolicy(params.config, capability, params.selectionPolicy),
+    executionPolicy,
     params.db,
     capability,
   );
@@ -1751,8 +1879,9 @@ export async function requestStorageGet(params: {
     await throwNoProviderFound({
       config: params.config,
       capability,
-      limit: params.limit ?? 10,
+      limit: params.limit ?? executionPolicy.searchLimit,
       selectionPolicy: params.selectionPolicy,
+      executionPolicy: params.executionPolicy,
       db: params.db,
     });
   }
@@ -1776,11 +1905,12 @@ export async function requestStorageGet(params: {
     reason: params.reason || "paid storage get",
   };
   const invoked = await invokeCapabilityWithFallback({
-    rankedProviders: preferPaidProviders(ranked),
+    rankedProviders: ranked,
     identity: params.identity,
     config: params.config,
     db: params.db,
     capability,
+    maxFallbackProviders: executionPolicy.maxFallbackProviders,
     request,
     eventKey: "agent_discovery:last_storage_get_event",
     parseResponse: (value) =>

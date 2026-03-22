@@ -774,6 +774,27 @@ describe("agent discovery", () => {
 
     global.fetch = vi.fn(async (input, init) => {
       const url = String(input);
+      if (
+        (url === "https://provider.example/expensive" ||
+          url === "https://provider.example/cheap") &&
+        (init?.method || "GET") === "HEAD"
+      ) {
+        return new Response(
+          JSON.stringify({
+            x402Version: 1,
+            accepts: [
+              {
+                scheme: "exact",
+                network: "tos:1666",
+                maxAmountRequired: "10",
+                payToAddress: config.walletAddress,
+                requiredDeadlineSeconds: 300,
+              },
+            ],
+          }),
+          { status: 402, headers: { "Content-Type": "application/json" } },
+        );
+      }
       if (url !== "http://127.0.0.1:8545") {
         throw new Error(`unexpected fetch url ${url}`);
       }
@@ -1404,5 +1425,401 @@ describe("agent discovery", () => {
         },
       }),
     ).rejects.toThrow(/package prefix mismatch/);
+  });
+
+  it("applies execution-policy mode and advertised-fee preferences when ranking providers", async () => {
+    const { discoverCapabilityProviders } =
+      await import("../agent-discovery/client.js");
+    const config = makeConfig();
+    const identity = makeIdentity();
+
+    const expensiveConfig = makeConfig();
+    expensiveConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/news-fetch-expensive" },
+    ];
+    expensiveConfig.agentDiscovery!.capabilities = [
+      {
+        name: "news.fetch",
+        mode: "paid",
+        policy: { per_request_fee_tos: "9" },
+      },
+    ];
+    const expensiveCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: expensiveConfig,
+      agentDiscovery: expensiveConfig.agentDiscovery!,
+      address: expensiveConfig.walletAddress!,
+      discoveryNodeId: "node-expensive",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 60,
+    });
+
+    const cheapConfig = makeConfig();
+    cheapConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/news-fetch-cheap" },
+    ];
+    cheapConfig.agentDiscovery!.capabilities = [
+      {
+        name: "news.fetch",
+        mode: "paid",
+        policy: { per_request_fee_tos: "2" },
+      },
+    ];
+    const cheapCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: cheapConfig,
+      agentDiscovery: cheapConfig.agentDiscovery!,
+      address: cheapConfig.walletAddress!,
+      discoveryNodeId: "node-cheap",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 40,
+    });
+
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (
+        (url === "https://provider.example/news-fetch-expensive" ||
+          url === "https://provider.example/news-fetch-cheap") &&
+        (init?.method || "GET") === "HEAD"
+      ) {
+        return new Response(
+          JSON.stringify({
+            x402Version: 1,
+            accepts: [
+              {
+                scheme: "exact",
+                network: "tos:1666",
+                maxAmountRequired: "10",
+                payToAddress: config.walletAddress,
+                requiredDeadlineSeconds: 300,
+              },
+            ],
+          }),
+          { status: 402, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url !== "http://127.0.0.1:8545") {
+        throw new Error(`unexpected fetch url ${url}`);
+      }
+      const body = JSON.parse(String(init?.body)) as {
+        id: number;
+        method: string;
+        params: unknown[];
+      };
+      switch (body.method) {
+        case "tos_agentDiscoverySearch":
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: [
+                {
+                  nodeId: "node-expensive",
+                  nodeRecord: "enr:expensive",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 2,
+                  cardSequence: 60,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 100,
+                  },
+                },
+                {
+                  nodeId: "node-cheap",
+                  nodeRecord: "enr:cheap",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 2,
+                  cardSequence: 40,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 100,
+                  },
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        case "tos_agentDiscoveryGetCard": {
+          const nodeRecord = String(body.params[0]);
+          const card =
+            nodeRecord === "enr:expensive" ? expensiveCard : cheapCard;
+          const nodeId =
+            nodeRecord === "enr:expensive" ? "node-expensive" : "node-cheap";
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                nodeId,
+                nodeRecord,
+                cardJson: JSON.stringify(card),
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        default:
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              error: {
+                code: -32601,
+                message: `unsupported method ${body.method}`,
+              },
+            }),
+            { status: 200 },
+          );
+      }
+    }) as typeof fetch;
+
+    const defaultRanked = await discoverCapabilityProviders({
+      config,
+      capability: "news.fetch",
+      limit: 10,
+      executionPolicy: {
+        preferLowerAdvertisedFee: false,
+      },
+    });
+    expect(defaultRanked.map((provider) => provider.search.nodeId)).toEqual([
+      "node-expensive",
+      "node-cheap",
+    ]);
+
+    const feeAwareRanked = await discoverCapabilityProviders({
+      config,
+      capability: "news.fetch",
+      limit: 10,
+      executionPolicy: {
+        preferLowerAdvertisedFee: true,
+        preferredModes: ["paid", "hybrid", "sponsored"],
+      },
+    });
+    expect(feeAwareRanked.map((provider) => provider.search.nodeId)).toEqual([
+      "node-cheap",
+      "node-expensive",
+    ]);
+  });
+
+  it("limits provider fallback depth through execution policy", async () => {
+    const { requestObservationOnce } = await import("../agent-discovery/client.js");
+    const config = makeConfig();
+    const identity = makeIdentity();
+
+    const firstConfig = makeConfig();
+    firstConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/observe-primary" },
+    ];
+    firstConfig.agentDiscovery!.capabilities = [
+      {
+        name: "observation.once",
+        mode: "paid",
+        policy: { per_request_fee_tos: "3" },
+      },
+    ];
+    const firstCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: firstConfig,
+      agentDiscovery: firstConfig.agentDiscovery!,
+      address: firstConfig.walletAddress!,
+      discoveryNodeId: "node-primary",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 70,
+    });
+
+    const secondConfig = makeConfig();
+    secondConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/observe-secondary" },
+    ];
+    secondConfig.agentDiscovery!.capabilities = [
+      {
+        name: "observation.once",
+        mode: "paid",
+        policy: { per_request_fee_tos: "4" },
+      },
+    ];
+    const secondCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: secondConfig,
+      agentDiscovery: secondConfig.agentDiscovery!,
+      address: secondConfig.walletAddress!,
+      discoveryNodeId: "node-secondary",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 69,
+    });
+
+    const providerHits: string[] = [];
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (
+        (url === "https://provider.example/observe-primary" ||
+          url === "https://provider.example/observe-secondary") &&
+        (init?.method || "GET") === "HEAD"
+      ) {
+        return new Response(
+          JSON.stringify({
+            x402Version: 1,
+            accepts: [
+              {
+                scheme: "exact",
+                network: "tos:1666",
+                maxAmountRequired: "10",
+                payToAddress: config.walletAddress,
+                requiredDeadlineSeconds: 300,
+              },
+            ],
+          }),
+          { status: 402, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url === "http://127.0.0.1:8545") {
+        const body = JSON.parse(String(init?.body)) as {
+          id: number;
+          method: string;
+          params: unknown[];
+        };
+        switch (body.method) {
+          case "tos_agentDiscoverySearch":
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                result: [
+                  {
+                    nodeId: "node-primary",
+                    nodeRecord: "enr:primary",
+                    primaryIdentity: config.walletAddress,
+                    connectionModes: 2,
+                    cardSequence: 70,
+                    trust: {
+                      registered: true,
+                      suspended: false,
+                      stake: "10",
+                      reputation: "10",
+                      ratingCount: "1",
+                      capabilityRegistered: true,
+                      hasOnchainCapability: true,
+                      localRankScore: 100,
+                    },
+                  },
+                  {
+                    nodeId: "node-secondary",
+                    nodeRecord: "enr:secondary",
+                    primaryIdentity: config.walletAddress,
+                    connectionModes: 2,
+                    cardSequence: 69,
+                    trust: {
+                      registered: true,
+                      suspended: false,
+                      stake: "10",
+                      reputation: "10",
+                      ratingCount: "1",
+                      capabilityRegistered: true,
+                      hasOnchainCapability: true,
+                      localRankScore: 90,
+                    },
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          case "tos_agentDiscoveryGetCard": {
+            const nodeRecord = String(body.params[0]);
+            const card =
+              nodeRecord === "enr:primary" ? firstCard : secondCard;
+            const nodeId =
+              nodeRecord === "enr:primary" ? "node-primary" : "node-secondary";
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                result: {
+                  nodeId,
+                  nodeRecord,
+                  cardJson: JSON.stringify(card),
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          default:
+            return new Response(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id,
+                error: {
+                  code: -32601,
+                  message: `unsupported method ${body.method}`,
+                },
+              }),
+              { status: 200 },
+            );
+        }
+      }
+      if (url === "https://provider.example/observe-primary") {
+        providerHits.push("primary");
+        return new Response("upstream failed", { status: 502 });
+      }
+      if (url === "https://provider.example/observe-secondary") {
+        providerHits.push("secondary");
+        return new Response(
+          JSON.stringify({
+            status: "ok",
+            observed_at: Math.floor(Date.now() / 1000),
+            target_url: "https://example.com",
+            http_status: 200,
+            content_type: "text/plain",
+            body_sha256:
+              "0x1111111111111111111111111111111111111111111111111111111111111111",
+            size_bytes: 2,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw new Error(`unexpected fetch url ${url}`);
+    }) as typeof fetch;
+
+    await expect(
+      requestObservationOnce({
+        identity,
+        config,
+        address: config.walletAddress!,
+        targetUrl: "https://example.com",
+        executionPolicy: {
+          maxFallbackProviders: 1,
+          preferredModes: ["paid", "hybrid", "sponsored"],
+        },
+      }),
+    ).rejects.toThrow(/All providers failed/);
+    expect(providerHits.length).toBeGreaterThan(0);
+    expect(new Set(providerHits)).toEqual(new Set(["primary"]));
+
+    providerHits.length = 0;
+
+    const success = await requestObservationOnce({
+      identity,
+      config,
+      address: config.walletAddress!,
+      targetUrl: "https://example.com",
+      executionPolicy: {
+        maxFallbackProviders: 2,
+        preferredModes: ["paid", "hybrid", "sponsored"],
+      },
+    });
+    expect(success.provider.search.nodeId).toBe("node-secondary");
+    expect(providerHits).toContain("primary");
+    expect(providerHits).toContain("secondary");
   });
 });

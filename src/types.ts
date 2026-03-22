@@ -362,6 +362,13 @@ export interface AgentDiscoverySelectionPolicy {
   minimumTrustScore?: number;
 }
 
+export interface AgentDiscoveryExecutionPolicy {
+  searchLimit: number;
+  maxFallbackProviders: number;
+  preferredModes: AgentDiscoveryCapabilityMode[];
+  preferLowerAdvertisedFee: boolean;
+}
+
 export interface AgentDiscoveryPolicyProfiles {
   sponsor: AgentDiscoverySelectionPolicy;
   observation: AgentDiscoverySelectionPolicy;
@@ -370,6 +377,16 @@ export interface AgentDiscoveryPolicyProfiles {
   proof: AgentDiscoverySelectionPolicy;
   storage: AgentDiscoverySelectionPolicy;
   gateway: AgentDiscoverySelectionPolicy;
+}
+
+export interface AgentDiscoveryExecutionPolicyProfiles {
+  sponsor: AgentDiscoveryExecutionPolicy;
+  observation: AgentDiscoveryExecutionPolicy;
+  oracle: AgentDiscoveryExecutionPolicy;
+  news: AgentDiscoveryExecutionPolicy;
+  proof: AgentDiscoveryExecutionPolicy;
+  storage: AgentDiscoveryExecutionPolicy;
+  gateway: AgentDiscoveryExecutionPolicy;
 }
 
 export interface AgentDiscoveryConfig {
@@ -383,6 +400,8 @@ export interface AgentDiscoveryConfig {
   directoryNodeRecords?: string[];
   selectionPolicy?: AgentDiscoverySelectionPolicy;
   policyProfiles?: Partial<AgentDiscoveryPolicyProfiles>;
+  executionPolicy?: Partial<AgentDiscoveryExecutionPolicy>;
+  executionPolicyProfiles?: Partial<AgentDiscoveryExecutionPolicyProfiles>;
   reputationUpdates?: AgentDiscoveryReputationUpdateConfig;
   faucetServer?: AgentDiscoveryFaucetServerConfig;
   observationServer?: AgentDiscoveryObservationServerConfig;
@@ -631,6 +650,55 @@ export const DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES: AgentDiscoveryPolicyProfil
     },
   };
 
+export const DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY: AgentDiscoveryExecutionPolicy =
+  {
+    searchLimit: 10,
+    maxFallbackProviders: 3,
+    preferredModes: ["sponsored", "hybrid", "paid"],
+    preferLowerAdvertisedFee: false,
+  };
+
+export const DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY_PROFILES: AgentDiscoveryExecutionPolicyProfiles =
+  {
+    sponsor: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      searchLimit: 6,
+      maxFallbackProviders: 2,
+      preferredModes: ["sponsored", "hybrid", "paid"],
+    },
+    observation: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      preferredModes: ["paid", "hybrid", "sponsored"],
+      preferLowerAdvertisedFee: true,
+    },
+    oracle: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      preferredModes: ["paid", "hybrid", "sponsored"],
+      preferLowerAdvertisedFee: true,
+    },
+    news: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      preferredModes: ["paid", "hybrid", "sponsored"],
+      preferLowerAdvertisedFee: true,
+    },
+    proof: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      preferredModes: ["paid", "hybrid", "sponsored"],
+      preferLowerAdvertisedFee: true,
+    },
+    storage: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      preferredModes: ["paid", "hybrid", "sponsored"],
+      preferLowerAdvertisedFee: true,
+    },
+    gateway: {
+      ...DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+      searchLimit: 5,
+      maxFallbackProviders: 2,
+      preferredModes: ["sponsored", "hybrid", "paid"],
+    },
+  };
+
 export const DEFAULT_AGENT_DISCOVERY_REPUTATION_UPDATE_CONFIG: AgentDiscoveryReputationUpdateConfig =
   {
     enabled: false,
@@ -651,6 +719,8 @@ export const DEFAULT_AGENT_DISCOVERY_CONFIG: AgentDiscoveryConfig = {
   directoryNodeRecords: [],
   selectionPolicy: DEFAULT_AGENT_DISCOVERY_SELECTION_POLICY,
   policyProfiles: DEFAULT_AGENT_DISCOVERY_POLICY_PROFILES,
+  executionPolicy: DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY,
+  executionPolicyProfiles: DEFAULT_AGENT_DISCOVERY_EXECUTION_POLICY_PROFILES,
   reputationUpdates: DEFAULT_AGENT_DISCOVERY_REPUTATION_UPDATE_CONFIG,
   mailServer: DEFAULT_AGENT_DISCOVERY_MAIL_SERVER_CONFIG,
   faucetServer: DEFAULT_AGENT_DISCOVERY_FAUCET_SERVER_CONFIG,
