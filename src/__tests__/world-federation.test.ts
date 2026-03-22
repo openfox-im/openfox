@@ -130,7 +130,7 @@ describe("world federation", () => {
         eventId: "wfe_fox_001",
         eventType: "fox_profile_updated",
         payloadJson: JSON.stringify({
-          address: "0xfed000000000000000000000000000000000dead",
+          address: "0xf71d99c2b05b3ab38ebabfae54f08b149f9dffa9fd49cf69e20b9f0ea86514f2",
           display_name: "Remote Fox",
           bio: "A fox from another node",
           updated_at: "2026-01-01T00:00:00.000Z",
@@ -145,7 +145,7 @@ describe("world federation", () => {
       .prepare(
         `SELECT * FROM world_search_index WHERE entry_id = ?`,
       )
-      .get("fox:0xfed000000000000000000000000000000000dead") as any;
+      .get("fox:0xf71d99c2b05b3ab38ebabfae54f08b149f9dffa9fd49cf69e20b9f0ea86514f2") as any;
 
     expect(entry).toBeDefined();
     expect(entry.searchable_text).toContain("Remote Fox");
@@ -160,14 +160,14 @@ describe("world federation", () => {
       db,
       entries: [
         {
-          address: "0xaaaa000000000000000000000000000000000001",
+          address: "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d",
           displayName: "Fox A",
           bio: "First fox",
           tnsName: "fox-a.tos",
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
         {
-          address: "0xbbbb000000000000000000000000000000000002",
+          address: "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05",
           displayName: "Fox B",
           bio: null,
           tnsName: null,
@@ -184,7 +184,7 @@ describe("world federation", () => {
 
   it("should resolve Fox directory conflicts with latest timestamp", () => {
     const peer = addFederationPeer(db, "https://node1.example.com");
-    const addr = "0xcccc000000000000000000000000000000000003";
+    const addr = "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7";
 
     // Import old entry
     importFoxDirectory({
@@ -243,7 +243,7 @@ describe("world federation", () => {
          VALUES (?, ?, ?, ?, ?)`,
       )
       .run(
-        "0xaaaa000000000000000000000000000000000001",
+        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d",
         "Local Fox",
         "A local fox",
         "local.tos",

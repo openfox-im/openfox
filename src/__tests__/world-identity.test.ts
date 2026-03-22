@@ -38,7 +38,7 @@ function makeConfig(walletAddress: `0x${string}`): OpenFoxConfig {
     name: "Test Fox",
     genesisPrompt: "test",
     creatorAddress:
-      "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
     registeredRemotely: false,
     sandboxId: "",
     runtimeApiUrl: undefined,
@@ -181,7 +181,7 @@ describe("world identity", () => {
 
   it("returns null for unresolvable fox profile", () => {
     const result = resolveFoxPublicProfile(
-      "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "0xf71d99c2b05b3ab38ebabfae54f08b149f9dffa9fd49cf69e20b9f0ea86514f2",
       { db },
     );
     expect(result).toBeNull();

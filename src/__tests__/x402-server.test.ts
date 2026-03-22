@@ -59,7 +59,7 @@ describe("x402 server payment manager", () => {
   it("recovers a paid request from the ledger after initial broadcast failure", async () => {
     const rpcUrl = "http://127.0.0.1:8545";
     const providerAddress =
-      "0x0000000000000000000000000000000000000000000000000000000000000042";
+      "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042";
     const payerAddress = deriveAddressFromPrivateKey(TEST_PRIVATE_KEY);
     const requestKey = "observation:req:1";
     const requestHash = hashX402RequestPayload({
@@ -172,7 +172,7 @@ describe("x402 server payment manager", () => {
   it("rejects replaying the same payment envelope for a different request", async () => {
     const rpcUrl = "http://127.0.0.1:8545";
     const providerAddress =
-      "0x0000000000000000000000000000000000000000000000000000000000000042";
+      "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042";
     const payerAddress = deriveAddressFromPrivateKey(TEST_PRIVATE_KEY);
 
     global.fetch = vi.fn(async (_input, init) => {

@@ -83,7 +83,7 @@ describe("operator reporting", () => {
       providerBaseUrl: "https://artifacts.example.com",
       providerAddress: otherProvider,
       requesterAddress:
-        "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
       status: "failed",
       createdAt: now,
       updatedAt: now,

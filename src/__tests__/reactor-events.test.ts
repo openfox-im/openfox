@@ -46,13 +46,13 @@ import type { HexString } from "../chain/address.js";
 const TEST_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as const;
 const SECOND_PRIVATE_KEY =
-  "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789" as const;
+  "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as const;
 
-const PUBLISHER = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const SOLVER = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const PUBLISHER = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
+const SOLVER = "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05";
 const ISSUER = "0xdddddddddddddddddddddddddddddddddddddd";
 const TREASURY_KEY =
-  "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as HexString;
+  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef" as HexString;
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(

@@ -17,7 +17,7 @@ describe("Pipeline Factory", () => {
   it("createPipeline returns a configured IntentPipeline", () => {
     // Minimal mock config
     const config = {
-      creatorAddress: "0x0000000000000000000000000000000000000001",
+      creatorAddress: "0x0000000000000000000000000000000000000000000000000000000000000001",
       dbPath: ":memory:",
       chainId: 1,
     };

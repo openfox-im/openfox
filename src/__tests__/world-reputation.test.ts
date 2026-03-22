@@ -30,10 +30,10 @@ function makeTmpDbPath(): string {
   return path.join(tmpDir, "test.db");
 }
 
-const ADDR_A = "0xaaaa000000000000000000000000000000000001";
-const ADDR_B = "0xbbbb000000000000000000000000000000000002";
-const ADDR_C = "0xcccc000000000000000000000000000000000003";
-const ADDR_ISSUER = "0xdddd000000000000000000000000000000000004";
+const ADDR_A = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
+const ADDR_B = "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05";
+const ADDR_C = "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7";
+const ADDR_ISSUER = "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533";
 const GROUP_1 = "group-rep-1";
 const GROUP_2 = "group-rep-2";
 

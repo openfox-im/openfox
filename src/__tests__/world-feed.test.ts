@@ -97,10 +97,10 @@ describe("metaWorld feed", () => {
       leaseId: "lease-feed-1",
       cid: "bafyfeedartifact",
       bundleHash:
-        "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d111111111111111111111111",
       providerBaseUrl: "https://artifacts.example.com",
       providerAddress:
-        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626daaaaaaaaaaaaaaaaaaaaaaaa",
       requesterAddress: account.address.toLowerCase() as `0x${string}`,
       status: "stored",
       createdAt: "2030-01-01T00:00:02.000Z",
@@ -113,7 +113,7 @@ describe("metaWorld feed", () => {
       subjectId: "bounty-feed-1",
       receipt: {} as any,
       receiptHash:
-        "0x2222222222222222222222222222222222222222222222222222222222222222",
+        "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05222222222222222222222222",
       createdAt: "2030-01-01T00:00:03.000Z",
       updatedAt: "2030-01-01T00:00:03.000Z",
     } satisfies SettlementRecord);

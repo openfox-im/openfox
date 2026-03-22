@@ -26,9 +26,9 @@ import type { OpenFoxDatabase } from "../types.js";
 const ADMIN_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as const;
 const MEMBER_PRIVATE_KEY =
-  "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789" as const;
+  "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as const;
 const APPLICANT_PRIVATE_KEY =
-  "0x1111111111111111111111111111111111111111111111111111111111111111" as const;
+  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d111111111111111111111111" as const;
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-world-notifications-test-"));
@@ -253,7 +253,7 @@ describe("metaWorld notifications", () => {
     const member = privateKeyToAccount(MEMBER_PRIVATE_KEY);
     const applicant = privateKeyToAccount(APPLICANT_PRIVATE_KEY);
     const outsider = privateKeyToAccount(
-      "0x2222222222222222222222222222222222222222222222222222222222222222",
+      "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05222222222222222222222222",
     );
 
     const created = await createGroup({

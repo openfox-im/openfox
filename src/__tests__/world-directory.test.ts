@@ -19,7 +19,7 @@ import {
 const ADMIN_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as const;
 const MEMBER_PRIVATE_KEY =
-  "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789" as const;
+  "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as const;
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-world-directory-test-"));
@@ -31,7 +31,7 @@ function makeConfig(walletAddress: `0x${string}`): OpenFoxConfig {
     name: "Local OpenFox",
     genesisPrompt: "test",
     creatorAddress:
-      "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
     registeredRemotely: false,
     sandboxId: "",
     runtimeApiUrl: undefined,

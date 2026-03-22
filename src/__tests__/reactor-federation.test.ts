@@ -28,8 +28,8 @@ import {
 } from "../metaworld/reputation.js";
 import type { OpenFoxDatabase } from "../types.js";
 
-const PUBLISHER = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const SOLVER = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const PUBLISHER = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
+const SOLVER = "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05";
 const ISSUER = "0xdddddddddddddddddddddddddddddddddddddd";
 
 function makeTmpDbPath(): string {

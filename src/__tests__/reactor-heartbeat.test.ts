@@ -35,7 +35,7 @@ import type { HexString } from "../chain/address.js";
 const TEST_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as const;
 const TREASURY_KEY =
-  "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as HexString;
+  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef" as HexString;
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(

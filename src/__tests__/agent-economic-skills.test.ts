@@ -21,8 +21,8 @@ import {
 } from "../metaworld/intents.js";
 import { initializeGroupTreasury, recordTreasuryInflow } from "../group/treasury.js";
 
-const FOX_ADDRESS = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const OTHER_ADDRESS = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const FOX_ADDRESS = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
+const OTHER_ADDRESS = "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05";
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-econ-test-"));
@@ -40,7 +40,7 @@ function makeToolContext(db: OpenFoxDatabase, address: string = FOX_ADDRESS): To
     } as OpenFoxIdentity,
     config: {
       name: "test-fox",
-      creatorAddress: "0x1111111111111111111111111111111111111111",
+      creatorAddress: "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d",
       inferenceModel: "test",
     } as OpenFoxConfig,
     db,

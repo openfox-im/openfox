@@ -318,7 +318,7 @@ export async function createBounty(
  * const submission = await submitAnswer(
  *   { baseUrl: "http://localhost:8080/bounties" },
  *   "bounty-456",
- *   "0x1234567890123456789012345678901234567890",
+ *   "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05",
  *   {
  *     submissionText: "My comprehensive answer to the bounty question...",
  *     solverAgentId: "agent-789",
@@ -557,7 +557,7 @@ export async function healthCheck(
  * const submission = await submitAnswer(
  *   config,
  *   bounty.bountyId,
- *   "0x1234567890123456789012345678901234567890",
+ *   "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05",
  *   {
  *     submissionText: "The capital of France is Paris"
  *   }

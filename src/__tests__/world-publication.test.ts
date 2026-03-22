@@ -20,7 +20,7 @@ import {
 } from "../metaworld/publication.js";
 
 const ADMIN_PRIVATE_KEY =
-  "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
+  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626daaaaaaaaaaaaaaaaaaaaaaaa" as const;
 
 function makeTmpDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -31,7 +31,7 @@ function makeConfig(walletAddress: `0x${string}`, dbPath: string): OpenFoxConfig
     name: "Publication Fox",
     genesisPrompt: "test",
     creatorAddress:
-      "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
     registeredRemotely: false,
     sandboxId: "",
     runtimeApiUrl: undefined,

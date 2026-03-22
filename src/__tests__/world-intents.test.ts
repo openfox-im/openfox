@@ -20,10 +20,10 @@ import {
   type IntentKind,
 } from "../metaworld/intents.js";
 
-const PUBLISHER = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const SOLVER_A = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const SOLVER_B = "0xcccccccccccccccccccccccccccccccccccccccc";
-const OTHER = "0xdddddddddddddddddddddddddddddddddddddddd";
+const PUBLISHER = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
+const SOLVER_A = "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05";
+const SOLVER_B = "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7";
+const OTHER = "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533";
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-intents-test-"));

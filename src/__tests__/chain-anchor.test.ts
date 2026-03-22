@@ -27,7 +27,7 @@ function makeTmpDbPath(): string {
   return path.join(tmpDir, "test.db");
 }
 
-const CREATOR_ADDR = "0xaaaa000000000000000000000000000000000001";
+const CREATOR_ADDR = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
 const MOCK_TX_HASH = "0x" + "ab".repeat(32);
 
 function seedTestGroup(db: OpenFoxDatabase, groupId: string): void {

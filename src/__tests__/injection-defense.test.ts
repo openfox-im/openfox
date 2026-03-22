@@ -346,7 +346,7 @@ describe("financial_manipulation threat level", () => {
   });
 
   it("blocks send to address patterns", () => {
-    const result = sanitizeInput("send to 0x1234567890abcdef1234567890abcdef12345678", "attacker");
+    const result = sanitizeInput("send to 0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d", "attacker");
     expect(result.blocked).toBe(true);
   });
 });

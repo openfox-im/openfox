@@ -88,7 +88,7 @@ function makeProviderConfig(): OpenFoxConfig {
     name: "ProviderFox",
     genesisPrompt: "test",
     creatorAddress:
-      "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
     registeredRemotely: false,
     sandboxId: "",
     runtimeApiUrl: undefined,
@@ -102,7 +102,7 @@ function makeProviderConfig(): OpenFoxConfig {
     dbPath: "~/.openfox/state.db",
     logLevel: "info",
     walletAddress:
-      "0x00000000000000000000000000000000000000000000000000000000000000aa",
+      "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000aa",
     rpcUrl: "http://127.0.0.1:8545",
     chainId: 1666,
     version: "0.2.1",
@@ -455,7 +455,7 @@ describe("agent gateway", () => {
             identity: {
               kind: "tos",
               value:
-                "0x0000000000000000000000000000000000000000000000000000000000000042",
+                "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042",
             },
           },
           request_nonce: "gateway-nonce-1",
@@ -544,7 +544,7 @@ describe("agent gateway", () => {
         ],
       },
       address:
-        "0x00000000000000000000000000000000000000000000000000000000000000bb",
+        "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000bb",
       discoveryNodeId: "node-gateway",
     });
 
@@ -565,7 +565,7 @@ describe("agent gateway", () => {
                     nodeId: "node-gateway",
                     nodeRecord: "enr:gateway",
                     primaryIdentity:
-                      "0x00000000000000000000000000000000000000000000000000000000000000bb",
+                      "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000bb",
                     trust: {
                       registered: true,
                       suspended: false,
@@ -1170,7 +1170,7 @@ describe("agent gateway", () => {
             identity: {
               kind: "tos",
               value:
-                "0x0000000000000000000000000000000000000000000000000000000000000042",
+                "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042",
             },
           },
           request_nonce: "provider-pays-nonce",

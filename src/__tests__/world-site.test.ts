@@ -29,7 +29,7 @@ function makeConfig(walletAddress: `0x${string}`, dbPath: string): OpenFoxConfig
     name: "Site Fox",
     genesisPrompt: "test",
     creatorAddress:
-      "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
     registeredRemotely: false,
     sandboxId: "",
     runtimeApiUrl: undefined,

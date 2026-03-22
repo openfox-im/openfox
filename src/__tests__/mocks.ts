@@ -322,7 +322,7 @@ export function createTestIdentity(): OpenFoxIdentity {
   return {
     name: "test-openfox",
     address:
-      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as `0x${string}`,
+      "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef" as `0x${string}`,
     account: {} as any, // Placeholder — not used in most tests
     creatorAddress:
       "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" as `0x${string}`,
@@ -350,7 +350,7 @@ export function createTestConfig(
     dbPath: "/tmp/test-state.db",
     logLevel: "error",
     walletAddress:
-      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as `0x${string}`,
+      "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef" as `0x${string}`,
     version: "0.2.1",
     skillsDir: "/tmp/test-skills",
     maxChildren: 3,

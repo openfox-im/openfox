@@ -263,7 +263,7 @@ export function simulateBattery(policy: PolicyDraft): SimulationResult[] {
     { action: "shield", value: "10000000000000000000", terminalClass: "kiosk", trustTier: 1, isPrivacy: true },
 
     // With unknown recipient
-    { action: "transfer", value: "100000000000000000000", terminalClass: "app", trustTier: 3, recipient: "0x0000000000000000000000000000000000000001" },
+    { action: "transfer", value: "100000000000000000000", terminalClass: "app", trustTier: 3, recipient: "0x0000000000000000000000000000000000000000000000000000000000000001" },
   ];
 
   return scenarios.map((scenario) => simulateScenario(policy, scenario));

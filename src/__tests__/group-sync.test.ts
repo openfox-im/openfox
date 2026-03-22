@@ -34,7 +34,7 @@ import type { GroupEventRecord } from "../group/store.js";
 const TEST_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as const;
 const SECOND_PRIVATE_KEY =
-  "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789" as const;
+  "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as const;
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-gsync-test-"));

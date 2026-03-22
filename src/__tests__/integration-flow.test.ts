@@ -25,8 +25,8 @@ import type { AuditEntry, AuditEntryKind } from "../audit/types.js";
 
 // ── Test Helpers ──────────────────────────────────────────────────
 
-const TEST_REQUESTER = "0x1111111111111111111111111111111111111111";
-const TEST_RECIPIENT = "0x2222222222222222222222222222222222222222";
+const TEST_REQUESTER = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
+const TEST_RECIPIENT = "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05";
 const SMALL_VALUE = "1000000000000000000"; // 1 TOS
 const MEDIUM_VALUE = "50000000000000000000"; // 50 TOS
 const LARGE_VALUE = "200000000000000000000"; // 200 TOS
@@ -108,7 +108,7 @@ function registerTestProvider(
   overrides?: Partial<ProviderProfile>,
 ): ProviderProfile {
   const profile: ProviderProfile = {
-    address: "0xABCDEF0000000000000000000000000000000001",
+    address: "0x3ccadfb801017cfb0f5dc61ef0e96fdaacbdb11c91ba5a230959e8d14020ea50",
     name: "TestProvider",
     serviceKinds: ["signer"],
     capabilities: ["transfer"],
@@ -906,7 +906,7 @@ describe("Full Intent Flow Integration", () => {
 
       const r2 = await pipeline.transfer({
         from: TEST_REQUESTER,
-        to: "0x3333333333333333333333333333333333333333",
+        to: "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7",
         value: MEDIUM_VALUE,
         terminalClass: "pos",
         trustTier: 2,

@@ -37,7 +37,7 @@ describe("runOnboard", () => {
     const config = {
       name: "test-openfox",
       walletAddress:
-        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
     };
     loadConfig.mockReturnValue(null);
     walletExists.mockReturnValue(false);
@@ -67,7 +67,7 @@ describe("runOnboard", () => {
     const config = {
       name: "test-openfox",
       walletAddress:
-        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
     };
     loadConfig.mockReturnValue(config);
     walletExists.mockReturnValue(true);

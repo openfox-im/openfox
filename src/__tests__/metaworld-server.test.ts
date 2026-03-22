@@ -17,14 +17,14 @@ import { publishFoxProfile, publishGroupProfile } from "../metaworld/identity.js
 import { registerMetaWorldSitePublication } from "../metaworld/publication.js";
 import type { OpenFoxConfig, OpenFoxDatabase } from "../types.js";
 
-const TEST_ADDRESS = "0xabcdef0123456789abcdef0123456789abcdef01";
-const FOLLOWER_ADDRESS = "0xabcdef0123456789abcdef0123456789abcdef02";
+const TEST_ADDRESS = "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7";
+const FOLLOWER_ADDRESS = "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533";
 const GROUP_FOLLOWER_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdea" as const;
 const GROUP_ADMIN_PRIVATE_KEY =
-  "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd12" as const;
+  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcd12" as const;
 const GROUP_APPLICANT_PRIVATE_KEY =
-  "0x2222222222222222222222222222222222222222222222222222222222222222" as const;
+  "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05222222222222222222222222" as const;
 const GROUP_MEMBER_PRIVATE_KEY =
   "0x4444444444444444444444444444444444444444444444444444444444444444" as const;
 const GROUP_OUTSIDER_PRIVATE_KEY =

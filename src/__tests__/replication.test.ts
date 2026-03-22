@@ -43,15 +43,15 @@ vi.mock("fs", async (importOriginal) => {
 
 describe("isValidWalletAddress", () => {
   it("accepts a valid 40-hex-char address with 0x prefix", () => {
-    expect(isValidWalletAddress("0xabcdef1234567890abcdef1234567890abcdef12")).toBe(true);
+    expect(isValidWalletAddress("0x3ccadfb801017cfb0f5dc61ef0e96fdaacbdb11c91ba5a230959e8d14020ea50")).toBe(true);
   });
 
   it("accepts uppercase hex characters", () => {
-    expect(isValidWalletAddress("0xABCDEF1234567890ABCDEF1234567890ABCDEF12")).toBe(true);
+    expect(isValidWalletAddress("0x3ccadfb801017cfb0f5dc61ef0e96fdaacbdb11c91ba5a230959e8d14020ea50")).toBe(true);
   });
 
   it("accepts mixed-case hex characters", () => {
-    expect(isValidWalletAddress("0xAbCdEf1234567890aBcDeF1234567890AbCdEf12")).toBe(true);
+    expect(isValidWalletAddress("0x3ccadfb801017cfb0f5dc61ef0e96fdaacbdb11c91ba5a230959e8d14020ea50")).toBe(true);
   });
 
   it("rejects the zero address", () => {
@@ -97,7 +97,7 @@ describe("spawnChild", () => {
     parentAddress: identity.address,
   };
 
-  const validAddress = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+  const validAddress = "0xf71d99c2b05b3ab38ebabfae54f08b149f9dffa9fd49cf69e20b9f0ea86514f2";
   const zeroAddress = "0x" + "0".repeat(40);
 
   beforeEach(() => {
