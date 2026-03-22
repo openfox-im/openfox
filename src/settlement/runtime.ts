@@ -1,3 +1,5 @@
+import type { Hex } from "@tosnetwork/tosdk";
+import type { SettlementRecord } from "../types.js";
 import { ChainRpcClient } from "../chain/client.js";
 
 export interface OpenFoxRuntimeReceipt {
@@ -42,6 +44,12 @@ export interface OpenFoxRuntimeSettlementSurface {
   effect?: OpenFoxSettlementEffect;
 }
 
+export interface OpenFoxSettlementRecordRuntimeBridge
+  extends OpenFoxRuntimeSettlementSurface {
+  runtimeReceiptRef?: Hex | null;
+  runtimeSettlementRef?: Hex | null;
+}
+
 export interface InspectOpenFoxRuntimeReceiptInput {
   rpcUrl: string;
   receiptRef: `0x${string}`;
@@ -66,6 +74,48 @@ function normalizeRuntimeRef(label: string, value: string): `0x${string}` {
     throw new Error(`Invalid ${label}: ${value}`);
   }
   return normalized as `0x${string}`;
+}
+
+function readRuntimeRefCandidate(value: unknown): Hex | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  if (!/^0x[0-9a-fA-F]+$/.test(normalized)) {
+    return null;
+  }
+  return normalized as Hex;
+}
+
+export function resolveOpenFoxSettlementRuntimeRefs(
+  record: SettlementRecord,
+): { runtimeReceiptRef?: Hex | null; runtimeSettlementRef?: Hex | null } {
+  const receiptMetadata =
+    record.receipt && typeof record.receipt.metadata === "object" && record.receipt.metadata
+      ? (record.receipt.metadata as Record<string, unknown>)
+      : null;
+  const settlementReceipt =
+    record.settlementReceipt && typeof record.settlementReceipt === "object"
+      ? (record.settlementReceipt as Record<string, unknown>)
+      : null;
+
+  const runtimeReceiptRef =
+    record.runtimeReceiptRef ??
+    readRuntimeRefCandidate(receiptMetadata?.runtimeReceiptRef) ??
+    readRuntimeRefCandidate(receiptMetadata?.runtime_receipt_ref) ??
+    readRuntimeRefCandidate(settlementReceipt?.receiptRef) ??
+    readRuntimeRefCandidate(settlementReceipt?.receipt_ref) ??
+    null;
+
+  const runtimeSettlementRef =
+    record.runtimeSettlementRef ??
+    readRuntimeRefCandidate(receiptMetadata?.runtimeSettlementRef) ??
+    readRuntimeRefCandidate(receiptMetadata?.runtime_settlement_ref) ??
+    readRuntimeRefCandidate(settlementReceipt?.settlementRef) ??
+    readRuntimeRefCandidate(settlementReceipt?.settlement_ref) ??
+    null;
+
+  return { runtimeReceiptRef, runtimeSettlementRef };
 }
 
 export async function inspectOpenFoxRuntimeReceipt(
@@ -102,4 +152,30 @@ export async function inspectOpenFoxSettlementEffect(
         )
       : undefined;
   return { receipt, effect };
+}
+
+export async function inspectOpenFoxSettlementRecordRuntimeBridge(input: {
+  rpcUrl: string;
+  record: SettlementRecord;
+}): Promise<OpenFoxSettlementRecordRuntimeBridge> {
+  const refs = resolveOpenFoxSettlementRuntimeRefs(input.record);
+  if (refs.runtimeReceiptRef) {
+    return {
+      ...refs,
+      ...(await inspectOpenFoxRuntimeReceipt({
+        rpcUrl: input.rpcUrl,
+        receiptRef: refs.runtimeReceiptRef,
+      })),
+    };
+  }
+  if (refs.runtimeSettlementRef) {
+    return {
+      ...refs,
+      ...(await inspectOpenFoxSettlementEffect({
+        rpcUrl: input.rpcUrl,
+        settlementRef: refs.runtimeSettlementRef,
+      })),
+    };
+  }
+  return refs;
 }

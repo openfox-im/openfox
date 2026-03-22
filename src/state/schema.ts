@@ -5,7 +5,7 @@
  * The database IS the openfox's memory.
  */
 
-export const SCHEMA_VERSION = 52;
+export const SCHEMA_VERSION = 53;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -292,6 +292,8 @@ export const CREATE_TABLES = `
     payout_tx_hash TEXT,
     settlement_tx_hash TEXT,
     settlement_receipt_json TEXT,
+    runtime_receipt_ref TEXT,
+    runtime_settlement_ref TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );

@@ -334,6 +334,16 @@ export interface AgentDiscoveryThreatModelHint {
   criticalInvariants?: string[];
 }
 
+export interface AgentDiscoveryDeploymentTrustHint {
+  packageName?: string;
+  packageVersion?: string;
+  publisherId?: string;
+  trusted?: boolean;
+  status?: string;
+  effectiveStatus?: string;
+  namespaceStatus?: string;
+}
+
 export interface AgentDiscoveryMetadataHints {
   agentAddress?: string;
   profileRef?: string;
@@ -342,6 +352,7 @@ export interface AgentDiscoveryMetadataHints {
   packageVersion?: string;
   routingProfile?: AgentDiscoveryRoutingProfileHint;
   threatModel?: AgentDiscoveryThreatModelHint;
+  deploymentTrust?: AgentDiscoveryDeploymentTrustHint;
 }
 
 export interface AgentDiscoverySelectionPolicy {
@@ -1929,6 +1940,8 @@ export interface SettlementRecord {
   payoutTxHash?: Hex | null;
   settlementTxHash?: Hex | null;
   settlementReceipt?: Record<string, unknown> | null;
+  runtimeReceiptRef?: Hex | null;
+  runtimeSettlementRef?: Hex | null;
   createdAt: string;
   updatedAt: string;
 }

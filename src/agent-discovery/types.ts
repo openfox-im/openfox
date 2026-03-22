@@ -2,6 +2,7 @@ import type {
   AgentDiscoveryCapabilityConfig,
   AgentDiscoveryCapabilityMode,
   AgentDiscoveryConfig,
+  AgentDiscoveryDeploymentTrustHint,
   AgentDiscoveryEndpointConfig,
   AgentDiscoveryExecutionPolicy,
   AgentDiscoveryExecutionPolicyProfiles,
@@ -26,6 +27,7 @@ import type {
 export type {
   AgentDiscoveryConfig,
   AgentDiscoveryCapabilityConfig,
+  AgentDiscoveryDeploymentTrustHint,
   AgentDiscoveryEndpointConfig,
   AgentDiscoveryExecutionPolicy,
   AgentDiscoveryExecutionPolicyProfiles,
@@ -88,6 +90,7 @@ export interface AgentDiscoveryCardPayload {
   capabilities: AgentDiscoveryCapability[];
   routing_profile?: AgentDiscoveryRoutingProfileHint;
   threat_model?: AgentDiscoveryThreatModelHint;
+  deployment_trust?: AgentDiscoveryDeploymentTrustHint;
   reputation_refs: string[];
   relay_encryption_pubkey?: `0x${string}`;
   metadata_signer: {

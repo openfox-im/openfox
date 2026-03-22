@@ -115,6 +115,33 @@ export function buildAgentDiscoveryCardPayload(params: {
           },
         }
       : {}),
+    ...(hints?.deploymentTrust
+      ? {
+          deployment_trust: {
+            ...(hints.deploymentTrust.packageName
+              ? { packageName: hints.deploymentTrust.packageName }
+              : {}),
+            ...(hints.deploymentTrust.packageVersion
+              ? { packageVersion: hints.deploymentTrust.packageVersion }
+              : {}),
+            ...(hints.deploymentTrust.publisherId
+              ? { publisherId: hints.deploymentTrust.publisherId }
+              : {}),
+            ...(typeof hints.deploymentTrust.trusted === "boolean"
+              ? { trusted: hints.deploymentTrust.trusted }
+              : {}),
+            ...(hints.deploymentTrust.status
+              ? { status: hints.deploymentTrust.status }
+              : {}),
+            ...(hints.deploymentTrust.effectiveStatus
+              ? { effectiveStatus: hints.deploymentTrust.effectiveStatus }
+              : {}),
+            ...(hints.deploymentTrust.namespaceStatus
+              ? { namespaceStatus: hints.deploymentTrust.namespaceStatus }
+              : {}),
+          },
+        }
+      : {}),
     reputation_refs: [],
     relay_encryption_pubkey: params.identity.account.publicKey?.toLowerCase() as
       | `0x${string}`

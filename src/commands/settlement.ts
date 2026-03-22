@@ -2,8 +2,10 @@ import { loadConfig, resolvePath } from "../config.js";
 import { createDatabase } from "../state/database.js";
 import { createLogger } from "../observability/logger.js";
 import {
+  inspectOpenFoxSettlementRecordRuntimeBridge,
   inspectOpenFoxRuntimeReceipt,
   inspectOpenFoxSettlementEffect,
+  resolveOpenFoxSettlementRuntimeRefs,
 } from "../settlement/runtime.js";
 
 const logger = createLogger("main");
@@ -115,12 +117,34 @@ Usage:
             : "Usage: openfox settlement get --receipt-id <id> | --kind <kind> --subject-id <id>",
         );
       }
+      const runtimeRefs = resolveOpenFoxSettlementRuntimeRefs(record);
+      let runtimeBridge:
+        | Awaited<ReturnType<typeof inspectOpenFoxSettlementRecordRuntimeBridge>>
+        | null = null;
+      let runtimeBridgeError: string | null = null;
+      if (runtimeRefs.runtimeReceiptRef || runtimeRefs.runtimeSettlementRef) {
+        if (config.rpcUrl) {
+          try {
+            runtimeBridge = await inspectOpenFoxSettlementRecordRuntimeBridge({
+              rpcUrl: config.rpcUrl,
+              record,
+            });
+          } catch (err) {
+            runtimeBridge = runtimeRefs;
+            runtimeBridgeError = err instanceof Error ? err.message : String(err);
+          }
+        } else {
+          runtimeBridge = runtimeRefs;
+        }
+      }
       if (asJson) {
         logger.info(
           JSON.stringify(
             {
               ...record,
               callback: db.getSettlementCallbackByReceiptId(record.receiptId) ?? null,
+              runtimeBridge,
+              runtimeBridgeError,
             },
             null,
             2,
@@ -139,8 +163,13 @@ Artifact:    ${record.artifactUrl || "(none)"}
 Payment tx:  ${record.paymentTxHash || "(none)"}
 Payout tx:   ${record.payoutTxHash || "(none)"}
 Anchor tx:   ${record.settlementTxHash || "(pending)"}
+Runtime rcpt:${runtimeBridge?.runtimeReceiptRef || "(none)"}
+Runtime setl:${runtimeBridge?.runtimeSettlementRef || "(none)"}
 Callback:    ${callback ? `${callback.status} -> ${callback.contractAddress}` : "(none)"}
 Callback tx: ${callback?.callbackTxHash || "(none)"}
+Runtime st:  ${runtimeBridge?.receipt?.statusName || "(unknown)"}
+Runtime md:  ${runtimeBridge?.effect?.modeName || runtimeBridge?.receipt?.modeName || "(unknown)"}
+Runtime err: ${runtimeBridgeError || "(none)"}
 Created:     ${record.createdAt}
 Updated:     ${record.updatedAt}
 =================================

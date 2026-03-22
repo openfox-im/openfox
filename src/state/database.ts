@@ -854,8 +854,8 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       `INSERT INTO settlement_receipts (
         receipt_id, kind, subject_id, receipt_json, receipt_hash, artifact_url,
         payment_tx_hash, payout_tx_hash, settlement_tx_hash, settlement_receipt_json,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        runtime_receipt_ref, runtime_settlement_ref, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(receipt_id) DO UPDATE SET
         receipt_json = excluded.receipt_json,
         receipt_hash = excluded.receipt_hash,
@@ -864,6 +864,8 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
         payout_tx_hash = excluded.payout_tx_hash,
         settlement_tx_hash = excluded.settlement_tx_hash,
         settlement_receipt_json = excluded.settlement_receipt_json,
+        runtime_receipt_ref = excluded.runtime_receipt_ref,
+        runtime_settlement_ref = excluded.runtime_settlement_ref,
         updated_at = excluded.updated_at`,
     ).run(
       receipt.receiptId,
@@ -876,6 +878,8 @@ export function createDatabase(dbPath: string): OpenFoxDatabase {
       receipt.payoutTxHash ?? null,
       receipt.settlementTxHash ?? null,
       receipt.settlementReceipt ? JSON.stringify(receipt.settlementReceipt) : null,
+      receipt.runtimeReceiptRef ?? null,
+      receipt.runtimeSettlementRef ?? null,
       receipt.createdAt,
       receipt.updatedAt,
     );
@@ -3210,12 +3214,29 @@ function applyMigrations(db: DatabaseType): void {
     .get() as { v: number | null } | undefined;
   const currentVersion = versionRow?.v ?? 0;
 
+  ensureColumn(db, "settlement_receipts", "runtime_receipt_ref", "TEXT");
+  ensureColumn(db, "settlement_receipts", "runtime_settlement_ref", "TEXT");
+
   if (currentVersion < SCHEMA_VERSION) {
-    // All tables are fully defined in CREATE_TABLES — just stamp the version.
     db.prepare("INSERT OR REPLACE INTO schema_version (version) VALUES (?)").run(
       SCHEMA_VERSION,
     );
   }
+}
+
+function ensureColumn(
+  db: DatabaseType,
+  table: string,
+  column: string,
+  sqlType: string,
+): void {
+  const rows = db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all() as Array<{ name?: string }>;
+  if (rows.some((row) => row.name === column)) {
+    return;
+  }
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`);
 }
 
 // ─── Exported Helpers ───────────────────────────────────────────
@@ -4419,6 +4440,8 @@ function deserializeSettlementRecord(row: any): SettlementRecord {
           "deserializeSettlementRecord.settlement_receipt_json",
         )
       : null,
+    runtimeReceiptRef: row.runtime_receipt_ref ?? null,
+    runtimeSettlementRef: row.runtime_settlement_ref ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -56,8 +56,10 @@ import { createCommitteeManager } from "../committee/manager.js";
 import { buildEvidenceWorkflowSummary } from "../evidence-workflow/summary.js";
 import { buildOracleSummary } from "../agent-discovery/oracle-summary.js";
 import {
+  inspectOpenFoxSettlementRecordRuntimeBridge,
   inspectOpenFoxRuntimeReceipt,
   inspectOpenFoxSettlementEffect,
+  resolveOpenFoxSettlementRuntimeRefs,
 } from "../settlement/runtime.js";
 
 const logger = createLogger("operator.api");
@@ -161,6 +163,7 @@ export async function startOperatorApiServer(
   const oracleSummaryPath = `${pathPrefix}/oracle/summary`;
   const paymentsPath = `${pathPrefix}/payments/status`;
   const settlementPath = `${pathPrefix}/settlement/status`;
+  const settlementBridgePath = `${pathPrefix}/settlement/bridge`;
   const settlementRuntimeReceiptPath = `${pathPrefix}/settlement/runtime-receipt`;
   const settlementRuntimeEffectPath = `${pathPrefix}/settlement/runtime-effect`;
   const marketPath = `${pathPrefix}/market/status`;
@@ -692,6 +695,44 @@ export async function startOperatorApiServer(
           200,
           await buildOperatorSettlementSnapshot(params.config, params.db),
         );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === settlementBridgePath) {
+        const receiptId = url.searchParams.get("receipt_id")?.trim();
+        if (!receiptId) {
+          json(res, 400, { error: "missing receipt_id" });
+          return;
+        }
+        const record = params.db.getSettlementReceiptById(receiptId);
+        if (!record) {
+          json(res, 404, { error: "settlement receipt not found" });
+          return;
+        }
+        const runtimeRefs = resolveOpenFoxSettlementRuntimeRefs(record);
+        let runtimeBridge: Awaited<
+          ReturnType<typeof inspectOpenFoxSettlementRecordRuntimeBridge>
+        > | null = null;
+        let runtimeBridgeError: string | null = null;
+        if ((runtimeRefs.runtimeReceiptRef || runtimeRefs.runtimeSettlementRef) && params.config.rpcUrl) {
+          try {
+            runtimeBridge = await inspectOpenFoxSettlementRecordRuntimeBridge({
+              rpcUrl: params.config.rpcUrl,
+              record,
+            });
+          } catch (err) {
+            runtimeBridge = runtimeRefs;
+            runtimeBridgeError = err instanceof Error ? err.message : String(err);
+          }
+        } else {
+          runtimeBridge = runtimeRefs;
+        }
+        json(res, 200, {
+          record,
+          callback: params.db.getSettlementCallbackByReceiptId(record.receiptId) ?? null,
+          runtimeBridge,
+          runtimeBridgeError,
+        });
         return;
       }
 

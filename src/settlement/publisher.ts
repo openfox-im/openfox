@@ -27,6 +27,8 @@ export interface SettlementPublicationInput {
   artifactUrl?: string | null;
   paymentTxHash?: Hex | null;
   payoutTxHash?: Hex | null;
+  runtimeReceiptRef?: Hex | null;
+  runtimeSettlementRef?: Hex | null;
   result: unknown;
   metadata?: Record<string, unknown>;
   createdAt?: string;
@@ -69,6 +71,8 @@ export function buildSettlementReceiptRecord(
     payoutTxHash: input.payoutTxHash ?? null,
     settlementTxHash: null,
     settlementReceipt: null,
+    runtimeReceiptRef: input.runtimeReceiptRef ?? null,
+    runtimeSettlementRef: input.runtimeSettlementRef ?? null,
     createdAt,
     updatedAt: createdAt,
   };

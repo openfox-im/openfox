@@ -44,6 +44,8 @@ describe("settlement publisher", () => {
         "0xdca90de7e66cec3a5c7683922036c75aa691b36b473f162b905590f8031217c2",
       result: { decision: "accepted", confidence: 0.97 },
       artifactUrl: "/bounties/bounty-1/result",
+      runtimeReceiptRef: "0xaaa1",
+      runtimeSettlementRef: "0xbbb1",
     });
 
     const second = await publisher.publish({
@@ -55,6 +57,8 @@ describe("settlement publisher", () => {
         "0xdca90de7e66cec3a5c7683922036c75aa691b36b473f162b905590f8031217c2",
       result: { confidence: 0.97, decision: "accepted" },
       artifactUrl: "/bounties/bounty-1/result",
+      runtimeReceiptRef: "0xaaa1",
+      runtimeSettlementRef: "0xbbb1",
     });
 
     expect(first.receiptId).toBe("bounty:bounty-1");
@@ -68,6 +72,8 @@ describe("settlement publisher", () => {
     const stored = db.getSettlementReceipt("bounty", "bounty-1");
     expect(stored?.receiptId).toBe(first.receiptId);
     expect(stored?.settlementTxHash).toBe(first.settlementTxHash);
+    expect(stored?.runtimeReceiptRef).toBe("0xaaa1");
+    expect(stored?.runtimeSettlementRef).toBe("0xbbb1");
     db.close();
   });
 });
