@@ -1,6 +1,10 @@
 import { loadConfig, resolvePath } from "../config.js";
 import { createDatabase } from "../state/database.js";
 import { createLogger } from "../observability/logger.js";
+import {
+  inspectOpenFoxRuntimeReceipt,
+  inspectOpenFoxSettlementEffect,
+} from "../settlement/runtime.js";
 
 const logger = createLogger("main");
 
@@ -32,6 +36,8 @@ Usage:
   openfox settlement callbacks [--kind <bounty|observation|oracle>] [--status <pending|confirmed|failed>] [--limit N] [--json]
   openfox settlement get --receipt-id <id> [--json]
   openfox settlement get --kind <bounty|observation|oracle> --subject-id <id> [--json]
+  openfox settlement runtime-receipt --receipt-ref <0x...> [--json]
+  openfox settlement runtime-effect --settlement-ref <0x...> [--json]
 `);
     return;
   }
@@ -138,6 +144,71 @@ Callback tx: ${callback?.callbackTxHash || "(none)"}
 Created:     ${record.createdAt}
 Updated:     ${record.updatedAt}
 =================================
+`);
+      return;
+    }
+
+    if (command === "runtime-receipt") {
+      const receiptRef = readOption(args, "--receipt-ref");
+      if (!receiptRef) {
+        throw new Error("Usage: openfox settlement runtime-receipt --receipt-ref <0x...> [--json]");
+      }
+      if (!config.rpcUrl) {
+        throw new Error("OpenFox runtime settlement inspection requires config.rpcUrl");
+      }
+      const surface = await inspectOpenFoxRuntimeReceipt({
+        rpcUrl: config.rpcUrl,
+        receiptRef: receiptRef as `0x${string}`,
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(surface, null, 2));
+        return;
+      }
+      logger.info(`
+=== OPENFOX RUNTIME SETTLEMENT RECEIPT ===
+Receipt ref:     ${surface.receipt?.receiptRef || receiptRef}
+Status:          ${surface.receipt?.statusName || "(unknown)"}
+Mode:            ${surface.receipt?.modeName || "(unknown)"}
+Sender:          ${surface.receipt?.sender || "(unknown)"}
+Recipient:       ${surface.receipt?.recipient || "(unknown)"}
+Settlement ref:  ${surface.receipt?.settlementRef || "(none)"}
+Proof ref:       ${surface.receipt?.proofRef || "(none)"}
+Failure ref:     ${surface.receipt?.failureRef || "(none)"}
+Opened at:       ${surface.receipt?.openedAt ?? "(unknown)"}
+Finalized at:    ${surface.receipt?.finalizedAt ?? "(unknown)"}
+==========================================
+`);
+      return;
+    }
+
+    if (command === "runtime-effect") {
+      const settlementRef = readOption(args, "--settlement-ref");
+      if (!settlementRef) {
+        throw new Error("Usage: openfox settlement runtime-effect --settlement-ref <0x...> [--json]");
+      }
+      if (!config.rpcUrl) {
+        throw new Error("OpenFox runtime settlement inspection requires config.rpcUrl");
+      }
+      const surface = await inspectOpenFoxSettlementEffect({
+        rpcUrl: config.rpcUrl,
+        settlementRef: settlementRef as `0x${string}`,
+      });
+      if (asJson) {
+        logger.info(JSON.stringify(surface, null, 2));
+        return;
+      }
+      logger.info(`
+=== OPENFOX RUNTIME SETTLEMENT EFFECT ===
+Settlement ref:  ${surface.effect?.settlementRef || settlementRef}
+Mode:            ${surface.effect?.modeName || "(unknown)"}
+Sender:          ${surface.effect?.sender || "(unknown)"}
+Recipient:       ${surface.effect?.recipient || "(unknown)"}
+Receipt ref:     ${surface.effect?.receiptRef || "(none)"}
+Amount ref:      ${surface.effect?.amountRef || "(none)"}
+Policy ref:      ${surface.effect?.policyRef || "(none)"}
+Artifact ref:    ${surface.effect?.artifactRef || "(none)"}
+Created at:      ${surface.effect?.createdAt ?? "(unknown)"}
+=========================================
 `);
       return;
     }

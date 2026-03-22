@@ -55,6 +55,10 @@ import {
 import { createCommitteeManager } from "../committee/manager.js";
 import { buildEvidenceWorkflowSummary } from "../evidence-workflow/summary.js";
 import { buildOracleSummary } from "../agent-discovery/oracle-summary.js";
+import {
+  inspectOpenFoxRuntimeReceipt,
+  inspectOpenFoxSettlementEffect,
+} from "../settlement/runtime.js";
 
 const logger = createLogger("operator.api");
 
@@ -157,6 +161,8 @@ export async function startOperatorApiServer(
   const oracleSummaryPath = `${pathPrefix}/oracle/summary`;
   const paymentsPath = `${pathPrefix}/payments/status`;
   const settlementPath = `${pathPrefix}/settlement/status`;
+  const settlementRuntimeReceiptPath = `${pathPrefix}/settlement/runtime-receipt`;
+  const settlementRuntimeEffectPath = `${pathPrefix}/settlement/runtime-effect`;
   const marketPath = `${pathPrefix}/market/status`;
   const controlStatusPath = `${pathPrefix}/control/status`;
   const controlEventsPath = `${pathPrefix}/control/events`;
@@ -685,6 +691,48 @@ export async function startOperatorApiServer(
           res,
           200,
           await buildOperatorSettlementSnapshot(params.config, params.db),
+        );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === settlementRuntimeReceiptPath) {
+        const receiptRef = url.searchParams.get("receipt_ref")?.trim();
+        if (!receiptRef) {
+          json(res, 400, { error: "missing receipt_ref" });
+          return;
+        }
+        if (!params.config.rpcUrl) {
+          json(res, 400, { error: "runtime settlement inspection requires rpcUrl" });
+          return;
+        }
+        json(
+          res,
+          200,
+          await inspectOpenFoxRuntimeReceipt({
+            rpcUrl: params.config.rpcUrl,
+            receiptRef: receiptRef as `0x${string}`,
+          }),
+        );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === settlementRuntimeEffectPath) {
+        const settlementRef = url.searchParams.get("settlement_ref")?.trim();
+        if (!settlementRef) {
+          json(res, 400, { error: "missing settlement_ref" });
+          return;
+        }
+        if (!params.config.rpcUrl) {
+          json(res, 400, { error: "runtime settlement inspection requires rpcUrl" });
+          return;
+        }
+        json(
+          res,
+          200,
+          await inspectOpenFoxSettlementEffect({
+            rpcUrl: params.config.rpcUrl,
+            settlementRef: settlementRef as `0x${string}`,
+          }),
         );
         return;
       }
