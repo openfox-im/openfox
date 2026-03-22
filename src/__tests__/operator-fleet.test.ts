@@ -206,14 +206,14 @@ describe("operator fleet", () => {
     const walletBaseUrl = await startEndpointServer("/operator/wallet/status", {
       kind: "wallet",
       address:
-        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
+        "0x97b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
       summary:
         "balance=5.000000 TOS reserved=1.000000 TOS available=4.000000 TOS, receivable=0.500000 TOS, payable=0.200000 TOS, runway=40.0d",
     });
     const financeBaseUrl = await startEndpointServer("/operator/finance/status", {
       kind: "finance",
       address:
-        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
+        "0x97b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
       summary:
         "30d revenue=8.000000 TOS, cost=3.000000 TOS, net=5.000000 TOS, operating=$12.50",
     });

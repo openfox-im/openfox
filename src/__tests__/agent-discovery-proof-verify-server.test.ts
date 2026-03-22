@@ -43,7 +43,7 @@ function makeConfig(): OpenFoxConfig {
     heartbeatConfigPath: "~/.openfox/heartbeat.yml",
     dbPath: "~/.openfox/state.db",
     logLevel: "info",
-    walletAddress: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042",
+    walletAddress: "0x0000000000000000000000000000000000000000000000000000000000000042",
     rpcUrl: "http://127.0.0.1:8545",
     chainId: 1666,
     version: "0.2.1",

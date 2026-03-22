@@ -21,7 +21,7 @@ test("binds direct execution trails from signer and paymaster records by tx hash
       requesterAddress:
         "0xc9b7083ed72ae7501f0f76c6fa2737ea3643ce0a7c85b2d81f4a2d030aea04ed",
       targetAddress:
-        "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
+        "0x3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
       valueTomi: "0",
       dataHex: "0x",
       gas: "21000",
@@ -59,7 +59,7 @@ test("binds direct execution trails from signer and paymaster records by tx hash
         "0xc9b7083ed72ae7501f0f76c6fa2737ea3643ce0a7c85b2d81f4a2d030aea04ed",
       requesterSignerType: "secp256k1",
       targetAddress:
-        "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
+        "0x3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
       valueTomi: "0",
       dataHex: "0x",
       gas: "21000",

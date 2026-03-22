@@ -41,7 +41,7 @@ function makeConfig(): OpenFoxConfig {
     heartbeatConfigPath: "~/.openfox/heartbeat.yml",
     dbPath: "~/.openfox/state.db",
     logLevel: "info",
-    walletAddress: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000aa",
+    walletAddress: "0x00000000000000000000000000000000000000000000000000000000000000aa",
     rpcUrl: "http://127.0.0.1:8545",
     chainId: 1666,
     version: "0.2.1",
@@ -104,7 +104,7 @@ describe("agent discovery faucet server", () => {
     const server = await startAgentDiscoveryFaucetServer({
       identity: makeIdentity(),
       config: makeConfig(),
-      address: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000aa",
+      address: "0x00000000000000000000000000000000000000000000000000000000000000aa",
       privateKey: TEST_PRIVATE_KEY,
       db: makeDb(),
       faucetConfig: makeConfig().agentDiscovery!.faucetServer!,
@@ -123,7 +123,7 @@ describe("agent discovery faucet server", () => {
             agent_id: "requester",
             identity: {
               kind: "tos",
-              value: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042",
+              value: "0x0000000000000000000000000000000000000000000000000000000000000042",
             },
           },
           request_nonce: "nonce-0001",
@@ -163,7 +163,7 @@ describe("agent discovery faucet server", () => {
           agent_id: "requester",
           identity: {
             kind: "tos",
-            value: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000042",
+            value: "0x0000000000000000000000000000000000000000000000000000000000000042",
           },
         },
         request_nonce: "nonce-0001",
@@ -212,7 +212,7 @@ describe("agent discovery faucet server", () => {
           agent_id: "requester",
           identity: {
             kind: "tos",
-            value: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000043",
+            value: "0x0000000000000000000000000000000000000000000000000000000000000043",
           },
         },
         request_nonce: "nonce-replay-1",

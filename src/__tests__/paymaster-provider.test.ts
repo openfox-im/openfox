@@ -237,7 +237,7 @@ afterEach(async () => {
     const providerKey =
       "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as Hex;
     const requesterKey =
-      "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as Hex;
+      "0x80291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as Hex;
     const identity = createIdentity(providerKey);
     const requester = privateKeyToAccount(requesterKey);
     const rpc = await startRpcServer({
@@ -493,7 +493,7 @@ afterEach(async () => {
     const providerKey =
       "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as Hex;
     const requesterKey =
-      "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as Hex;
+      "0x80291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as Hex;
     const identity = createIdentity(providerKey);
     const requester = privateKeyToAccount(requesterKey);
     const rpc = await startRpcServer({
@@ -714,7 +714,7 @@ afterEach(async () => {
           rawTransaction:
             "0xdeadbeef" as Hex,
           txHash:
-            "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd" as Hex,
+            "0x3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd" as Hex,
           receipt: { status: "0x1", blockNumber: "0x10" },
         };
       },
@@ -789,7 +789,7 @@ afterEach(async () => {
     {
       signerType: "secp256r1" as const,
       privateKey:
-        "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001" as Hex,
+        "0x0000000000000000000000000000000000000000000000000000000000000001" as Hex,
       requestKey: "paymaster:secp256r1",
     },
     {

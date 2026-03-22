@@ -64,7 +64,7 @@ describe("metaWorld boards", () => {
     db.upsertOwnerOpportunityAlert({
       alertId: "alert-board-1",
       opportunityHash:
-        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d111111111111111111111111",
+        "0x97b1c813eae702332ba3eaa1625f942c5472626d111111111111111111111111",
       kind: "provider",
       providerClass: "oracle",
       trustTier: "org_trusted",
@@ -93,10 +93,10 @@ describe("metaWorld boards", () => {
       leaseId: "lease-board-1",
       cid: "bafyboardartifact",
       bundleHash:
-        "0x473302ca547d5f9877e272cffe58d4def43198b66ba35cff4b2e584be19efa05222222222222222222222222",
+        "0xfe58d4def43198b66ba35cff4b2e584be19efa05222222222222222222222222",
       providerBaseUrl: "https://artifacts.example.com",
       providerAddress:
-        "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626daaaaaaaaaaaaaaaaaaaaaaaa",
+        "0x97b1c813eae702332ba3eaa1625f942c5472626daaaaaaaaaaaaaaaaaaaaaaaa",
       requesterAddress: account.address.toLowerCase() as `0x${string}`,
       status: "stored",
       createdAt: "2030-01-01T00:00:03.000Z",
@@ -109,7 +109,7 @@ describe("metaWorld boards", () => {
       subjectId: "bounty-board-1",
       receipt: {} as any,
       receiptHash:
-        "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7333333333333333333333333",
+        "0x80291bb781ac0a8a3a69c785631d4193e9a9d5e7333333333333333333333333",
       createdAt: "2030-01-01T00:00:04.000Z",
       updatedAt: "2030-01-01T00:00:04.000Z",
     } satisfies SettlementRecord);

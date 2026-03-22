@@ -32,7 +32,7 @@ function makeTmpDbPath(): string {
 const CREATOR_ADDR = "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d";
 const GROUP_ID = "test-group-chain-1";
 const PRIVATE_KEY =
-  "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001" as any;
+  "0x0000000000000000000000000000000000000000000000000000000000000001" as any;
 const RPC_URL = "http://localhost:9999";
 
 const mockSendAction: SendActionFn = async (_params: any) => ({

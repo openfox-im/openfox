@@ -42,7 +42,7 @@ vi.mock("fs", async (importOriginal) => {
 // ─── isValidWalletAddress ─────────────────────────────────────
 
 describe("isValidWalletAddress", () => {
-  it("accepts a valid 40-hex-char address with 0x prefix", () => {
+  it("accepts a valid 64-hex-char address with 0x prefix", () => {
     expect(isValidWalletAddress("0x3ccadfb801017cfb0f5dc61ef0e96fdaacbdb11c91ba5a230959e8d14020ea50")).toBe(true);
   });
 
@@ -55,11 +55,11 @@ describe("isValidWalletAddress", () => {
   });
 
   it("rejects the zero address", () => {
-    expect(isValidWalletAddress("0x" + "0".repeat(40))).toBe(false);
+    expect(isValidWalletAddress("0x" + "0".repeat(64))).toBe(false);
   });
 
   it("rejects addresses without 0x prefix", () => {
-    expect(isValidWalletAddress("abcdef1234567890abcdef1234567890abcdef12")).toBe(false);
+    expect(isValidWalletAddress("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")).toBe(false);
   });
 
   it("rejects addresses that are too short", () => {
@@ -67,7 +67,7 @@ describe("isValidWalletAddress", () => {
   });
 
   it("rejects addresses that are too long", () => {
-    expect(isValidWalletAddress("0x" + "a".repeat(42))).toBe(false);
+    expect(isValidWalletAddress("0x" + "a".repeat(66))).toBe(false);
   });
 
   it("rejects empty string", () => {
@@ -75,7 +75,7 @@ describe("isValidWalletAddress", () => {
   });
 
   it("rejects non-hex characters", () => {
-    expect(isValidWalletAddress("0xGGGGGG1234567890abcdef1234567890abcdef12")).toBe(false);
+    expect(isValidWalletAddress("0xGGGGGG1234567890abcdef1234567890abcdef1234567890abcdef1234567890")).toBe(false);
   });
 
   it("rejects 0x prefix alone", () => {
@@ -98,7 +98,7 @@ describe("spawnChild", () => {
   };
 
   const validAddress = "0xf71d99c2b05b3ab38ebabfae54f08b149f9dffa9fd49cf69e20b9f0ea86514f2";
-  const zeroAddress = "0x" + "0".repeat(40);
+  const zeroAddress = "0x" + "0".repeat(64);
 
   beforeEach(() => {
     runtime = new MockRuntimeClient();

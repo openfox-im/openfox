@@ -27,7 +27,7 @@ describe("chain address", () => {
 
   it("normalizes short hex addresses by left-padding to 32 bytes", () => {
     expect(normalizeAddress("0x1234")).toBe(
-      "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000001234",
+      "0x0000000000000000000000000000000000000000000000000000000000001234",
     );
   });
 });

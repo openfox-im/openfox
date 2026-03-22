@@ -95,7 +95,7 @@ describe("settlement callbacks", () => {
       payloadMode: "canonical_receipt",
       payloadHex: "0x1234",
       payloadHash:
-        "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
+        "0x3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
       status: "pending",
       attemptCount: 1,
       maxAttempts: 3,

@@ -17,6 +17,9 @@ import type {
 import type { ChildLifecycle } from "./lifecycle.js";
 import { ulid } from "ulid";
 import { propagateConstitution } from "./constitution.js";
+import { isChainAddress } from "../chain/address.js";
+
+const NATIVE_WALLET_ADDRESS_RE = /0x[a-fA-F0-9]{64}/;
 
 /** Valid Runtime sandbox pricing tiers. */
 const SANDBOX_TIERS = [
@@ -33,12 +36,10 @@ function selectSandboxTier(requestedMemoryMb: number) {
 }
 
 /**
- * Validate that an address is a well-formed, non-zero Ethereum wallet address.
+ * Validate that an address is a well-formed, non-zero native wallet address.
  */
 export function isValidWalletAddress(address: string): boolean {
-  return (
-    /^0x[a-fA-F0-9]{40}$/.test(address) && address !== "0x" + "0".repeat(40)
-  );
+  return isChainAddress(address) && address !== "0x" + "0".repeat(64);
 }
 
 /**
@@ -151,7 +152,7 @@ export async function spawnChild(
 
     // Initialize child wallet (on the CHILD sandbox)
     const initResult = await childRuntime.exec("node /root/openfox/dist/index.js --init 2>&1", 60_000);
-    const walletMatch = (initResult.stdout || "").match(/0x[a-fA-F0-9]{40}/);
+    const walletMatch = (initResult.stdout || "").match(NATIVE_WALLET_ADDRESS_RE);
     const childWallet = walletMatch ? walletMatch[0] : "";
 
     if (!isValidWalletAddress(childWallet)) {
@@ -278,7 +279,7 @@ async function spawnChildLegacy(
     }
 
     const initResult = await childRuntime.exec("node /root/openfox/dist/index.js --init 2>&1", 60_000);
-    const walletMatch = (initResult.stdout || "").match(/0x[a-fA-F0-9]{40}/);
+    const walletMatch = (initResult.stdout || "").match(NATIVE_WALLET_ADDRESS_RE);
     const childWallet = walletMatch ? walletMatch[0] : "";
 
     if (!isValidWalletAddress(childWallet)) {

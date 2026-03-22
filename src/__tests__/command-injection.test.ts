@@ -436,7 +436,7 @@ describe("Validation rules", () => {
   describe("validate.address_format", () => {
     const rule = rules.find((r) => r.id === "validate.address_format")!;
 
-    it("allows valid Ethereum addresses", () => {
+    it("allows valid native chain addresses", () => {
       const valid = [
         "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d",
         "0x3ccadfb801017cfb0f5dc61ef0e96fdaacbdb11c91ba5a230959e8d14020ea50",

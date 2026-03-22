@@ -428,7 +428,7 @@ describe("operator api", () => {
           trustTier: "self_hosted",
           policyId: "policy-test",
           walletAddress:
-            "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
+            "0x97b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef",
           allowedTargets: [
             "0x74ad93496274ddc81b6336c6fb3f32e17127f96a57dfafa05d87eadcb40b4d01",
           ],

@@ -20,7 +20,7 @@ import {
 } from "../metaworld/publication.js";
 
 const ADMIN_PRIVATE_KEY =
-  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626daaaaaaaaaaaaaaaaaaaaaaaa" as const;
+  "0x97b1c813eae702332ba3eaa1625f942c5472626daaaaaaaaaaaaaaaaaaaaaaaa" as const;
 
 function makeTmpDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));

@@ -79,7 +79,7 @@ describe("heartbeat settlement retry task", () => {
       attemptCount: 1,
       maxAttempts: 3,
       callbackTxHash:
-        "0xf4897a85e6ac20f6b7b22e2c3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
+        "0x3a8fac52fb6c36430b80655354e5aa4f5e1a3533dddddddddddddddddddddddd",
       callbackReceipt: null,
       lastError: null,
       nextAttemptAt: "2026-03-09T00:00:00.000Z",

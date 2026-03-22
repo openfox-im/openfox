@@ -23,11 +23,11 @@ const TOS = 10n ** 18n;
 const ADMIN_PRIVATE_KEY =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as const;
 const MEMBER_PRIVATE_KEY =
-  "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as const;
+  "0x80291bb781ac0a8a3a69c785631d4193e9a9d5e723456789abcdef0123456789" as const;
 const APPLICANT_PRIVATE_KEY =
-  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d111111111111111111111111" as const;
+  "0x97b1c813eae702332ba3eaa1625f942c5472626d111111111111111111111111" as const;
 const OUTSIDER_PRIVATE_KEY =
-  "0xdf96edbc954f43d46dc80e0180291bb781ac0a8a3a69c785631d4193e9a9d5e7333333333333333333333333" as const;
+  "0x80291bb781ac0a8a3a69c785631d4193e9a9d5e7333333333333333333333333" as const;
 
 function makeTmpDbPath(): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openfox-world-group-page-test-"));

@@ -24,7 +24,7 @@ import {
 } from "../group/treasury.js";
 
 const TEST_PRIVATE_KEY =
-  "0x8ac013baac6fd392efc57bb097b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef" as HexString;
+  "0x97b1c813eae702332ba3eaa1625f942c5472626d90abcdef1234567890abcdef" as HexString;
 const TEST_GROUP_ID = "test-group-001";
 
 describe("group treasury", () => {
