@@ -1,4 +1,8 @@
-import { discoverCapabilityProviders } from "../agent-discovery/client.js";
+import {
+  diagnoseCapabilityProviders,
+  discoverCapabilityProviders,
+  summarizeProviderDiagnostics,
+} from "../agent-discovery/client.js";
 import type { VerifiedAgentProvider } from "../agent-discovery/types.js";
 import { fetchRemoteBounties, fetchRemoteCampaigns } from "../bounty/client.js";
 import type {
@@ -80,6 +84,21 @@ function parseTrustTierFromProvider(
     return "public_low_trust";
   }
   return "unknown";
+}
+
+function recordDiscoveryDiagnostics(
+  db: OpenFoxDatabase,
+  capability: string,
+  summary: string,
+): void {
+  db.setKV(
+    `opportunity_scout:last_discovery_diagnostics:${capability}`,
+    JSON.stringify({
+      at: new Date().toISOString(),
+      capability,
+      summary,
+    }),
+  );
 }
 
 function classifyProviderClass(capability: string): OpportunityProviderClass {
@@ -356,6 +375,19 @@ export async function collectOpportunityItems(params: {
           capability,
           limit: params.config.opportunityScout.maxItems,
         });
+        if (!providers.length) {
+          const diagnostics = await diagnoseCapabilityProviders({
+            config: params.config,
+            db: params.db,
+            capability,
+            limit: params.config.opportunityScout.maxItems,
+          });
+          recordDiscoveryDiagnostics(
+            params.db,
+            capability,
+            summarizeProviderDiagnostics(diagnostics),
+          );
+        }
         for (const provider of providers) {
           const providerClass = classifyProviderClass(provider.matchedCapability.name);
           const trustTier = parseTrustTierFromProvider(provider);
@@ -378,8 +410,18 @@ export async function collectOpportunityItems(params: {
                 provider.search.primaryIdentity ||
                 provider.card.agent_id,
               description:
-                provider.matchedCapability.description ||
-                `Provider for ${provider.matchedCapability.name}`,
+                [
+                  provider.matchedCapability.description ||
+                    `Provider for ${provider.matchedCapability.name}`,
+                  provider.card.package_name
+                    ? `package=${provider.card.package_name}`
+                    : undefined,
+                  provider.card.routing_profile?.serviceKind
+                    ? `routing=${provider.card.routing_profile.serviceKind}/${provider.card.routing_profile.capabilityKind || "unknown"}`
+                    : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(" | "),
               capability: provider.matchedCapability.name,
               baseUrl: provider.endpoint.url,
               providerAgentId: provider.card.agent_id,
@@ -390,7 +432,12 @@ export async function collectOpportunityItems(params: {
             }),
           );
         }
-      } catch {
+      } catch (error) {
+        recordDiscoveryDiagnostics(
+          params.db,
+          capability,
+          error instanceof Error ? error.message : String(error),
+        );
         continue;
       }
     }

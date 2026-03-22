@@ -2,8 +2,10 @@ import { WebSocket } from "ws";
 import type { OpenFoxConfig, OpenFoxDatabase, OpenFoxIdentity } from "../types.js";
 import { createLogger } from "../observability/logger.js";
 import {
+  diagnoseCapabilityProviders,
   discoverCapabilityProviders,
   recordAgentDiscoveryProviderFeedback,
+  summarizeProviderDiagnostics,
 } from "../agent-discovery/client.js";
 import type { VerifiedAgentProvider } from "../agent-discovery/types.js";
 import { loadWalletPrivateKey } from "../identity/wallet.js";
@@ -130,6 +132,7 @@ async function selectGatewayTargets(params: {
   const client = params.config.agentDiscovery?.gatewayClient;
   const targets: GatewayTarget[] = [];
   const seen = new Set<string>();
+  let discoveryFailureSummary: string | undefined;
 
   const addTarget = (target: GatewayTarget) => {
     const key = targetKey(target);
@@ -153,10 +156,30 @@ async function selectGatewayTargets(params: {
         limit: Math.max(5, client?.maxGatewaySessions ?? 1),
         db: params.db,
       });
+      if (!providers.length) {
+        const diagnostics = await diagnoseCapabilityProviders({
+          config: params.config,
+          capability: "gateway.relay",
+          limit: Math.max(5, client?.maxGatewaySessions ?? 1),
+          db: params.db,
+        });
+        discoveryFailureSummary = summarizeProviderDiagnostics(diagnostics);
+        params.db?.setKV(
+          "agent_gateway:last_discovery_diagnostics",
+          JSON.stringify({
+            at: new Date().toISOString(),
+            capability: "gateway.relay",
+            summary: discoveryFailureSummary,
+            diagnostics,
+          }),
+        );
+      }
+      let wsCandidates = 0;
       for (const provider of providers) {
         if (provider.endpoint.kind !== "ws") {
           continue;
         }
+        wsCandidates += 1;
         const payment = targetPaymentMetadata({
           gatewayAgentId: provider.card.agent_id.toLowerCase(),
           gatewayUrl: provider.endpoint.url,
@@ -170,10 +193,30 @@ async function selectGatewayTargets(params: {
           ...payment,
         });
       }
+      if (providers.length > 0 && wsCandidates === 0) {
+        discoveryFailureSummary = providers
+          .slice(0, 3)
+          .map(
+            (provider) =>
+              `${provider.search.nodeId}: endpoint kind ${provider.endpoint.kind} is not websocket relay-compatible`,
+          )
+          .join(" | ");
+        params.db?.setKV(
+          "agent_gateway:last_discovery_diagnostics",
+          JSON.stringify({
+            at: new Date().toISOString(),
+            capability: "gateway.relay",
+            summary: discoveryFailureSummary,
+            providerCount: providers.length,
+          }),
+        );
+      }
     } catch (error) {
       logger.warn(
         `Gateway discovery failed, falling back to bootnodes: ${error instanceof Error ? error.message : String(error)}`,
       );
+      discoveryFailureSummary =
+        error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -189,7 +232,13 @@ async function selectGatewayTargets(params: {
   }
 
   const limit = Math.max(1, client?.maxGatewaySessions ?? 1);
-  return targets.slice(0, limit);
+  const selected = targets.slice(0, limit);
+  if (!selected.length && discoveryFailureSummary) {
+    throw new Error(
+      `no gateway target configured: ${discoveryFailureSummary}`,
+    );
+  }
+  return selected;
 }
 
 function recordGatewayFeedback(params: {

@@ -1,5 +1,9 @@
 import type { Address } from "@tosnetwork/tosdk";
-import { discoverCapabilityProviders } from "../agent-discovery/client.js";
+import {
+  diagnoseCapabilityProviders,
+  discoverCapabilityProviders,
+  summarizeProviderDiagnostics,
+} from "../agent-discovery/client.js";
 import type {
   BountyConfig,
   BountyRecord,
@@ -33,6 +37,25 @@ function attemptedKey(bountyId: string): string {
 
 function completionKey(bountyId: string): string {
   return `bounty:completion:${bountyId}`;
+}
+
+function discoveryDiagnosticsKey(capability: string): string {
+  return `bounty:last_discovery_diagnostics:${capability}`;
+}
+
+function recordDiscoveryDiagnostics(
+  db: OpenFoxDatabase,
+  capability: string,
+  summary: string,
+): void {
+  db.setKV(
+    discoveryDiagnosticsKey(capability),
+    JSON.stringify({
+      at: new Date().toISOString(),
+      capability,
+      summary,
+    }),
+  );
 }
 
 function resolveBountySkillName(config: BountyConfig): string {
@@ -193,19 +216,45 @@ async function listCandidateBounties(params: {
   if (params.config.agentDiscovery?.enabled) {
     const capability =
       params.config.bounty?.discoveryCapability || "task.submit";
-    const providers = await discoverCapabilityProviders({
-      config: params.config,
-      capability,
-      db: params.db,
-      limit: 10,
-    });
-    for (const provider of providers) {
-      if (provider.search.primaryIdentity === params.identity.address) continue;
-      try {
-        await pushCandidates(provider.endpoint.url);
-      } catch {
-        continue;
+    try {
+      const providers = await discoverCapabilityProviders({
+        config: params.config,
+        capability,
+        db: params.db,
+        limit: 10,
+      });
+      if (!providers.length) {
+        const diagnostics = await diagnoseCapabilityProviders({
+          config: params.config,
+          capability,
+          db: params.db,
+          limit: 10,
+        });
+        recordDiscoveryDiagnostics(
+          params.db,
+          capability,
+          summarizeProviderDiagnostics(diagnostics),
+        );
       }
+      for (const provider of providers) {
+        if (provider.search.primaryIdentity === params.identity.address) continue;
+        try {
+          await pushCandidates(provider.endpoint.url);
+        } catch (error) {
+          recordDiscoveryDiagnostics(
+            params.db,
+            capability,
+            error instanceof Error ? error.message : String(error),
+          );
+          continue;
+        }
+      }
+    } catch (error) {
+      recordDiscoveryDiagnostics(
+        params.db,
+        capability,
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 

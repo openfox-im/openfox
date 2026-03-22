@@ -1064,7 +1064,7 @@ export async function resolveCapabilityProviderWithDiagnostics(params: {
   return { provider: selected, diagnostics };
 }
 
-function summarizeProviderDiagnostics(
+export function summarizeProviderDiagnostics(
   diagnostics: readonly AgentDiscoveryProviderDiagnostics[],
 ): string {
   if (diagnostics.length === 0) {
