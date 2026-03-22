@@ -6,7 +6,10 @@ import type { SignerProviderTrustTier } from "../types.js";
 import type { VerifiedAgentProvider } from "../agent-discovery/types.js";
 import type { loadConfig } from "../config.js";
 import type { createDatabase } from "../state/database.js";
-import { discoverCapabilityProviders } from "../agent-discovery/client.js";
+import {
+  diagnoseCapabilityProviders,
+  discoverCapabilityProviders,
+} from "../agent-discovery/client.js";
 
 export function readOption(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -114,6 +117,41 @@ export function readSignerTrustTierOption(
   return raw;
 }
 
+function summarizeDiscoveryFailure(
+  diagnostics: readonly {
+    provider: { search: { nodeId: string } };
+    trustFailures: string[];
+    selectionFailures: string[];
+  }[],
+): string {
+  if (diagnostics.length === 0) {
+    return "No verified discovery candidates exposed a callable provider surface."
+  }
+  return diagnostics
+    .slice(0, 3)
+    .map((item) => {
+      const reasons = [...item.trustFailures, ...item.selectionFailures];
+      return `${item.provider.search.nodeId}: ${
+        reasons.length ? reasons.join("; ") : "not selected"
+      }`;
+    })
+    .join(" | ");
+}
+
+function summarizeDiscoveredTrustTiers(
+  providers: readonly VerifiedAgentProvider[],
+): string {
+  return providers
+    .slice(0, 3)
+    .map((provider) => {
+      const trustTier =
+        provider.matchedCapability.policy?.trust_tier ?? "(unknown)";
+      const pkg = provider.card.package_name ?? "(no-package)";
+      return `${provider.search.nodeId}: trust_tier=${trustTier}, package=${pkg}`;
+    })
+    .join(" | ");
+}
+
 export async function resolveSignerProviderBaseUrl(params: {
   config: NonNullable<ReturnType<typeof loadConfig>>;
   capabilityPrefix: string;
@@ -143,10 +181,23 @@ export async function resolveSignerProviderBaseUrl(params: {
       )
     : providers;
   if (!matchingProviders.length) {
+    if (params.requiredTrustTier && providers.length) {
+      throw new Error(
+        `No signer-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered. Seen: ${summarizeDiscoveredTrustTiers(
+          providers,
+        )}`,
+      );
+    }
+    const diagnostics = await diagnoseCapabilityProviders({
+      config: params.config,
+      capability: `${params.capabilityPrefix}.quote`,
+      limit: 5,
+      db: params.db,
+    });
     throw new Error(
-      params.requiredTrustTier
-        ? `No signer-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered.`
-        : `No signer-provider advertising ${params.capabilityPrefix}.quote was discovered.`,
+      `No signer-provider advertising ${params.capabilityPrefix}.quote was discovered. ${summarizeDiscoveryFailure(
+        diagnostics,
+      )}`,
     );
   }
   const provider = matchingProviders[0];
@@ -188,10 +239,23 @@ export async function resolvePaymasterProviderBaseUrl(params: {
       )
     : providers;
   if (!matchingProviders.length) {
+    if (params.requiredTrustTier && providers.length) {
+      throw new Error(
+        `No paymaster-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered. Seen: ${summarizeDiscoveredTrustTiers(
+          providers,
+        )}`,
+      );
+    }
+    const diagnostics = await diagnoseCapabilityProviders({
+      config: params.config,
+      capability: `${params.capabilityPrefix}.quote`,
+      limit: 5,
+      db: params.db,
+    });
     throw new Error(
-      params.requiredTrustTier
-        ? `No paymaster-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered.`
-        : `No paymaster-provider advertising ${params.capabilityPrefix}.quote was discovered.`,
+      `No paymaster-provider advertising ${params.capabilityPrefix}.quote was discovered. ${summarizeDiscoveryFailure(
+        diagnostics,
+      )}`,
     );
   }
   const provider = matchingProviders[0];

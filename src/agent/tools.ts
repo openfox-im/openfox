@@ -1374,7 +1374,7 @@ Model: ${ctx.inference.getDefaultModel()}
         required: ["capability"],
       },
       execute: async (args, ctx) => {
-        const { discoverCapabilityProviders } =
+        const { diagnoseCapabilityProviders, discoverCapabilityProviders } =
           await import("../agent-discovery/client.js");
         const capability = String(args.capability || "")
           .trim()
@@ -1387,7 +1387,28 @@ Model: ${ctx.inference.getDefaultModel()}
           db: ctx.db,
         });
         if (!providers.length) {
-          return `No providers found for capability ${capability}.`;
+          const diagnostics = await diagnoseCapabilityProviders({
+            config: ctx.config,
+            capability,
+            limit,
+            db: ctx.db,
+          });
+          if (!diagnostics.length) {
+            return `No providers found for capability ${capability}.`;
+          }
+          const summary = diagnostics
+            .slice(0, 3)
+            .map((item) => {
+              const reasons = [
+                ...item.trustFailures,
+                ...item.selectionFailures,
+              ];
+              return `${item.provider.search.nodeId}: ${
+                reasons.length ? reasons.join("; ") : "not selected"
+              }`;
+            })
+            .join(" | ");
+          return `No providers found for capability ${capability}. ${summary}`;
         }
 
         if ((args.format as string)?.toLowerCase() === "json") {
@@ -1400,6 +1421,11 @@ Model: ${ctx.inference.getDefaultModel()}
 Node ID: ${provider.search.nodeId}
 Endpoint: ${provider.endpoint.url}
 Mode: ${provider.matchedCapability.mode}
+Agent Address: ${provider.card.agent_address || provider.search.primaryIdentity || "unknown"}
+Package: ${provider.card.package_name || "n/a"}
+Routing: ${provider.card.routing_profile?.serviceKind || "n/a"}/${provider.card.routing_profile?.capabilityKind || "n/a"}
+Privacy: ${provider.card.routing_profile?.privacyMode || "n/a"}
+Receipt Mode: ${provider.card.routing_profile?.receiptMode || "n/a"}
 Registered: ${provider.search.trust?.registered ?? "unknown"}
 Suspended: ${provider.search.trust?.suspended ?? "unknown"}
 Stake: ${provider.search.trust?.stake ?? "unknown"}

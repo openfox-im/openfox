@@ -5,16 +5,19 @@ import type {
   AgentDiscoveryEndpointConfig,
   AgentDiscoveryFaucetServerConfig,
   AgentDiscoveryMailServerConfig,
+  AgentDiscoveryMetadataHints,
   AgentDiscoveryNewsFetchServerConfig,
   NewsFetchSourcePolicyConfig,
   AgentDiscoveryObservationServerConfig,
   AgentDiscoveryOracleServerConfig,
   AgentDiscoveryPolicyProfiles,
   AgentDiscoveryProofVerifyServerConfig,
+  AgentDiscoveryRoutingProfileHint,
   ProofVerifierClass,
   AgentDiscoverySelectionPolicy,
   AgentDiscoverySentimentAnalysisServerConfig,
   AgentDiscoveryStorageServerConfig,
+  AgentDiscoveryThreatModelHint,
   VerificationSurfaceMode,
 } from "../types.js";
 
@@ -24,16 +27,19 @@ export type {
   AgentDiscoveryEndpointConfig,
   AgentDiscoveryFaucetServerConfig,
   AgentDiscoveryMailServerConfig,
+  AgentDiscoveryMetadataHints,
   AgentDiscoveryNewsFetchServerConfig,
   NewsFetchSourcePolicyConfig,
   AgentDiscoveryObservationServerConfig,
   AgentDiscoveryOracleServerConfig,
   AgentDiscoveryPolicyProfiles,
   AgentDiscoveryProofVerifyServerConfig,
+  AgentDiscoveryRoutingProfileHint,
   ProofVerifierClass,
   AgentDiscoverySelectionPolicy,
   AgentDiscoverySentimentAnalysisServerConfig,
   AgentDiscoveryStorageServerConfig,
+  AgentDiscoveryThreatModelHint,
   VerificationSurfaceMode,
 };
 
@@ -63,6 +69,11 @@ export interface AgentDiscoveryCapability {
 export interface AgentDiscoveryCardPayload {
   version: number;
   agent_id: string;
+  agent_address?: string;
+  profile_ref?: string;
+  discovery_ref?: string;
+  package_name?: string;
+  package_version?: string;
   primary_identity: AgentDiscoveryIdentityRef;
   discovery_node_id: string;
   card_seq: number;
@@ -71,6 +82,8 @@ export interface AgentDiscoveryCardPayload {
   display_name: string;
   endpoints: AgentDiscoveryEndpoint[];
   capabilities: AgentDiscoveryCapability[];
+  routing_profile?: AgentDiscoveryRoutingProfileHint;
+  threat_model?: AgentDiscoveryThreatModelHint;
   reputation_refs: string[];
   relay_encryption_pubkey?: `0x${string}`;
   metadata_signer: {
@@ -134,6 +147,7 @@ export interface AgentDiscoveryCardResponse {
   nodeId: string;
   nodeRecord: string;
   cardJson: string;
+  parsedCard?: AgentDiscoveryCardPayload;
 }
 
 export interface VerifiedAgentProvider {
@@ -142,6 +156,19 @@ export interface VerifiedAgentProvider {
   matchedCapability: AgentDiscoveryCapability;
   endpoint: AgentDiscoveryEndpoint;
   localFeedback?: AgentDiscoveryLocalFeedback;
+}
+
+export interface AgentDiscoveryProviderDiagnostics {
+  provider: VerifiedAgentProvider;
+  trustScore: number;
+  trustFailures: string[];
+  selectionFailures: string[];
+  selected: boolean;
+}
+
+export interface ResolveCapabilityProviderResult {
+  provider: VerifiedAgentProvider | null;
+  diagnostics: AgentDiscoveryProviderDiagnostics[];
 }
 
 export interface FaucetInvocationRequest {

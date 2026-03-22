@@ -3,6 +3,7 @@ import { createDatabase } from "../state/database.js";
 import { createLogger } from "../observability/logger.js";
 import { getWallet } from "../identity/wallet.js";
 import {
+  diagnoseCapabilityProviders,
   discoverCapabilityProviders,
 } from "../agent-discovery/client.js";
 import {
@@ -40,6 +41,41 @@ function readSignerTrustTierOption(
   return raw;
 }
 
+function summarizeDiscoveryFailure(
+  diagnostics: readonly {
+    provider: { search: { nodeId: string } };
+    trustFailures: string[];
+    selectionFailures: string[];
+  }[],
+): string {
+  if (diagnostics.length === 0) {
+    return "No verified discovery candidates exposed a callable provider surface.";
+  }
+  return diagnostics
+    .slice(0, 3)
+    .map((item) => {
+      const reasons = [...item.trustFailures, ...item.selectionFailures];
+      return `${item.provider.search.nodeId}: ${
+        reasons.length ? reasons.join("; ") : "not selected"
+      }`;
+    })
+    .join(" | ");
+}
+
+function summarizeDiscoveredTrustTiers(
+  providers: readonly VerifiedAgentProvider[],
+): string {
+  return providers
+    .slice(0, 3)
+    .map((provider) => {
+      const trustTier =
+        provider.matchedCapability.policy?.trust_tier ?? "(unknown)";
+      const pkg = provider.card.package_name ?? "(no-package)";
+      return `${provider.search.nodeId}: trust_tier=${trustTier}, package=${pkg}`;
+    })
+    .join(" | ");
+}
+
 async function resolveSignerProviderBaseUrl(params: {
   config: NonNullable<ReturnType<typeof loadConfig>>;
   capabilityPrefix: string;
@@ -69,10 +105,23 @@ async function resolveSignerProviderBaseUrl(params: {
       )
     : providers;
   if (!matchingProviders.length) {
+    if (params.requiredTrustTier && providers.length) {
+      throw new Error(
+        `No signer-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered. Seen: ${summarizeDiscoveredTrustTiers(
+          providers,
+        )}`,
+      );
+    }
+    const diagnostics = await diagnoseCapabilityProviders({
+      config: params.config,
+      capability: `${params.capabilityPrefix}.quote`,
+      limit: 5,
+      db: params.db,
+    });
     throw new Error(
-      params.requiredTrustTier
-        ? `No signer-provider advertising ${params.capabilityPrefix}.quote with trust_tier=${params.requiredTrustTier} was discovered.`
-        : `No signer-provider advertising ${params.capabilityPrefix}.quote was discovered.`,
+      `No signer-provider advertising ${params.capabilityPrefix}.quote was discovered. ${summarizeDiscoveryFailure(
+        diagnostics,
+      )}`,
     );
   }
   const provider = matchingProviders[0];
@@ -166,10 +215,16 @@ Usage:
       );
       const discovered = providers.map((provider) => ({
         providerAddress: provider.search.primaryIdentity,
+        agentAddress: provider.card.agent_address ?? null,
         nodeId: provider.search.nodeId,
         capability: provider.matchedCapability.name,
         mode: provider.matchedCapability.mode,
         endpoint: provider.endpoint.url,
+        packageName: provider.card.package_name ?? null,
+        serviceKind: provider.card.routing_profile?.serviceKind ?? null,
+        capabilityKind: provider.card.routing_profile?.capabilityKind ?? null,
+        privacyMode: provider.card.routing_profile?.privacyMode ?? null,
+        receiptMode: provider.card.routing_profile?.receiptMode ?? null,
         trustTier: provider.matchedCapability.policy?.trust_tier ?? null,
         trust: provider.search.trust,
       }));
@@ -178,12 +233,24 @@ Usage:
         return;
       }
       if (!discovered.length) {
-        logger.info("No signer providers discovered.");
+        const diagnostics = await diagnoseCapabilityProviders({
+          config,
+          capability: `${capabilityPrefix}.quote`,
+          limit: 10,
+          db,
+        });
+        logger.info(
+          diagnostics.length
+            ? `No signer providers discovered. ${summarizeDiscoveryFailure(
+                diagnostics,
+              )}`
+            : "No signer providers discovered.",
+        );
         return;
       }
       for (const provider of discovered) {
         logger.info(
-          `${provider.providerAddress}  capability=${provider.capability}  mode=${provider.mode}  trust_tier=${provider.trustTier || "(unknown)"}  endpoint=${provider.endpoint}`,
+          `${provider.providerAddress}  capability=${provider.capability}  mode=${provider.mode}  trust_tier=${provider.trustTier || "(unknown)"}  package=${provider.packageName || "(none)"}  routing=${provider.serviceKind || "(n/a)"}/${provider.capabilityKind || "(n/a)"}  endpoint=${provider.endpoint}`,
         );
       }
       return;

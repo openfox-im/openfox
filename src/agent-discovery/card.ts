@@ -40,10 +40,16 @@ export function buildAgentDiscoveryCardPayload(params: {
   const issuedAt = params.issuedAt ?? Math.floor(Date.now() / 1000);
   const displayName = params.agentDiscovery.displayName?.trim() || params.config.name;
   const capabilities = params.agentDiscovery.capabilities.map(capabilityFromConfig);
+  const hints = params.agentDiscovery.metadataHints;
 
   return {
     version: 1,
     agent_id: params.config.agentId || params.identity.address.toLowerCase(),
+    agent_address: (hints?.agentAddress || params.address).toLowerCase(),
+    ...(hints?.profileRef ? { profile_ref: hints.profileRef } : {}),
+    ...(hints?.discoveryRef ? { discovery_ref: hints.discoveryRef } : {}),
+    ...(hints?.packageName ? { package_name: hints.packageName } : {}),
+    ...(hints?.packageVersion ? { package_version: hints.packageVersion } : {}),
     primary_identity: {
       kind: "tos",
       value: params.address.toLowerCase(),
@@ -60,6 +66,55 @@ export function buildAgentDiscoveryCardPayload(params: {
       role: endpoint.role?.trim() || undefined,
     })),
     capabilities,
+    ...(hints?.routingProfile
+      ? {
+          routing_profile: {
+            ...(hints.routingProfile.serviceKind
+              ? { serviceKind: hints.routingProfile.serviceKind }
+              : {}),
+            ...(hints.routingProfile.serviceKinds?.length
+              ? { serviceKinds: [...hints.routingProfile.serviceKinds] }
+              : {}),
+            ...(hints.routingProfile.capabilityKind
+              ? { capabilityKind: hints.routingProfile.capabilityKind }
+              : {}),
+            ...(hints.routingProfile.pricingKind
+              ? { pricingKind: hints.routingProfile.pricingKind }
+              : {}),
+            ...(hints.routingProfile.privacyMode
+              ? { privacyMode: hints.routingProfile.privacyMode }
+              : {}),
+            ...(hints.routingProfile.receiptMode
+              ? { receiptMode: hints.routingProfile.receiptMode }
+              : {}),
+            ...(typeof hints.routingProfile.disclosureReady === "boolean"
+              ? { disclosureReady: hints.routingProfile.disclosureReady }
+              : {}),
+            ...(hints.routingProfile.trustFloorRef
+              ? { trustFloorRef: hints.routingProfile.trustFloorRef }
+              : {}),
+          },
+        }
+      : {}),
+    ...(hints?.threatModel
+      ? {
+          threat_model: {
+            ...(hints.threatModel.family ? { family: hints.threatModel.family } : {}),
+            ...(hints.threatModel.trustBoundary
+              ? { trustBoundary: hints.threatModel.trustBoundary }
+              : {}),
+            ...(hints.threatModel.failurePosture
+              ? { failurePosture: hints.threatModel.failurePosture }
+              : {}),
+            ...(hints.threatModel.runtimeDependency
+              ? { runtimeDependency: hints.threatModel.runtimeDependency }
+              : {}),
+            ...(hints.threatModel.criticalInvariants?.length
+              ? { criticalInvariants: [...hints.threatModel.criticalInvariants] }
+              : {}),
+          },
+        }
+      : {}),
     reputation_refs: [],
     relay_encryption_pubkey: params.identity.account.publicKey?.toLowerCase() as
       | `0x${string}`

@@ -27,6 +27,7 @@ import {
   type AgentDiscoveryConfig,
   type AgentDiscoveryInfo,
   type AgentDiscoveryLocalFeedback,
+  type AgentDiscoveryProviderDiagnostics,
   type AgentDiscoverySelectionPolicy,
   type AgentDiscoverySearchResult,
   type FaucetInvocationRequest,
@@ -43,6 +44,7 @@ import {
   type StorageGetInvocationResponse,
   type StoragePutInvocationRequest,
   type StoragePutInvocationResponse,
+  type ResolveCapabilityProviderResult,
   type VerifiedAgentProvider,
 } from "./types.js";
 
@@ -256,6 +258,17 @@ function parseSignedBigInt(value: string | undefined): bigint {
   return BigInt(value.trim());
 }
 
+function connectionModesToNames(mask: number | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!mask) {
+    return out;
+  }
+  if ((mask & 0x01) === 0x01) out.add("talkreq");
+  if ((mask & 0x02) === 0x02) out.add("https");
+  if ((mask & 0x04) === 0x04) out.add("stream");
+  return out;
+}
+
 function buildRequestExpiry(ttlSeconds = 300): number {
   return Math.floor(Date.now() / 1000) + Math.max(30, ttlSeconds);
 }
@@ -291,6 +304,14 @@ function resolveSelectionPolicy(
     minimumReputation: "0",
     preferHigherStake: true,
     preferHigherReputation: true,
+    requiredConnectionModes: [],
+    packagePrefix: undefined,
+    serviceKind: undefined,
+    capabilityKind: undefined,
+    privacyMode: undefined,
+    receiptMode: undefined,
+    requireDisclosureReady: false,
+    minimumTrustScore: 0,
     ...(config.agentDiscovery?.selectionPolicy ?? {}),
     ...(profile ?? {}),
     ...(override ?? {}),
@@ -486,38 +507,147 @@ function providerMatchesSelectionPolicy(
   policy: AgentDiscoverySelectionPolicy,
   requestedAmount: bigint,
 ): boolean {
-  const maxAmount = parseBigIntAmount(provider.matchedCapability.max_amount);
-  if (maxAmount !== 0n && requestedAmount > maxAmount) {
-    return false;
-  }
+  return (
+    getTrustFailures(provider, policy).length === 0 &&
+    getSelectionFailures(provider, policy, requestedAmount).length === 0
+  );
+}
 
+function getTrustFailures(
+  provider: VerifiedAgentProvider,
+  policy: AgentDiscoverySelectionPolicy,
+): string[] {
+  const failures: string[] = [];
   const trust = provider.search.trust;
   if (!trust) {
-    return true;
+    return failures;
   }
   if (policy.requireRegistered && !trust.registered) {
-    return false;
+    failures.push("provider not registered");
   }
   if (policy.excludeSuspended && trust.suspended) {
-    return false;
+    failures.push("provider suspended");
   }
-  if (policy.onchainCapabilityMode === "require_onchain") {
-    if (!trust.capabilityRegistered || !trust.hasOnchainCapability) {
-      return false;
-    }
+  if (
+    policy.onchainCapabilityMode === "require_onchain" &&
+    (!trust.capabilityRegistered || !trust.hasOnchainCapability)
+  ) {
+    failures.push("capability missing on-chain");
   }
   if (
     parseBigIntAmount(policy.minimumStakeTomi) > parseBigIntAmount(trust.stake)
   ) {
-    return false;
+    failures.push("stake below minimum");
   }
   if (
     parseSignedBigInt(policy.minimumReputation) >
     parseSignedBigInt(trust.reputation)
   ) {
-    return false;
+    failures.push("reputation below minimum");
   }
-  return true;
+  if (
+    typeof policy.minimumTrustScore === "number" &&
+    (trust.localRankScore ?? 0) < policy.minimumTrustScore
+  ) {
+    failures.push("trust score below minimum");
+  }
+  return failures;
+}
+
+function getSelectionFailures(
+  provider: VerifiedAgentProvider,
+  policy: AgentDiscoverySelectionPolicy,
+  requestedAmount: bigint,
+): string[] {
+  const failures: string[] = [];
+  const maxAmount = parseBigIntAmount(provider.matchedCapability.max_amount);
+  if (maxAmount !== 0n && requestedAmount > maxAmount) {
+    failures.push("requested amount exceeds provider max");
+  }
+
+  if (policy.requiredConnectionModes?.length) {
+    const supportedModes = connectionModesToNames(provider.search.connectionModes);
+    for (const mode of policy.requiredConnectionModes) {
+      if (!supportedModes.has(mode)) {
+        failures.push(`missing required connection mode: ${mode}`);
+      }
+    }
+  }
+
+  if (
+    policy.packagePrefix &&
+    !provider.card.package_name?.startsWith(policy.packagePrefix)
+  ) {
+    failures.push("package prefix mismatch");
+  }
+
+  const requiresRouting =
+    Boolean(policy.serviceKind) ||
+    Boolean(policy.capabilityKind) ||
+    Boolean(policy.privacyMode) ||
+    Boolean(policy.receiptMode) ||
+    policy.requireDisclosureReady === true;
+  if (requiresRouting) {
+    const routing = provider.card.routing_profile;
+    if (!routing) {
+      failures.push("routing profile missing");
+      return failures;
+    }
+    if (policy.serviceKind) {
+      const serviceKinds = routing.serviceKinds ?? [];
+      if (
+        routing.serviceKind !== policy.serviceKind &&
+        !serviceKinds.includes(policy.serviceKind)
+      ) {
+        failures.push("service kind mismatch");
+      }
+    }
+    if (
+      policy.capabilityKind &&
+      routing.capabilityKind !== policy.capabilityKind
+    ) {
+      failures.push("capability kind mismatch");
+    }
+    if (policy.privacyMode && routing.privacyMode !== policy.privacyMode) {
+      failures.push("privacy mode mismatch");
+    }
+    if (policy.receiptMode && routing.receiptMode !== policy.receiptMode) {
+      failures.push("receipt mode mismatch");
+    }
+    if (
+      policy.requireDisclosureReady === true &&
+      routing.disclosureReady !== true
+    ) {
+      failures.push("disclosure-ready requirement not met");
+    }
+  }
+  return failures;
+}
+
+function buildProviderDiagnostics(
+  provider: VerifiedAgentProvider,
+  policy: AgentDiscoverySelectionPolicy,
+  requestedAmount: bigint,
+  selected: boolean,
+): AgentDiscoveryProviderDiagnostics {
+  return {
+    provider,
+    trustScore: provider.search.trust?.localRankScore ?? 0,
+    trustFailures: getTrustFailures(provider, policy),
+    selectionFailures: getSelectionFailures(provider, policy, requestedAmount),
+    selected,
+  };
+}
+
+function attachLocalFeedback(
+  providers: VerifiedAgentProvider[],
+  db: OpenFoxDatabase | undefined,
+  capability: string,
+): VerifiedAgentProvider[] {
+  return providers.map((provider) => ({
+    ...provider,
+    localFeedback: loadLocalFeedback(db, provider, capability),
+  }));
 }
 
 function sortProviders(
@@ -540,11 +670,7 @@ function sortProviders(
     }
   };
 
-  return providers
-    .map((provider) => ({
-      ...provider,
-      localFeedback: loadLocalFeedback(db, provider, capability),
-    }))
+  return attachLocalFeedback(providers, db, capability)
     .filter((provider) =>
       providerMatchesSelectionPolicy(
         provider,
@@ -610,6 +736,53 @@ function sortProviders(
       }
       return (right.card.card_seq || 0) - (left.card.card_seq || 0);
     });
+}
+
+async function collectVerifiedCapabilityProviders(params: {
+  config: OpenFoxConfig;
+  capability: string;
+  limit: number;
+}): Promise<VerifiedAgentProvider[]> {
+  const rpc = requireDiscoveryRpc(params.config);
+  const searchResults = await collectSearchResults(
+    rpc,
+    params.config,
+    params.capability,
+    params.limit,
+  );
+  const providers: VerifiedAgentProvider[] = [];
+
+  for (const search of searchResults) {
+    try {
+      const cardResponse = await rpc.getCard(search.nodeRecord);
+      const card = parseCardJson(cardResponse.cardJson);
+      const valid = await verifyAgentDiscoveryCard(card, search.nodeId);
+      if (!valid) {
+        continue;
+      }
+      const matchedCapability = card.capabilities.find(
+        (capability) => capability.name === params.capability,
+      );
+      const endpoint = getInvokableEndpoint(card, params.capability);
+      if (!matchedCapability || !endpoint) {
+        continue;
+      }
+      const provider: VerifiedAgentProvider = {
+        search,
+        card,
+        matchedCapability,
+        endpoint,
+      };
+      if (!(await endpointSupportsDeclaredMode(provider))) {
+        continue;
+      }
+      providers.push(provider);
+    } catch {
+      continue;
+    }
+  }
+
+  return providers;
 }
 
 async function collectSearchResults(
@@ -781,44 +954,11 @@ export async function discoverCapabilityProviders(params: {
   selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
   db?: OpenFoxDatabase;
 }): Promise<VerifiedAgentProvider[]> {
-  const rpc = requireDiscoveryRpc(params.config);
-  const searchResults = await collectSearchResults(
-    rpc,
-    params.config,
-    params.capability,
-    params.limit ?? 10,
-  );
-  const providers: VerifiedAgentProvider[] = [];
-
-  for (const search of searchResults) {
-    try {
-      const cardResponse = await rpc.getCard(search.nodeRecord);
-      const card = parseCardJson(cardResponse.cardJson);
-      const valid = await verifyAgentDiscoveryCard(card, search.nodeId);
-      if (!valid) {
-        continue;
-      }
-      const matchedCapability = card.capabilities.find(
-        (capability) => capability.name === params.capability,
-      );
-      const endpoint = getInvokableEndpoint(card, params.capability);
-      if (!matchedCapability || !endpoint) {
-        continue;
-      }
-      const provider: VerifiedAgentProvider = {
-        search,
-        card,
-        matchedCapability,
-        endpoint,
-      };
-      if (!(await endpointSupportsDeclaredMode(provider))) {
-        continue;
-      }
-      providers.push(provider);
-    } catch {
-      continue;
-    }
-  }
+  const providers = await collectVerifiedCapabilityProviders({
+    config: params.config,
+    capability: params.capability,
+    limit: params.limit ?? 10,
+  });
 
   return sortProviders(
     providers,
@@ -830,6 +970,137 @@ export async function discoverCapabilityProviders(params: {
     ),
     params.db,
     params.capability,
+  );
+}
+
+export async function resolveCapabilityProvider(params: {
+  config: OpenFoxConfig;
+  capability: string;
+  requestedAmountTomi?: bigint;
+  limit?: number;
+  selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  db?: OpenFoxDatabase;
+}): Promise<VerifiedAgentProvider | null> {
+  const providers = await collectVerifiedCapabilityProviders({
+    config: params.config,
+    capability: params.capability,
+    limit: params.limit ?? 10,
+  });
+  const ranked = sortProviders(
+    providers,
+    params.requestedAmountTomi ?? 0n,
+    resolveSelectionPolicy(
+      params.config,
+      params.capability,
+      params.selectionPolicy,
+    ),
+    params.db,
+    params.capability,
+  );
+  return ranked[0] ?? null;
+}
+
+export async function diagnoseCapabilityProviders(params: {
+  config: OpenFoxConfig;
+  capability: string;
+  requestedAmountTomi?: bigint;
+  limit?: number;
+  selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  db?: OpenFoxDatabase;
+}): Promise<AgentDiscoveryProviderDiagnostics[]> {
+  const policy = resolveSelectionPolicy(
+    params.config,
+    params.capability,
+    params.selectionPolicy,
+  );
+  const requestedAmount = params.requestedAmountTomi ?? 0n;
+  const providers = attachLocalFeedback(
+    await collectVerifiedCapabilityProviders({
+      config: params.config,
+      capability: params.capability,
+      limit: params.limit ?? 10,
+    }),
+    params.db,
+    params.capability,
+  );
+  const selected = sortProviders(
+    [...providers],
+    requestedAmount,
+    policy,
+    params.db,
+    params.capability,
+  )[0];
+  return providers
+    .map((provider) =>
+      buildProviderDiagnostics(
+        provider,
+        policy,
+        requestedAmount,
+        provider.search.nodeId === selected?.search.nodeId,
+      ),
+    )
+    .sort((left, right) => {
+      if (left.selected !== right.selected) {
+        return left.selected ? -1 : 1;
+      }
+      if (left.trustScore !== right.trustScore) {
+        return right.trustScore - left.trustScore;
+      }
+      return left.provider.search.nodeId.localeCompare(right.provider.search.nodeId);
+    });
+}
+
+export async function resolveCapabilityProviderWithDiagnostics(params: {
+  config: OpenFoxConfig;
+  capability: string;
+  requestedAmountTomi?: bigint;
+  limit?: number;
+  selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  db?: OpenFoxDatabase;
+}): Promise<ResolveCapabilityProviderResult> {
+  const diagnostics = await diagnoseCapabilityProviders(params);
+  const selected =
+    diagnostics.find((item) => item.selected)?.provider ?? null;
+  return { provider: selected, diagnostics };
+}
+
+function summarizeProviderDiagnostics(
+  diagnostics: readonly AgentDiscoveryProviderDiagnostics[],
+): string {
+  if (diagnostics.length === 0) {
+    return "no verified providers advertised a callable endpoint for this capability";
+  }
+  return diagnostics
+    .slice(0, 3)
+    .map((item) => {
+      const failures = [...item.trustFailures, ...item.selectionFailures];
+      return `${item.provider.search.nodeId}: ${
+        failures.length > 0 ? failures.join("; ") : "no matching provider selected"
+      }`;
+    })
+    .join(" | ");
+}
+
+async function throwNoProviderFound(params: {
+  config: OpenFoxConfig;
+  capability: string;
+  requestedAmountTomi?: bigint;
+  limit?: number;
+  selectionPolicy?: Partial<AgentDiscoverySelectionPolicy>;
+  db?: OpenFoxDatabase;
+}): Promise<never> {
+  const diagnostics = await diagnoseCapabilityProviders({
+    config: params.config,
+    capability: params.capability,
+    requestedAmountTomi: params.requestedAmountTomi,
+    limit: params.limit,
+    selectionPolicy: params.selectionPolicy,
+    db: params.db,
+  });
+  throw new Error(
+    `No provider found for capability ${params.capability}: ${summarizeProviderDiagnostics(
+      diagnostics,
+    )}`,
   );
 }
 
@@ -866,7 +1137,14 @@ export async function requestTestnetFaucet(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      requestedAmountTomi: params.requestedAmountTomi,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
 
   const provider = ranked[0];
@@ -991,7 +1269,13 @@ export async function requestObservationOnce(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
   const provider =
     ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
@@ -1097,7 +1381,13 @@ export async function requestOracleResolution(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
   const provider =
     ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
@@ -1206,7 +1496,13 @@ export async function requestNewsFetch(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
   const provider =
     ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
@@ -1320,7 +1616,13 @@ export async function requestProofVerify(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
   const provider =
     ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
@@ -1437,7 +1739,13 @@ export async function requestStoragePut(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
   const provider =
     ranked.find((entry) => entry.matchedCapability.mode === "paid") ??
@@ -1549,7 +1857,13 @@ export async function requestStorageGet(params: {
     capability,
   );
   if (!ranked.length) {
-    throw new Error(`No provider found for capability ${capability}`);
+    await throwNoProviderFound({
+      config: params.config,
+      capability,
+      limit: params.limit ?? 10,
+      selectionPolicy: params.selectionPolicy,
+      db: params.db,
+    });
   }
   const provider =
     ranked.find((entry) => entry.matchedCapability.mode === "paid") ??

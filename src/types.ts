@@ -315,6 +315,35 @@ export interface AgentDiscoveryReputationUpdateConfig {
   reasonPrefix: string;
 }
 
+export interface AgentDiscoveryRoutingProfileHint {
+  serviceKind?: string;
+  serviceKinds?: string[];
+  capabilityKind?: string;
+  pricingKind?: string;
+  privacyMode?: string;
+  receiptMode?: string;
+  disclosureReady?: boolean;
+  trustFloorRef?: string;
+}
+
+export interface AgentDiscoveryThreatModelHint {
+  family?: string;
+  trustBoundary?: string;
+  failurePosture?: string;
+  runtimeDependency?: string;
+  criticalInvariants?: string[];
+}
+
+export interface AgentDiscoveryMetadataHints {
+  agentAddress?: string;
+  profileRef?: string;
+  discoveryRef?: string;
+  packageName?: string;
+  packageVersion?: string;
+  routingProfile?: AgentDiscoveryRoutingProfileHint;
+  threatModel?: AgentDiscoveryThreatModelHint;
+}
+
 export interface AgentDiscoverySelectionPolicy {
   requireRegistered: boolean;
   excludeSuspended: boolean;
@@ -323,6 +352,14 @@ export interface AgentDiscoverySelectionPolicy {
   minimumReputation: string;
   preferHigherStake: boolean;
   preferHigherReputation: boolean;
+  requiredConnectionModes?: ("talkreq" | "https" | "stream")[];
+  packagePrefix?: string;
+  serviceKind?: string;
+  capabilityKind?: string;
+  privacyMode?: string;
+  receiptMode?: string;
+  requireDisclosureReady?: boolean;
+  minimumTrustScore?: number;
 }
 
 export interface AgentDiscoveryPolicyProfiles {
@@ -342,6 +379,7 @@ export interface AgentDiscoveryConfig {
   cardTtlSeconds: number;
   endpoints: AgentDiscoveryEndpointConfig[];
   capabilities: AgentDiscoveryCapabilityConfig[];
+  metadataHints?: AgentDiscoveryMetadataHints;
   directoryNodeRecords?: string[];
   selectionPolicy?: AgentDiscoverySelectionPolicy;
   policyProfiles?: Partial<AgentDiscoveryPolicyProfiles>;

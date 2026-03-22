@@ -124,6 +124,38 @@ describe("agent discovery", () => {
     await expect(verifyAgentDiscoveryCard(card, "node-2")).resolves.toBe(false);
   });
 
+  it("includes optional metadata hints in the published discovery card", async () => {
+    const config = makeConfig();
+    config.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.settlement",
+      packageVersion: "1.0.0",
+      profileRef: "profile://settlement",
+      routingProfile: {
+        serviceKind: "settlement",
+        capabilityKind: "managed_execution",
+        privacyMode: "public",
+        receiptMode: "required",
+      },
+    };
+    const identity = makeIdentity();
+    const card = await buildSignedAgentDiscoveryCard({
+      identity,
+      config,
+      agentDiscovery: config.agentDiscovery!,
+      address: config.walletAddress!,
+      discoveryNodeId: "node-hints",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 11,
+    });
+
+    expect(card.agent_address).toBe(config.walletAddress!.toLowerCase());
+    expect(card.package_name).toBe("tolang.openlib.settlement");
+    expect(card.package_version).toBe("1.0.0");
+    expect(card.profile_ref).toBe("profile://settlement");
+    expect(card.routing_profile?.serviceKind).toBe("settlement");
+    expect(card.routing_profile?.capabilityKind).toBe("managed_execution");
+  });
+
   it("discovers a faucet provider and invokes it", async () => {
     const { requestTestnetFaucet } =
       await import("../agent-discovery/client.js");
@@ -644,5 +676,505 @@ describe("agent discovery", () => {
     expect(strictProviders.map((provider) => provider.search.nodeId)).toEqual([
       "node-high",
     ]);
+  });
+
+  it("applies typed selection-policy hints when discovery cards advertise them", async () => {
+    const { discoverCapabilityProviders } =
+      await import("../agent-discovery/client.js");
+    const config = makeConfig();
+    const identity = makeIdentity();
+
+    const settlementConfig = makeConfig();
+    settlementConfig.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.settlement",
+      routingProfile: {
+        serviceKind: "settlement",
+        serviceKinds: ["settlement", "marketplace"],
+        capabilityKind: "managed_execution",
+        privacyMode: "public",
+        receiptMode: "required",
+        disclosureReady: false,
+      },
+    };
+    settlementConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/settlement" },
+    ];
+    const settlementCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: settlementConfig,
+      agentDiscovery: settlementConfig.agentDiscovery!,
+      address: settlementConfig.walletAddress!,
+      discoveryNodeId: "node-settlement",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 21,
+    });
+
+    const privacyConfig = makeConfig();
+    privacyConfig.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.privacy",
+    };
+    privacyConfig.agentDiscovery!.endpoints = [
+      { kind: "ws", url: "wss://provider.example/privacy" },
+    ];
+    const privacyCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: privacyConfig,
+      agentDiscovery: privacyConfig.agentDiscovery!,
+      address: privacyConfig.walletAddress!,
+      discoveryNodeId: "node-privacy",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 22,
+    });
+
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url !== "http://127.0.0.1:8545") {
+        throw new Error(`unexpected fetch url ${url}`);
+      }
+      const body = JSON.parse(String(init?.body)) as {
+        id: number;
+        method: string;
+        params: unknown[];
+      };
+      switch (body.method) {
+        case "tos_agentDiscoverySearch":
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: [
+                {
+                  nodeId: "node-privacy",
+                  nodeRecord: "enr:privacy",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 5,
+                  cardSequence: 22,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 90,
+                  },
+                },
+                {
+                  nodeId: "node-settlement",
+                  nodeRecord: "enr:settlement",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 3,
+                  cardSequence: 21,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 80,
+                  },
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        case "tos_agentDiscoveryGetCard": {
+          const nodeRecord = String(body.params[0]);
+          const card =
+            nodeRecord === "enr:settlement" ? settlementCard : privacyCard;
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                nodeId:
+                  nodeRecord === "enr:settlement"
+                    ? "node-settlement"
+                    : "node-privacy",
+                nodeRecord,
+                cardJson: JSON.stringify(card),
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        default:
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              error: {
+                code: -32601,
+                message: `unsupported method ${body.method}`,
+              },
+            }),
+            { status: 200 },
+          );
+      }
+    }) as typeof fetch;
+
+    const providers = await discoverCapabilityProviders({
+      config,
+      capability: "sponsor.topup.testnet",
+      limit: 10,
+      selectionPolicy: {
+        requiredConnectionModes: ["https"],
+        packagePrefix: "tolang.openlib.settlement",
+        serviceKind: "settlement",
+        capabilityKind: "managed_execution",
+        privacyMode: "public",
+        receiptMode: "required",
+        minimumTrustScore: 75,
+      },
+    });
+
+    expect(providers.map((provider) => provider.search.nodeId)).toEqual([
+      "node-settlement",
+    ]);
+    expect(providers[0]?.card.package_name).toBe("tolang.openlib.settlement");
+    expect(providers[0]?.card.routing_profile?.serviceKind).toBe("settlement");
+  });
+
+  it("resolves the preferred provider and explains trust/selection failures", async () => {
+    const {
+      resolveCapabilityProvider,
+      resolveCapabilityProviderWithDiagnostics,
+    } = await import("../agent-discovery/client.js");
+    const config = makeConfig();
+    const identity = makeIdentity();
+
+    const settlementConfig = makeConfig();
+    settlementConfig.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.settlement",
+      routingProfile: {
+        serviceKind: "settlement",
+        serviceKinds: ["settlement", "marketplace"],
+        capabilityKind: "managed_execution",
+        privacyMode: "public",
+        receiptMode: "required",
+        disclosureReady: false,
+      },
+    };
+    settlementConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/settlement" },
+    ];
+    const settlementCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: settlementConfig,
+      agentDiscovery: settlementConfig.agentDiscovery!,
+      address: settlementConfig.walletAddress!,
+      discoveryNodeId: "node-settlement",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 30,
+    });
+
+    const privacyConfig = makeConfig();
+    privacyConfig.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.privacy",
+    };
+    privacyConfig.agentDiscovery!.endpoints = [
+      { kind: "ws", url: "wss://provider.example/privacy" },
+    ];
+    const privacyCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: privacyConfig,
+      agentDiscovery: privacyConfig.agentDiscovery!,
+      address: privacyConfig.walletAddress!,
+      discoveryNodeId: "node-privacy",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 31,
+    });
+
+    const weakConfig = makeConfig();
+    weakConfig.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.settlement.weak",
+      routingProfile: {
+        serviceKind: "settlement",
+        capabilityKind: "managed_execution",
+        privacyMode: "public",
+        receiptMode: "required",
+      },
+    };
+    weakConfig.agentDiscovery!.endpoints = [
+      { kind: "https", url: "https://provider.example/weak" },
+    ];
+    const weakCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: weakConfig,
+      agentDiscovery: weakConfig.agentDiscovery!,
+      address: weakConfig.walletAddress!,
+      discoveryNodeId: "node-weak",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 32,
+    });
+
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url !== "http://127.0.0.1:8545") {
+        throw new Error(`unexpected fetch url ${url}`);
+      }
+      const body = JSON.parse(String(init?.body)) as {
+        id: number;
+        method: string;
+        params: unknown[];
+      };
+      switch (body.method) {
+        case "tos_agentDiscoverySearch":
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: [
+                {
+                  nodeId: "node-weak",
+                  nodeRecord: "enr:weak",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 3,
+                  cardSequence: 32,
+                  trust: {
+                    registered: false,
+                    suspended: false,
+                    stake: "1",
+                    reputation: "0",
+                    ratingCount: "0",
+                    capabilityRegistered: false,
+                    hasOnchainCapability: false,
+                    localRankScore: 99,
+                  },
+                },
+                {
+                  nodeId: "node-privacy",
+                  nodeRecord: "enr:privacy",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 5,
+                  cardSequence: 31,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 90,
+                  },
+                },
+                {
+                  nodeId: "node-settlement",
+                  nodeRecord: "enr:settlement",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 3,
+                  cardSequence: 30,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 80,
+                  },
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        case "tos_agentDiscoveryGetCard": {
+          const nodeRecord = String(body.params[0]);
+          const card =
+            nodeRecord === "enr:settlement"
+              ? settlementCard
+              : nodeRecord === "enr:privacy"
+                ? privacyCard
+                : weakCard;
+          const nodeId =
+            nodeRecord === "enr:settlement"
+              ? "node-settlement"
+              : nodeRecord === "enr:privacy"
+                ? "node-privacy"
+                : "node-weak";
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                nodeId,
+                nodeRecord,
+                cardJson: JSON.stringify(card),
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        default:
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              error: {
+                code: -32601,
+                message: `unsupported method ${body.method}`,
+              },
+            }),
+            { status: 200 },
+          );
+      }
+    }) as typeof fetch;
+
+    const selectionPolicy = {
+      onchainCapabilityMode: "require_onchain" as const,
+      requiredConnectionModes: ["https"] as const,
+      packagePrefix: "tolang.openlib.settlement",
+      serviceKind: "settlement",
+      capabilityKind: "managed_execution",
+      privacyMode: "public",
+      receiptMode: "required",
+      minimumTrustScore: 75,
+    };
+
+    const provider = await resolveCapabilityProvider({
+      config,
+      capability: "sponsor.topup.testnet",
+      limit: 10,
+      selectionPolicy,
+    });
+    expect(provider?.search.nodeId).toBe("node-settlement");
+
+    const resolved = await resolveCapabilityProviderWithDiagnostics({
+      config,
+      capability: "sponsor.topup.testnet",
+      limit: 10,
+      selectionPolicy,
+    });
+    expect(resolved.provider?.search.nodeId).toBe("node-settlement");
+
+    const weak = resolved.diagnostics.find(
+      (item) => item.provider.search.nodeId === "node-weak",
+    );
+    expect(weak?.selected).toBe(false);
+    expect(weak?.trustFailures).toContain("provider not registered");
+    expect(weak?.trustFailures).toContain("capability missing on-chain");
+
+    const privacy = resolved.diagnostics.find(
+      (item) => item.provider.search.nodeId === "node-privacy",
+    );
+    expect(privacy?.selected).toBe(false);
+    expect(privacy?.selectionFailures).toContain("missing required connection mode: https");
+    expect(privacy?.selectionFailures).toContain("package prefix mismatch");
+
+    const settlement = resolved.diagnostics.find(
+      (item) => item.provider.search.nodeId === "node-settlement",
+    );
+    expect(settlement?.selected).toBe(true);
+    expect(settlement?.trustFailures).toEqual([]);
+    expect(settlement?.selectionFailures).toEqual([]);
+  });
+
+  it("surfaces provider-selection diagnostics when a high-level request cannot find a match", async () => {
+    const { requestTestnetFaucet } = await import("../agent-discovery/client.js");
+    const config = makeConfig();
+    const identity = makeIdentity();
+
+    const settlementConfig = makeConfig();
+    settlementConfig.agentDiscovery!.metadataHints = {
+      packageName: "tolang.openlib.settlement",
+      routingProfile: {
+        serviceKind: "settlement",
+        capabilityKind: "managed_execution",
+        privacyMode: "public",
+        receiptMode: "required",
+      },
+    };
+    const settlementCard = await buildSignedAgentDiscoveryCard({
+      identity,
+      config: settlementConfig,
+      agentDiscovery: settlementConfig.agentDiscovery!,
+      address: settlementConfig.walletAddress!,
+      discoveryNodeId: "node-settlement",
+      issuedAt: Math.floor(Date.now() / 1000),
+      cardSequence: 40,
+    });
+
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url !== "http://127.0.0.1:8545") {
+        throw new Error(`unexpected fetch url ${url}`);
+      }
+      const body = JSON.parse(String(init?.body)) as {
+        id: number;
+        method: string;
+        params: unknown[];
+      };
+      switch (body.method) {
+        case "tos_agentDiscoverySearch":
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: [
+                {
+                  nodeId: "node-settlement",
+                  nodeRecord: "enr:settlement",
+                  primaryIdentity: config.walletAddress,
+                  connectionModes: 3,
+                  cardSequence: 40,
+                  trust: {
+                    registered: true,
+                    suspended: false,
+                    stake: "10",
+                    reputation: "10",
+                    ratingCount: "1",
+                    capabilityRegistered: true,
+                    hasOnchainCapability: true,
+                    localRankScore: 80,
+                  },
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        case "tos_agentDiscoveryGetCard":
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                nodeId: "node-settlement",
+                nodeRecord: "enr:settlement",
+                cardJson: JSON.stringify(settlementCard),
+              },
+            }),
+            { status: 200 },
+          );
+        default:
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              error: {
+                code: -32601,
+                message: `unsupported method ${body.method}`,
+              },
+            }),
+            { status: 200 },
+          );
+      }
+    }) as typeof fetch;
+
+    await expect(
+      requestTestnetFaucet({
+        identity,
+        config,
+        address: config.walletAddress!,
+        requestedAmountTomi: 1n,
+        selectionPolicy: {
+          packagePrefix: "tolang.openlib.nonexistent",
+        },
+      }),
+    ).rejects.toThrow(/package prefix mismatch/);
   });
 });
