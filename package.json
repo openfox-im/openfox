@@ -91,7 +91,7 @@
     "ora": "^8.0.0",
     "simple-git": "^3.24.0",
     "siwe": "^2.3.0",
-    "@tosnetwork/tosdk": "^0.4.0",
+    "@tosnetwork/tosdk": "^0.5.1",
     "ulid": "^2.3.0",
     "ws": "^8.19.0",
     "yaml": "^2.4.0"

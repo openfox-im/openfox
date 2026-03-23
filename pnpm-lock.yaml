@@ -12,8 +12,8 @@ importers:
         specifier: ^2.3.0
         version: 2.3.0
       '@tosnetwork/tosdk':
-        specifier: ^0.4.0
-        version: 0.4.0(typescript@5.9.3)
+        specifier: ^0.5.1
+        version: 0.5.1(typescript@5.9.3)
       better-sqlite3:
         specifier: ^11.0.0
         version: 11.10.0
@@ -581,8 +581,8 @@ packages:
   '@stablelib/wipe@1.0.1':
     resolution: {integrity: sha512-WfqfX/eXGiAd3RJe4VU2snh/ZPwtSjLG4ynQ/vYzvghTh7dHFcI1wl+nrkWG6lGhukOxOsUHfv8dUXr58D0ayg==}
 
-  '@tosnetwork/tosdk@0.4.0':
-    resolution: {integrity: sha512-nYbiwwvl8FfkS+vGa5XIq76ydLbUBgVybSx4+tTCe/+bP3D5X9H33kBnPVtP0nNvrEesBfOO7gl1uKanR/LmwA==}
+  '@tosnetwork/tosdk@0.5.1':
+    resolution: {integrity: sha512-eyHyOGAe7LpNH+hrtixYUEA0b4nGVbwhjxKuaZ+8+kavLB630NEp9vfHA36r1mkh86FyAHmKp16ymWfTIe7RAw==}
     engines: {node: '>=20'}
 
   '@types/better-sqlite3@7.6.13':
@@ -1501,7 +1501,7 @@ snapshots:
 
   '@stablelib/wipe@1.0.1': {}
 
-  '@tosnetwork/tosdk@0.4.0(typescript@5.9.3)':
+  '@tosnetwork/tosdk@0.5.1(typescript@5.9.3)':
     dependencies:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
